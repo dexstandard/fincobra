@@ -273,7 +273,7 @@ describe('agent exec log routes', () => {
     const parsedAi = parseExecLog(aiLog);
     await insertReviewResult({
       portfolioId: agentId,
-      log: aiLog,
+      log: JSON.stringify(parsedAi.response),
       rebalance: true,
       shortReport: parsedAi.response?.shortReport,
       ...(parsedAi.error ? { error: parsedAi.error } : {}),
@@ -289,14 +289,16 @@ describe('agent exec log routes', () => {
     const body = res.json();
 
     expect(typeof body.items[0].log).toBe('string');
-    expect(body.items[0].log).toContain('result');
     expect(body.items[0].log).toContain('orders');
 
-    const parsedLog = parseExecLog(body.items[0].log);
-    expect(parsedLog.response).toMatchObject({
+    const parsedLog = JSON.parse(body.items[0].log);
+    expect(parsedLog).toMatchObject({
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
       shortReport: 's',
     });
+    expect(body.items[0].response.orders).toEqual([
+      { pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 },
+    ]);
 
     await app.close();
   });

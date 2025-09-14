@@ -29,6 +29,7 @@ export interface ExecLog {
     rebalance: boolean;
     newAllocation?: number;
     shortReport: string;
+    orders?: { pair: string; token: string; side: string; quantity: number }[];
   };
   error?: Record<string, unknown>;
   createdAt: number;
