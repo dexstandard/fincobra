@@ -34,7 +34,6 @@ import {
 } from '../repos/limit-orders.js';
 import {
   createRebalanceLimitOrder,
-  calcRebalanceOrder,
   MIN_LIMIT_ORDER_USD,
 } from '../services/rebalance.js';
 import { parseBinanceError } from '../services/binance.js';
@@ -46,19 +45,21 @@ const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
 
 
-async function getAgentForRequest(
+async function getWorkflowForRequest(
   req: FastifyRequest,
   reply: FastifyReply,
-): Promise<{ userId: string; id: string; log: FastifyBaseLogger; agent: any } | undefined> {
+): Promise<
+  { userId: string; id: string; log: FastifyBaseLogger; agent: any } | undefined
+> {
   const userId = requireUserId(req, reply);
   if (!userId) return;
   const params = parseParams(idParams, req.params, reply);
   if (!params) return;
   const { id } = params;
-  const log = req.log.child({ userId, agentId: id });
+  const log = req.log.child({ userId, workflowId: id });
   const agent = await getAgent(id);
   if (!agent || agent.status === AgentStatus.Retired) {
-    log.error('agent not found');
+    log.error('workflow not found');
     reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
     return;
   }
@@ -70,8 +71,97 @@ async function getAgentForRequest(
   return { userId, id, log, agent };
 }
 
+async function prepareManualRebalanceData(
+  log: FastifyBaseLogger,
+  agent: any,
+  userId: string,
+  workflowId: string,
+  logId: string,
+): Promise<
+  | {
+      token1: string;
+      token2: string;
+      positions: { sym: string; value_usdt: number }[];
+      newAllocation: number;
+      price1Data: { currentPrice: number };
+      price2Data: { currentPrice: number };
+      order: { diff: number; quantity: number; currentPrice: number };
+    }
+  | { code: number; body: { error: string } }
+> {
+  const existing = await getLimitOrdersByReviewResult(workflowId, logId);
+  if (existing.length) {
+    log.error({ execLogId: logId }, 'manual order exists');
+    return {
+      code: 400,
+      body: errorResponse('order already exists for log'),
+    };
+  }
+  const result = await getRebalanceInfo(workflowId, logId);
+  if (!result || !result.rebalance || result.newAllocation === null) {
+    log.error({ execLogId: logId }, 'no rebalance info');
+    return { code: 400, body: errorResponse('no rebalance info') };
+  }
+  const token1 = agent.tokens[0].token;
+  const token2 = agent.tokens[1].token;
+  const account = await binance.fetchAccount(userId);
+  if (!account) {
+    log.error('missing api keys');
+    return { code: 400, body: errorResponse('missing api keys') };
+  }
+  const bal1 = account.balances.find((b) => b.asset === token1);
+  const bal2 = account.balances.find((b) => b.asset === token2);
+  if (!bal1 || !bal2) {
+    log.error('missing balances');
+    return {
+      code: 400,
+      body: errorResponse('failed to fetch balances'),
+    };
+  }
+  const [price1Data, price2Data, pairPrice] = await Promise.all([
+    ['USDT', 'USDC'].includes(token1)
+      ? Promise.resolve({ currentPrice: 1 })
+      : binance.fetchPairData(token1, 'USDT'),
+    ['USDT', 'USDC'].includes(token2)
+      ? Promise.resolve({ currentPrice: 1 })
+      : binance.fetchPairData(token2, 'USDT'),
+    binance.fetchPairData(token1, token2),
+  ]);
+  const positions = [
+    {
+      sym: token1,
+      value_usdt:
+        (Number(bal1.free) + Number(bal1.locked)) * price1Data.currentPrice,
+    },
+    {
+      sym: token2,
+      value_usdt:
+        (Number(bal2.free) + Number(bal2.locked)) * price2Data.currentPrice,
+    },
+  ];
+  const total = positions[0].value_usdt + positions[1].value_usdt;
+  const target1 = (result.newAllocation / 100) * total;
+  const diff = target1 - positions[0].value_usdt;
+  if (!diff || Math.abs(diff) < MIN_LIMIT_ORDER_USD) {
+    log.error({ execLogId: logId }, 'order below minimum');
+    return {
+      code: 400,
+      body: errorResponse('order value below minimum'),
+    };
+  }
+  const quantity = Math.abs(diff) / pairPrice.currentPrice;
+  return {
+    token1,
+    token2,
+    positions,
+    newAllocation: result.newAllocation,
+    price1Data,
+    price2Data,
+    order: { diff, quantity, currentPrice: pairPrice.currentPrice },
+  };
+}
 
-export default async function agentRoutes(app: FastifyInstance) {
+export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
   app.get(
     '/portfolio-workflows/paginated',
     { config: { rateLimit: RATE_LIMITS.RELAXED } },
@@ -88,7 +178,7 @@ export default async function agentRoutes(app: FastifyInstance) {
       const ps = Math.max(parseInt(pageSize, 10), 1);
       const offset = (p - 1) * ps;
       const { rows, total } = await getAgentsPaginated(userId, status, ps, offset);
-      log.info('listed agents');
+      log.info('listed workflows');
       return {
         items: rows.map(toApi),
         total,
@@ -126,9 +216,9 @@ export default async function agentRoutes(app: FastifyInstance) {
         });
         if (status === AgentStatus.Active)
           reviewAgentPortfolio(req.log, row.id).catch((err) =>
-            log.error({ err, agentId: row.id }, 'initial review failed'),
+            log.error({ err, workflowId: row.id }, 'initial review failed'),
           );
-        log.info({ agentId: row.id }, 'created agent');
+        log.info({ workflowId: row.id }, 'created workflow');
         return toApi(row);
       }
     );
@@ -137,7 +227,7 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/exec-log',
     { config: { rateLimit: RATE_LIMITS.RELAXED } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
       const { page = '1', pageSize = '10', rebalanceOnly } = req.query as {
@@ -192,7 +282,7 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/exec-log/:logId/prompt',
     { config: { rateLimit: RATE_LIMITS.RELAXED } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
       const lp = parseParams(logIdParams, req.params, reply);
@@ -213,7 +303,7 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/exec-log/:logId/orders',
     { config: { rateLimit: RATE_LIMITS.RELAXED } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
       const lp = parseParams(logIdParams, req.params, reply);
@@ -243,11 +333,11 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/exec-log/:logId/rebalance',
     { config: { rateLimit: RATE_LIMITS.TIGHT } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, userId, log, agent } = ctx;
       if (!agent.manual_rebalance) {
-        log.error('agent not in manual mode');
+        log.error('workflow not in manual mode');
         return reply
           .code(400)
           .send(errorResponse('manual rebalance disabled'));
@@ -255,65 +345,20 @@ export default async function agentRoutes(app: FastifyInstance) {
       const lp = parseParams(logIdParams, req.params, reply);
       if (!lp) return;
       const { logId } = lp;
-      const existing = await getLimitOrdersByReviewResult(id, logId);
-      if (existing.length) {
-        log.error({ execLogId: logId }, 'manual order exists');
-        return reply
-          .code(400)
-          .send(errorResponse('order already exists for log'));
-      }
-      const result = await getRebalanceInfo(id, logId);
-      if (!result || !result.rebalance || result.newAllocation === null) {
-        log.error({ execLogId: logId }, 'no rebalance info');
-        return reply.code(400).send(errorResponse('no rebalance info'));
-      }
-      const token1 = agent.tokens[0].token;
-      const token2 = agent.tokens[1].token;
-      const account = await binance.fetchAccount(userId);
-      if (!account) {
-        log.error('missing api keys');
-        return reply.code(400).send(errorResponse('missing api keys'));
-      }
-      const bal1 = account.balances.find((b) => b.asset === token1);
-      const bal2 = account.balances.find((b) => b.asset === token2);
-      if (!bal1 || !bal2) {
-        log.error('missing balances');
-        return reply.code(400).send(errorResponse('failed to fetch balances'));
-      }
-      const [price1Data, price2Data] = await Promise.all([
-        ['USDT', 'USDC'].includes(token1)
-          ? Promise.resolve({ currentPrice: 1 })
-          : binance.fetchPairData(token1, 'USDT'),
-        ['USDT', 'USDC'].includes(token2)
-          ? Promise.resolve({ currentPrice: 1 })
-          : binance.fetchPairData(token2, 'USDT'),
-      ]);
-      const positions = [
-        {
-          sym: token1,
-          value_usdt:
-            (Number(bal1.free) + Number(bal1.locked)) * price1Data.currentPrice,
-        },
-        {
-          sym: token2,
-          value_usdt:
-            (Number(bal2.free) + Number(bal2.locked)) * price2Data.currentPrice,
-        },
-      ];
+      const prep = await prepareManualRebalanceData(log, agent, userId, id, logId);
+      if ('code' in prep) return reply.code(prep.code).send(prep.body);
+      const {
+        token1,
+        token2,
+        positions,
+        newAllocation,
+        price1Data,
+        price2Data,
+        order,
+      } = prep;
       const body = req.body as
         | { price?: number; quantity?: number; manuallyEdited?: boolean }
         | undefined;
-      const order = await calcRebalanceOrder({
-        tokens: [token1, token2],
-        positions,
-        newAllocation: result.newAllocation,
-      });
-      if (!order) {
-        log.error({ execLogId: logId }, 'order below minimum');
-        return reply
-          .code(400)
-          .send(errorResponse('order value below minimum'));
-      }
       const info = await binance.fetchPairInfo(token1, token2);
       const wantMoreToken1 = order.diff > 0;
       const side = info.baseAsset === token1
@@ -352,7 +397,7 @@ export default async function agentRoutes(app: FastifyInstance) {
           userId,
           tokens: [token1, token2],
           positions,
-          newAllocation: result.newAllocation,
+          newAllocation,
           reviewResultId: logId,
           log: log.child({ execLogId: logId }),
           price: finalPrice,
@@ -374,7 +419,7 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/exec-log/:logId/orders/:orderId/cancel',
     { config: { rateLimit: RATE_LIMITS.TIGHT } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, userId, log } = ctx;
       const lp = parseParams(orderIdParams, req.params, reply);
@@ -411,11 +456,11 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/exec-log/:logId/rebalance/preview',
     { config: { rateLimit: RATE_LIMITS.RELAXED } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, userId, log, agent } = ctx;
       if (!agent.manual_rebalance) {
-        log.error('agent not in manual mode');
+        log.error('workflow not in manual mode');
         return reply
           .code(400)
           .send(errorResponse('manual rebalance disabled'));
@@ -423,60 +468,9 @@ export default async function agentRoutes(app: FastifyInstance) {
       const lp = parseParams(logIdParams, req.params, reply);
       if (!lp) return;
       const { logId } = lp;
-      const existing = await getLimitOrdersByReviewResult(id, logId);
-      if (existing.length) {
-        log.error({ execLogId: logId }, 'manual order exists');
-        return reply
-          .code(400)
-          .send(errorResponse('order already exists for log'));
-      }
-      const result = await getRebalanceInfo(id, logId);
-      if (!result || !result.rebalance || result.newAllocation === null) {
-        log.error({ execLogId: logId }, 'no rebalance info');
-        return reply.code(400).send(errorResponse('no rebalance info'));
-      }
-      const token1 = agent.tokens[0].token;
-      const token2 = agent.tokens[1].token;
-      const account = await binance.fetchAccount(userId);
-      if (!account) {
-        log.error('missing api keys');
-        return reply.code(400).send(errorResponse('missing api keys'));
-      }
-      const bal1 = account.balances.find((b) => b.asset === token1);
-      const bal2 = account.balances.find((b) => b.asset === token2);
-      if (!bal1 || !bal2) {
-        log.error('missing balances');
-        return reply.code(400).send(errorResponse('failed to fetch balances'));
-      }
-      const [price1Data, price2Data] = await Promise.all([
-        ['USDT', 'USDC'].includes(token1)
-          ? Promise.resolve({ currentPrice: 1 })
-          : binance.fetchPairData(token1, 'USDT'),
-        ['USDT', 'USDC'].includes(token2)
-          ? Promise.resolve({ currentPrice: 1 })
-          : binance.fetchPairData(token2, 'USDT'),
-      ]);
-      const positions = [
-        {
-          sym: token1,
-          value_usdt:
-            (Number(bal1.free) + Number(bal1.locked)) * price1Data.currentPrice,
-        },
-        {
-          sym: token2,
-          value_usdt:
-            (Number(bal2.free) + Number(bal2.locked)) * price2Data.currentPrice,
-        },
-      ];
-      const order = await calcRebalanceOrder({
-        tokens: [token1, token2],
-        positions,
-        newAllocation: result.newAllocation,
-      });
-      if (!order) {
-        log.error({ execLogId: logId }, 'no rebalance needed');
-        return reply.code(400).send(errorResponse('no rebalance needed'));
-      }
+      const prep = await prepareManualRebalanceData(log, agent, userId, id, logId);
+      if ('code' in prep) return reply.code(prep.code).send(prep.body);
+      const { token1, token2, order } = prep;
       const info = await binance.fetchPairInfo(token1, token2);
       const wantMoreToken1 = order.diff > 0;
       const side = info.baseAsset === token1
@@ -492,10 +486,10 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id',
     { config: { rateLimit: RATE_LIMITS.RELAXED } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { log, agent: row } = ctx;
-      log.info('fetched agent');
+      log.info('fetched workflow');
       return toApi(row);
     }
   );
@@ -504,7 +498,7 @@ export default async function agentRoutes(app: FastifyInstance) {
       '/portfolio-workflows/:id',
       { config: { rateLimit: RATE_LIMITS.TIGHT } },
       async (req, reply) => {
-        const ctx = await getAgentForRequest(req, reply);
+        const ctx = await getWorkflowForRequest(req, reply);
         if (!ctx) return;
         const { userId, id, log } = ctx;
         const body = req.body as AgentInput;
@@ -529,7 +523,7 @@ export default async function agentRoutes(app: FastifyInstance) {
         const row = (await getAgent(id))!;
         if (status === AgentStatus.Active)
           await reviewAgentPortfolio(req.log, id);
-        log.info('updated agent');
+        log.info('updated workflow');
         return toApi(row);
       }
     );
@@ -538,7 +532,7 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id',
     { config: { rateLimit: RATE_LIMITS.TIGHT } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { userId, id, log, agent } = ctx;
       await repoDeleteAgent(id);
@@ -553,7 +547,7 @@ export default async function agentRoutes(app: FastifyInstance) {
         log.error({ err }, 'failed to cancel open orders');
       }
       await cancelOpenLimitOrdersByAgent(id);
-      log.info('deleted agent');
+      log.info('deleted workflow');
       return { ok: true };
     }
   );
@@ -562,7 +556,7 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/start',
     { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { userId, id, log, agent: existing } = ctx;
       if (!existing.model) {
@@ -586,7 +580,7 @@ export default async function agentRoutes(app: FastifyInstance) {
         log.error({ err }, 'initial review failed')
       );
       const row = (await getAgent(id))!;
-      log.info('started agent');
+      log.info('started workflow');
       return toApi(row);
     }
   );
@@ -595,12 +589,12 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/stop',
     { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
       await repoStopAgent(id);
       const row = (await getAgent(id))!;
-      log.info('stopped agent');
+      log.info('stopped workflow');
       return toApi(row);
     }
   );
@@ -609,14 +603,14 @@ export default async function agentRoutes(app: FastifyInstance) {
     '/portfolio-workflows/:id/review',
     { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
     async (req, reply) => {
-      const ctx = await getAgentForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log, agent } = ctx;
       if (agent.status !== AgentStatus.Active) {
-        log.error('agent not active');
+        log.error('workflow not active');
         return reply
           .code(400)
-          .send(errorResponse('agent not active'));
+          .send(errorResponse('workflow not active'));
       }
       try {
         await reviewAgentPortfolio(req.log, id);
