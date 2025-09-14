@@ -101,12 +101,12 @@ export async function collectPromptData(
   const routes: RebalancePrompt['routes'] = [];
 
   const balCash = account.balances.find((b) => b.asset === cash);
-  const cashQty = balCash ? Number(balCash.free) + Number(balCash.locked) : 0;
+  const cashQty = balCash ? Number(balCash.free) : 0;
   positions.push({ sym: cash, qty: cashQty, price_usdt: 1, value_usdt: cashQty });
 
   for (const t of row.tokens) {
     const bal = account.balances.find((b) => b.asset === t.token);
-    const qty = bal ? Number(bal.free) + Number(bal.locked) : undefined;
+    const qty = bal ? Number(bal.free) : undefined;
     if (qty === undefined) {
       log.error('failed to fetch token balances');
       return undefined;
