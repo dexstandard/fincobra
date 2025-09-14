@@ -1,8 +1,16 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
-import { db } from '../src/db/index.js';
+import { describe, it, expect, vi } from 'vitest';
+import { insertUser } from './repos/users.js';
+import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertReviewResult } from './repos/agent-review-result.js';
+import { mockLogger } from './helpers.js';
+import {
+  insertLimitOrder,
+  getLimitOrdersByReviewResult,
+} from '../src/repos/limit-orders.js';
+import { setAiKey } from '../src/repos/api-keys.js';
+import { reviewAgentPortfolio } from '../src/workflows/portfolio-review.js';
 
-const sampleIndicators = {
+const sampleIndicators = vi.hoisted(() => ({
   ret: { '1h': 0, '4h': 0, '24h': 0, '7d': 0, '30d': 0 },
   sma_dist: { '20': 0, '50': 0, '200': 0 },
   macd_hist: 0,
@@ -12,7 +20,7 @@ const sampleIndicators = {
   corr: { BTC_30d: 0 },
   regime: { BTC: 'range' },
   osc: { rsi_14: 0, stoch_k: 0, stoch_d: 0 },
-};
+}));
 
 vi.mock('../src/util/ai.js', () => ({
   callAi: vi.fn().mockResolvedValue('ok'),
@@ -24,7 +32,9 @@ vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
 }));
 
-const cancelOrder = vi.fn().mockResolvedValue(undefined);
+const { cancelOrder } = vi.hoisted(() => ({
+  cancelOrder: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../src/services/binance.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
@@ -54,37 +64,45 @@ vi.mock('../src/services/rebalance.js', () => ({
   createRebalanceLimitOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
-let reviewAgentPortfolio: (log: FastifyBaseLogger, agentId: string) => Promise<void>;
-
-beforeAll(async () => {
-  ({ reviewAgentPortfolio } = await import('../src/workflows/portfolio-review.js'));
-});
-
 describe('cleanup open orders', () => {
   it('cancels open orders before running agent', async () => {
-    await db.query('INSERT INTO users (id) VALUES ($1)', ['1']);
-    await db.query("INSERT INTO ai_api_keys (user_id, provider, api_key_enc) VALUES ($1, 'openai', $2)", ['1', 'enc']);
-    await db.query(
-      "INSERT INTO portfolio_workflow (id, user_id, model, status, name, risk, review_interval, agent_instructions, manual_rebalance) VALUES ($1, $2, 'gpt', 'active', 'A', 'low', '1h', 'inst', false)",
-      ['1', '1'],
-    );
-    await db.query(
-      "INSERT INTO portfolio_workflow_tokens (portfolio_workflow_id, token, min_allocation, position) VALUES ($1, 'BTC', 10, 1), ($1, 'ETH', 20, 2)",
-      ['1'],
-    );
-    const rr = await db.query(
-      "INSERT INTO agent_review_result (agent_id, log, rebalance, new_allocation, short_report) VALUES ($1, $2, true, 50, 's') RETURNING id",
-      ['1', 'log'],
-    );
-    await db.query(
-      "INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, 'open', $3, $4)",
-      ['1', JSON.stringify({ symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 }), rr.rows[0].id, '123'],
-    );
-    const log = { child: () => log, info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
-    await reviewAgentPortfolio(log, '1');
+    const userId = await insertUser('1');
+    await setAiKey(userId, 'enc');
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioId: agent.id,
+      log: 'log',
+      rebalance: true,
+      newAllocation: 50,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '123',
+    });
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent.id);
     expect(cancelOrder).toHaveBeenCalledTimes(1);
-    const { rows } = await db.query("SELECT status FROM limit_order WHERE order_id = '123'");
-    expect(rows[0].status).toBe('canceled');
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders[0].status).toBe('canceled');
   });
 
   it('cancels multiple open orders in parallel', async () => {
@@ -97,34 +115,53 @@ describe('cleanup open orders', () => {
         }),
     );
 
-    await db.query('INSERT INTO users (id) VALUES ($1)', ['1']);
-    await db.query("INSERT INTO ai_api_keys (user_id, provider, api_key_enc) VALUES ($1, 'openai', $2)", ['1', 'enc']);
-    await db.query(
-      "INSERT INTO portfolio_workflow (id, user_id, model, status, name, risk, review_interval, agent_instructions, manual_rebalance) VALUES ($1, $2, 'gpt', 'active', 'A', 'low', '1h', 'inst', false)",
-      ['1', '1'],
-    );
-    await db.query(
-      "INSERT INTO portfolio_workflow_tokens (portfolio_workflow_id, token, min_allocation, position) VALUES ($1, 'BTC', 10, 1), ($1, 'ETH', 20, 2)",
-      ['1'],
-    );
-    const rr = await db.query(
-      "INSERT INTO agent_review_result (agent_id, log, rebalance, new_allocation, short_report) VALUES ($1, $2, true, 50, 's') RETURNING id",
-      ['1', 'log'],
-    );
-    await db.query(
-      "INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, 'open', $3, $4), ($1, $2, 'open', $3, $5)",
-      ['1', JSON.stringify({ symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 }), rr.rows[0].id, '123', '456'],
-    );
+    const userId = await insertUser('1');
+    await setAiKey(userId, 'enc');
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioId: agent.id,
+      log: 'log',
+      rebalance: true,
+      newAllocation: 50,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '123',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '456',
+    });
 
-    const log = { child: () => log, info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
-    const runPromise = reviewAgentPortfolio(log, '1');
+    const log = mockLogger();
+    const runPromise = reviewAgentPortfolio(log, agent.id);
     await vi.waitUntil(() => cancelOrder.mock.calls.length === 2);
     resolves.forEach((r) => r());
     await runPromise;
-    const { rows } = await db.query(
-      "SELECT order_id, status FROM limit_order ORDER BY order_id",
-    );
-    expect(rows).toEqual([
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders.map((o) => ({ order_id: o.order_id, status: o.status }))).toEqual([
       { order_id: '123', status: 'canceled' },
       { order_id: '456', status: 'canceled' },
     ]);

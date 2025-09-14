@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { RebalancePrompt } from '../src/util/ai.js';
+import { callAi, developerInstructions, rebalanceResponseSchema, type RebalancePrompt } from '../src/util/ai.js';
 
 describe('callAi structured output', () => {
   it('includes json schema in request', async () => {
@@ -8,7 +8,6 @@ describe('callAi structured output', () => {
       .mockResolvedValue({ ok: true, text: async () => '' });
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
-    const { callAi, developerInstructions, rebalanceResponseSchema } = await import('../src/util/ai.js');
     const prompt: RebalancePrompt = {
       instructions: 'inst',
       policy: { floor: { USDT: 20 } },
@@ -77,7 +76,6 @@ describe('callAi structured output', () => {
       .mockResolvedValue({ ok: true, text: async () => '' });
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
-    const { callAi, developerInstructions, rebalanceResponseSchema } = await import('../src/util/ai.js');
     await callAi(
       'gpt-test',
       developerInstructions,

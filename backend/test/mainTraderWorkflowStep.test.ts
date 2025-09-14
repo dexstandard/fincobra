@@ -1,32 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
+import { mockLogger } from './helpers.js';
 
-const callAiMock = vi.fn(() =>
-  Promise.resolve(
-    JSON.stringify({
-      output: [
-        {
-          id: 'msg_1',
-          content: [
-            {
-              text: JSON.stringify({
-                result: {
-                  orders: [
-                    {
-                      pair: 'BTCUSDT',
-                      token: 'BTC',
-                      side: 'SELL',
-                      quantity: 1,
-                    },
-                  ],
-                  shortReport: 'ok',
-                },
-              }),
-            },
-          ],
-        },
-      ],
-    }),
+const callAiMock = vi.hoisted(() =>
+  vi.fn(() =>
+    Promise.resolve(
+      JSON.stringify({
+        output: [
+          {
+            id: 'msg_1',
+            content: [
+              {
+                text: JSON.stringify({
+                  result: {
+                    orders: [
+                      {
+                        pair: 'BTCUSDT',
+                        token: 'BTC',
+                        side: 'SELL',
+                        quantity: 1,
+                      },
+                    ],
+                    shortReport: 'ok',
+                  },
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+    ),
   ),
 );
 
@@ -36,10 +38,7 @@ vi.mock('../src/util/ai.js', () => ({
   rebalanceResponseSchema: {},
 }));
 
-function createLogger(): FastifyBaseLogger {
-  const log = { info: () => {}, error: () => {}, child: () => log } as unknown as FastifyBaseLogger;
-  return log;
-}
+import { run } from '../src/agents/main-trader.js';
 
 describe('main trader step', () => {
   beforeEach(() => {
@@ -47,7 +46,6 @@ describe('main trader step', () => {
   });
 
   it('returns decision from AI response', async () => {
-    const { run } = await import('../src/agents/main-trader.js');
     const prompt = {
       instructions: '',
       policy: { floor: {} },
@@ -58,7 +56,7 @@ describe('main trader step', () => {
     };
     const decision = await run(
       {
-        log: createLogger(),
+        log: mockLogger(),
         model: 'gpt',
         apiKey: 'key',
         portfolioId: 'agent1',
