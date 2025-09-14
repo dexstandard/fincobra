@@ -73,10 +73,9 @@ export default async function buildServer(
   await fetchOutputIp();
 
   for (const file of fs.readdirSync(routesDir)) {
-    if (file.endsWith('.js') || (file.endsWith('.ts') && !file.endsWith('.d.ts'))) {
-      const route = await import(pathToFileURL(path.join(routesDir, file)).href);
-      app.register(route.default, { prefix: '/api' });
-    }
+    if (!file.endsWith('.js')) continue;
+    const route = await import(pathToFileURL(path.join(routesDir, file)).href);
+    app.register(route.default, { prefix: '/api' });
   }
 
   app.addHook('preHandler', (req, _reply, done) => {
