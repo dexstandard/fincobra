@@ -417,7 +417,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.post(
     '/portfolio-workflows/:id/exec-log/:logId/orders/:orderId/cancel',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    { config: { rateLimit: RATE_LIMITS.RELAXED } },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
