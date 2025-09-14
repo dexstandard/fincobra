@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { mockLogger } from './helpers.js';
 import type { ActivePortfolioWorkflowRow } from '../src/repos/portfolio-workflow.js';
 import { collectPromptData } from '../src/agents/main-trader.js';
+import { fetchAccount } from '../src/services/binance.js';
 
 vi.mock('../src/services/binance.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
@@ -128,6 +129,37 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.positions).toHaveLength(3);
     expect(prompt?.cash).toBe('USDT');
     expect(prompt?.routes).toHaveLength(3);
+  });
+
+  it('excludes locked balances for current positions', async () => {
+    vi.mocked(fetchAccount).mockResolvedValueOnce({
+      balances: [
+        { asset: 'BTC', free: '1', locked: '2' },
+        { asset: 'USDT', free: '1000', locked: '500' },
+      ],
+    });
+
+    const row: ActivePortfolioWorkflowRow = {
+      id: '1',
+      user_id: 'u1',
+      model: 'm',
+      cash_token: 'USDT',
+      tokens: [{ token: 'BTC', min_allocation: 50 }],
+      risk: 'low',
+      review_interval: '1h',
+      agent_instructions: 'inst',
+      ai_api_key_enc: '',
+      manual_rebalance: false,
+      start_balance: null,
+      created_at: '2025-01-01T00:00:00.000Z',
+      portfolio_id: '1',
+    };
+
+    const prompt = await collectPromptData(row, mockLogger());
+    const btc = prompt?.portfolio.positions.find((p) => p.sym === 'BTC');
+    const usdt = prompt?.portfolio.positions.find((p) => p.sym === 'USDT');
+    expect(btc?.qty).toBe(1);
+    expect(usdt?.qty).toBe(1000);
   });
 });
 
