@@ -55,6 +55,11 @@ export interface MarketTimeseries {
   ret_24m: number;
 }
 
+export interface OrderBookSnapshot {
+  bid: [number, number];
+  ask: [number, number];
+}
+
 export interface RebalancePosition {
   sym: string;
   qty: number;
@@ -98,6 +103,7 @@ export interface RebalancePrompt {
     indicators?: Record<string, TokenMetrics>;
     market_timeseries?: Record<string, MarketTimeseries>;
     fearGreedIndex?: { value: number; classification: string };
+    orderBooks?: Record<string, OrderBookSnapshot>;
     openInterest?: number;
     fundingRate?: number;
   };

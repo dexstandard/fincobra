@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { fetchTokenIndicators, type TokenIndicators } from '../services/indicators.js';
 import { fetchOrderBook } from '../services/derivatives.js';
+import { fetchFearGreedIndex, type FearGreedIndex } from '../services/binance.js';
 import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
 import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
@@ -39,6 +40,8 @@ export function fetchTokenIndicatorsCached(
 export function getTechnicalOutlookCached(
   token: string,
   indicators: TokenIndicators,
+  orderBook: { bid: [number, number]; ask: [number, number] },
+  fearGreedIndex: FearGreedIndex | undefined,
   model: string,
   apiKey: string,
   log: FastifyBaseLogger,
@@ -50,7 +53,15 @@ export function getTechnicalOutlookCached(
     return cached.promise;
   }
   log.info({ token }, 'technical outlook cache miss');
-  const promise = getTechnicalOutlook(token, indicators, model, apiKey, log);
+  const promise = getTechnicalOutlook(
+    token,
+    indicators,
+    orderBook,
+    fearGreedIndex,
+    model,
+    apiKey,
+    log,
+  );
   cache.set(token, { promise, expires: now + CACHE_MS });
   promise.catch(() => cache.delete(token));
   return promise;
@@ -59,13 +70,14 @@ export function getTechnicalOutlookCached(
 export async function getTechnicalOutlook(
   token: string,
   indicators: TokenIndicators,
+  orderBook: { bid: [number, number]; ask: [number, number] },
+  fearGreedIndex: FearGreedIndex | undefined,
   model: string,
   apiKey: string,
   log: FastifyBaseLogger,
 ): Promise<AnalysisLog> {
-  const orderBook = await fetchOrderBook(`${token}USDT`);
-  const prompt = { indicators, orderBook };
-  const instructions = `You are a crypto technical analyst. Given the indicators and order book snapshot, write a short outlook for ${token} covering short, mid, and long-term timeframes. Include a bullishness score from 0-10 and key signals. - shortReport ≤255 chars.`;
+  const prompt = { indicators, orderBook, fearGreedIndex };
+  const instructions = `You are a crypto technical analyst. Given the indicators, order book snapshot, and fear & greed index, write a short outlook for ${token} covering short, mid, and long-term timeframes. Include a bullishness score from 0-10 and key signals. - shortReport ≤255 chars.`;
   const fallback: Analysis = { comment: 'Analysis unavailable', score: 0 };
   try {
     const res = await callAi(model, instructions, analysisSchema, prompt, apiKey);
@@ -98,13 +110,25 @@ export async function runTechnicalAnalyst(
 
   if (tokenReports.size === 0) return;
   if (!prompt.marketData.indicators) prompt.marketData.indicators = {};
+  if (!prompt.marketData.orderBooks) prompt.marketData.orderBooks = {};
+
+  const fearGreedIndex = await fetchFearGreedIndex().catch((err) => {
+    log.error({ err }, 'failed to fetch fear & greed index');
+    return undefined;
+  });
+  if (fearGreedIndex) prompt.marketData.fearGreedIndex = fearGreedIndex;
 
   await Promise.all(
     [...tokenReports.entries()].map(async ([token, reports]) => {
-      const indicators = await fetchTokenIndicatorsCached(token, log);
+      const [indicators, orderBook] = await Promise.all([
+        fetchTokenIndicatorsCached(token, log),
+        fetchOrderBook(`${token}USDT`),
+      ]);
       const { analysis, prompt: p, response } = await getTechnicalOutlookCached(
         token,
         indicators,
+        orderBook,
+        fearGreedIndex,
         model,
         apiKey,
         log,
@@ -112,6 +136,7 @@ export async function runTechnicalAnalyst(
       if (p && response)
         await insertReviewRawLog({ portfolioId, prompt: p, response });
       (prompt.marketData.indicators as Record<string, any>)[token] = indicators;
+      (prompt.marketData.orderBooks as Record<string, any>)[token] = orderBook;
       for (const r of reports) r.tech = analysis;
     }),
   );
