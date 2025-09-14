@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { RATE_LIMITS } from '../src/rate-limit.js';
 import buildServer from '../src/server.js';
+import { OAuth2Client } from 'google-auth-library';
 
 interface Endpoint {
   name: string;
@@ -20,7 +21,6 @@ const endpoints: Endpoint[] = [
     payload: { token: 'test-token' },
     limit: RATE_LIMITS.VERY_TIGHT.max,
     setup: async () => {
-      const { OAuth2Client } = await import('google-auth-library');
       vi.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
         getPayload: () => ({ sub: '1', email: 'user@example.com' }),
       } as any);

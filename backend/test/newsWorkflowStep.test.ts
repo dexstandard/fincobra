@@ -5,7 +5,7 @@ vi.mock('../src/util/tokens.js', () => ({
   isStablecoin: (sym: string) => sym === 'USDC',
 }));
 
-const insertReviewRawLogMock = vi.fn();
+const insertReviewRawLogMock = vi.hoisted(() => vi.fn());
 vi.mock('../src/repos/agent-review-raw-log.js', () => ({
   insertReviewRawLog: insertReviewRawLogMock,
 }));
@@ -19,16 +19,17 @@ vi.mock('../src/util/ai.js', () => ({
   extractJson: () => ({ comment: 'summary for BTC', score: 1 }),
 }));
 
+import { runNewsAnalyst } from '../src/agents/news-analyst.js';
+
 describe('news analyst step', () => {
   it('fetches news summaries', async () => {
-    const mod = await import('../src/agents/news-analyst.js');
     const prompt: any = {
       reports: [
         { token: 'BTC', news: null, tech: null },
         { token: 'USDC', news: null, tech: null },
       ],
     };
-    await mod.runNewsAnalyst(
+    await runNewsAnalyst(
       { log: mockLogger(), model: 'gpt', apiKey: 'key', portfolioId: 'agent1' },
       prompt,
     );

@@ -1,32 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockLogger } from './helpers.js';
 
-const callAiMock = vi.fn(() =>
-  Promise.resolve(
-    JSON.stringify({
-      output: [
-        {
-          id: 'msg_1',
-          content: [
-            {
-              text: JSON.stringify({
-                result: {
-                  orders: [
-                    {
-                      pair: 'BTCUSDT',
-                      token: 'BTC',
-                      side: 'SELL',
-                      quantity: 1,
-                    },
-                  ],
-                  shortReport: 'ok',
-                },
-              }),
-            },
-          ],
-        },
-      ],
-    }),
+const callAiMock = vi.hoisted(() =>
+  vi.fn(() =>
+    Promise.resolve(
+      JSON.stringify({
+        output: [
+          {
+            id: 'msg_1',
+            content: [
+              {
+                text: JSON.stringify({
+                  result: {
+                    orders: [
+                      {
+                        pair: 'BTCUSDT',
+                        token: 'BTC',
+                        side: 'SELL',
+                        quantity: 1,
+                      },
+                    ],
+                    shortReport: 'ok',
+                  },
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+    ),
   ),
 );
 
@@ -36,13 +38,14 @@ vi.mock('../src/util/ai.js', () => ({
   rebalanceResponseSchema: {},
 }));
 
+import { run } from '../src/agents/main-trader.js';
+
 describe('main trader step', () => {
   beforeEach(() => {
     callAiMock.mockClear();
   });
 
   it('returns decision from AI response', async () => {
-    const { run } = await import('../src/agents/main-trader.js');
     const prompt = {
       instructions: '',
       policy: { floor: {} },

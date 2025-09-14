@@ -110,3 +110,9 @@ export async function runTechnicalAnalyst(
     }),
   );
 }
+
+// Used only in tests to ensure cache isolation
+export function resetTechnicalAnalystCache(): void {
+  cache.clear();
+  indicatorCache.clear();
+}

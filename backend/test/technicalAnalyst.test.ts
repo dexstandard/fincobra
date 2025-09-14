@@ -1,13 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockLogger } from './helpers.js';
 
+const insertReviewRawLogMock = vi.hoisted(() => vi.fn());
+const fetchTokenIndicatorsMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    ret: {},
+    sma_dist: {},
+    macd_hist: 0,
+    vol: {},
+    range: {},
+    volume: {},
+    corr: {},
+    regime: {},
+    osc: {},
+  }),
+);
+const callAiMock = vi.hoisted(() => vi.fn().mockResolvedValue('res'));
+
 vi.mock('../src/services/derivatives.js', () => ({
   fetchOrderBook: vi.fn().mockResolvedValue({ bid: [0, 0], ask: [0, 0] }),
+}));
+vi.mock('../src/repos/agent-review-raw-log.js', () => ({
+  insertReviewRawLog: insertReviewRawLogMock,
+}));
+vi.mock('../src/services/indicators.js', () => ({
+  fetchTokenIndicators: fetchTokenIndicatorsMock,
+}));
+vi.mock('../src/util/ai.js', () => ({
+  callAi: callAiMock,
+  extractJson: () => ({ comment: 'outlook for BTC', score: 2 }),
 }));
 
 import {
   getTechnicalOutlook,
   getTechnicalOutlookCached,
+  runTechnicalAnalyst,
+  resetTechnicalAnalystCache,
 } from '../src/agents/technical-analyst.js';
 
 const responseJson = JSON.stringify({
@@ -90,42 +118,14 @@ describe('technical analyst', () => {
 });
 
 describe('technical analyst step', () => {
-  const insertReviewRawLogMock = vi.fn();
-  const fetchTokenIndicatorsMock = vi.fn().mockResolvedValue({
-    ret: {},
-    sma_dist: {},
-    macd_hist: 0,
-    vol: {},
-    range: {},
-    volume: {},
-    corr: {},
-    regime: {},
-    osc: {},
-  });
-  const callAiMock = vi.fn().mockResolvedValue('res');
-
   beforeEach(() => {
-    vi.resetModules();
+    resetTechnicalAnalystCache();
     insertReviewRawLogMock.mockClear();
     fetchTokenIndicatorsMock.mockClear();
     callAiMock.mockClear();
-    vi.doMock('../src/repos/agent-review-raw-log.js', () => ({
-      insertReviewRawLog: insertReviewRawLogMock,
-    }));
-    vi.doMock('../src/services/indicators.js', () => ({
-      fetchTokenIndicators: fetchTokenIndicatorsMock,
-    }));
-    vi.doMock('../src/util/ai.js', () => ({
-      callAi: callAiMock,
-      extractJson: () => ({ comment: 'outlook for BTC', score: 2 }),
-    }));
-    vi.doMock('../src/services/derivatives.js', () => ({
-      fetchOrderBook: vi.fn().mockResolvedValue({ bid: [0, 0], ask: [0, 0] }),
-    }));
   });
 
   it('fetches technical outlook per token', async () => {
-    const mod = await import('../src/agents/technical-analyst.js');
     const prompt: any = {
       marketData: {},
       reports: [
@@ -133,7 +133,7 @@ describe('technical analyst step', () => {
         { token: 'USDC', news: null, tech: null },
       ],
     };
-    await mod.runTechnicalAnalyst(
+    await runTechnicalAnalyst(
       {
         log: mockLogger(),
         model: 'gpt',
@@ -151,7 +151,6 @@ describe('technical analyst step', () => {
   });
 
   it('dedupes tokens and caches indicators', async () => {
-    const mod = await import('../src/agents/technical-analyst.js');
     const prompt: any = {
       marketData: {},
       reports: [
@@ -159,7 +158,7 @@ describe('technical analyst step', () => {
         { token: 'BTC', news: null, tech: null },
       ],
     };
-    await mod.runTechnicalAnalyst(
+    await runTechnicalAnalyst(
       {
         log: mockLogger(),
         model: 'gpt',

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { FastifyBaseLogger } from 'fastify';
 import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
@@ -6,6 +6,9 @@ import { insertAgent } from './repos/portfolio-workflow.js';
 import { setAiKey } from '../src/repos/api-keys.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/agent-review-raw-log.js';
 import { getRecentReviewResults } from '../src/repos/agent-review-result.js';
+import * as mainTrader from '../src/agents/main-trader.js';
+import * as newsAnalyst from '../src/agents/news-analyst.js';
+import * as techAnalyst from '../src/agents/technical-analyst.js';
 
 const { sampleIndicators, sampleTimeseries } = vi.hoisted(() => ({
   sampleIndicators: {
@@ -57,10 +60,26 @@ const flatTimeseries = {
 };
 
 const runMainTrader = vi.fn();
-vi.mock('../src/agents/main-trader.js', async (importOriginal) => {
-  const actual = await importOriginal();
-  return { ...actual, run: runMainTrader };
+vi.spyOn(mainTrader, 'run').mockImplementation(runMainTrader);
+
+const runNewsAnalyst = vi.fn((_params: any, prompt: any) => {
+  const report = prompt.reports?.find((r: any) => r.token === 'BTC');
+  if (report) report.news = { comment: 'news', score: 1 };
+  return Promise.resolve();
 });
+vi.spyOn(newsAnalyst, 'runNewsAnalyst').mockImplementation(runNewsAnalyst);
+
+const runTechnicalAnalyst = vi.fn((_params: any, prompt: any) => {
+  const report = prompt.reports?.find((r: any) => r.token === 'BTC');
+  if (report) report.tech = { comment: 'tech', score: 2 };
+  return Promise.resolve();
+});
+vi.spyOn(techAnalyst, 'runTechnicalAnalyst').mockImplementation(runTechnicalAnalyst);
+
+import {
+  reviewAgentPortfolio,
+  removeWorkflowFromSchedule,
+} from '../src/workflows/portfolio-review.js';
 
 vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
@@ -94,34 +113,14 @@ vi.mock('../src/services/indicators.js', () => ({
   fetchTokenIndicators: vi.fn().mockResolvedValue(sampleIndicators),
 }));
 
-const createDecisionLimitOrders = vi.fn().mockResolvedValue(undefined);
+const createDecisionLimitOrders = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
 vi.mock('../src/services/rebalance.js', () => ({
   createDecisionLimitOrders,
 }));
 
-const runNewsAnalyst = vi.fn((_params: any, prompt: any) => {
-  const report = prompt.reports?.find((r: any) => r.token === 'BTC');
-  if (report) report.news = { comment: 'news', score: 1 };
-  return Promise.resolve();
-});
-vi.mock('../src/agents/news-analyst.js', () => ({ runNewsAnalyst }));
 
-const runTechnicalAnalyst = vi.fn((_params: any, prompt: any) => {
-  const report = prompt.reports?.find((r: any) => r.token === 'BTC');
-  if (report) report.tech = { comment: 'tech', score: 2 };
-  return Promise.resolve();
-});
-vi.mock('../src/agents/technical-analyst.js', () => ({ runTechnicalAnalyst }));
-
-
-let reviewAgentPortfolio: (log: FastifyBaseLogger, agentId: string) => Promise<void>;
-let removeWorkflowFromSchedule: (id: string) => void;
-
-beforeAll(async () => {
-  ({ reviewAgentPortfolio, removeWorkflowFromSchedule } = await import(
-    '../src/workflows/portfolio-review.js'
-  ));
-});
 
 beforeEach(() => {
   vi.clearAllMocks();

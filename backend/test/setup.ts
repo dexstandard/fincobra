@@ -3,7 +3,7 @@ import { beforeAll, beforeEach, afterAll } from 'vitest';
 process.env.DATABASE_URL ??=
   'postgres://postgres:postgres@localhost:5432/promptswap_test';
 
-const { db, migrate } = await import('../src/db/index.js');
+import { db, migrate } from '../src/db/index.js';
 
 beforeAll(async () => {
   await migrate();

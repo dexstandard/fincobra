@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mockLogger } from './helpers.js';
 import type { ActivePortfolioWorkflowRow } from '../src/repos/portfolio-workflow.js';
+import { collectPromptData } from '../src/agents/main-trader.js';
 
 vi.mock('../src/services/binance.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
@@ -45,7 +46,6 @@ vi.mock('../src/repos/limit-orders.js', () => ({
 
 describe('collectPromptData', () => {
   it('includes start balance and PnL in prompt', async () => {
-    const { collectPromptData } = await import('../src/agents/main-trader.js');
     const row: ActivePortfolioWorkflowRow = {
       id: '1',
       user_id: 'u1',
@@ -70,7 +70,6 @@ describe('collectPromptData', () => {
   });
 
   it('includes recent limit orders in prompt', async () => {
-    const { collectPromptData } = await import('../src/agents/main-trader.js');
     const row: ActivePortfolioWorkflowRow = {
       id: '1',
       user_id: 'u1',
@@ -105,7 +104,6 @@ describe('collectPromptData', () => {
   });
 
   it('handles three-token portfolio', async () => {
-    const { collectPromptData } = await import('../src/agents/main-trader.js');
     const row: ActivePortfolioWorkflowRow = {
       id: '1',
       user_id: 'u1',

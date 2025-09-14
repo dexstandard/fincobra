@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
+import { describe, it, expect, vi } from 'vitest';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/agent-review-result.js';
@@ -9,8 +8,9 @@ import {
   getLimitOrdersByReviewResult,
 } from '../src/repos/limit-orders.js';
 import { setAiKey } from '../src/repos/api-keys.js';
+import { reviewAgentPortfolio } from '../src/workflows/portfolio-review.js';
 
-const sampleIndicators = {
+const sampleIndicators = vi.hoisted(() => ({
   ret: { '1h': 0, '4h': 0, '24h': 0, '7d': 0, '30d': 0 },
   sma_dist: { '20': 0, '50': 0, '200': 0 },
   macd_hist: 0,
@@ -20,7 +20,7 @@ const sampleIndicators = {
   corr: { BTC_30d: 0 },
   regime: { BTC: 'range' },
   osc: { rsi_14: 0, stoch_k: 0, stoch_d: 0 },
-};
+}));
 
 vi.mock('../src/util/ai.js', () => ({
   callAi: vi.fn().mockResolvedValue('ok'),
@@ -63,12 +63,6 @@ vi.mock('../src/services/indicators.js', () => ({
 vi.mock('../src/services/rebalance.js', () => ({
   createRebalanceLimitOrder: vi.fn().mockResolvedValue(undefined),
 }));
-
-let reviewAgentPortfolio: (log: FastifyBaseLogger, agentId: string) => Promise<void>;
-
-beforeAll(async () => {
-  ({ reviewAgentPortfolio } = await import('../src/workflows/portfolio-review.js'));
-});
 
 describe('cleanup open orders', () => {
   it('cancels open orders before running agent', async () => {
