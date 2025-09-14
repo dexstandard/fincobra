@@ -89,6 +89,9 @@ export async function collectPromptData(
         quantity: planned.quantity,
         status: o.status,
         datetime: o.created_at.toISOString(),
+        ...(o.cancellation_reason
+          ? { cancellationReason: o.cancellation_reason }
+          : {}),
       } as const;
     });
     const report: PreviousReport = {

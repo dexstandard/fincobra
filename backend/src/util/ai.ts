@@ -57,6 +57,7 @@ export interface PreviousReport {
     quantity: number;
     status: string;
     datetime: string;
+    cancellationReason?: string;
   }[];
   shortReport?: string;
   error?: unknown;

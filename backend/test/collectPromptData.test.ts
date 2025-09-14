@@ -37,7 +37,7 @@ vi.mock('../src/repos/limit-orders.js', () => ({
         status: 'filled',
         created_at: new Date(`2025-01-0${i}T00:00:00.000Z`),
         order_id: String(i),
-        cancellation_reason: null,
+        cancellation_reason: 'price limit',
       },
     ];
   }),
@@ -102,6 +102,7 @@ describe('collectPromptData', () => {
           quantity: 1,
           status: 'filled',
           datetime: '2025-01-01T00:00:00.000Z',
+          cancellationReason: 'price limit',
         },
       ],
       shortReport: 'p1',
