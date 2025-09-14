@@ -29,7 +29,7 @@ import {
   parseBinanceError,
 } from '../services/binance.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
-import { type RebalancePrompt } from '../util/ai.js';
+import { type RebalancePrompt } from '../agents/types.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
 

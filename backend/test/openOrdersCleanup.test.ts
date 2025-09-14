@@ -24,8 +24,6 @@ const sampleIndicators = vi.hoisted(() => ({
 
 vi.mock('../src/util/ai.js', () => ({
   callAi: vi.fn().mockResolvedValue('ok'),
-  developerInstructions: '',
-  rebalanceResponseSchema: {},
 }));
 
 vi.mock('../src/util/crypto.js', () => ({

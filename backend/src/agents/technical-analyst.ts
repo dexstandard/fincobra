@@ -2,9 +2,15 @@ import type { FastifyBaseLogger } from 'fastify';
 import { fetchTokenIndicators, type TokenIndicators } from '../services/indicators.js';
 import { fetchOrderBook } from '../services/derivatives.js';
 import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
-import { callAi, extractJson, type RebalancePrompt } from '../util/ai.js';
+import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
-import { type AnalysisLog, type Analysis, analysisSchema, type RunParams } from './types.js';
+import {
+  type RebalancePrompt,
+  type AnalysisLog,
+  type Analysis,
+  analysisSchema,
+  type RunParams,
+} from './types.js';
 
 const CACHE_MS = 3 * 60 * 1000;
 const cache = new Map<string, { promise: Promise<AnalysisLog>; expires: number }>();
