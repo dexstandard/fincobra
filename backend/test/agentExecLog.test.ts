@@ -5,6 +5,7 @@ import { insertReviewResult } from '../src/repos/agent-review-result.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewRawLog } from './repos/agent-review-raw-log.js';
+import { insertLimitOrder, getLimitOrder, getLimitOrdersByReviewResult } from './repos/limit-orders.js';
 import { db } from '../src/db/index.js';
 import * as binance from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
@@ -31,16 +32,13 @@ describe('agent exec log routes', () => {
       useEarn: true,
     });
     const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    await db.query(
-      'INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, $3, $4, $5)',
-      [
-        user1Id,
-        JSON.stringify({ side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' }),
-        'open',
-        reviewResultId,
-        '1',
-      ],
-    );
+    await insertLimitOrder({
+      userId: user1Id,
+      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      status: 'open',
+      reviewResultId,
+      orderId: '1',
+    });
     let res = await app.inject({
       method: 'GET',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders`,
@@ -90,16 +88,13 @@ describe('agent exec log routes', () => {
       useEarn: true,
     });
     const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    await db.query(
-      'INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, $3, $4, $5)',
-      [
-        user1Id,
-        JSON.stringify({ side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' }),
-        'open',
-        reviewResultId,
-        '2',
-      ],
-    );
+    await insertLimitOrder({
+      userId: user1Id,
+      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      status: 'open',
+      reviewResultId,
+      orderId: '2',
+    });
     const spy = vi.spyOn(binance, 'cancelOrder').mockResolvedValue({} as any);
     let res = await app.inject({
       method: 'POST',
@@ -111,16 +106,16 @@ describe('agent exec log routes', () => {
       symbol: 'BTCETH',
       orderId: 2,
     });
-    let row = await db.query('SELECT status FROM limit_order WHERE order_id=$1', ['2']);
-    expect(row.rows[0].status).toBe('canceled');
+    let row = await getLimitOrder('2');
+    expect(row?.status).toBe('canceled');
     res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/2/cancel`,
       cookies: authCookies(user2Id),
     });
     expect(res.statusCode).toBe(403);
-    row = await db.query('SELECT status FROM limit_order WHERE order_id=$1', ['2']);
-    expect(row.rows[0].status).toBe('canceled');
+    row = await getLimitOrder('2');
+    expect(row?.status).toBe('canceled');
     spy.mockRestore();
     await app.close();
   });
@@ -399,10 +394,7 @@ describe('agent exec log routes', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(201);
-    const { rows } = await db.query(
-      'SELECT * FROM limit_order WHERE review_result_id = $1',
-      [reviewResultId],
-    );
+    const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(1);
     expect(JSON.parse(rows[0].planned_json)).toMatchObject({ price: 99.9 });
     res = await app.inject({
@@ -467,10 +459,7 @@ describe('agent exec log routes', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);
-    const { rows } = await db.query(
-      'SELECT * FROM limit_order WHERE review_result_id = $1',
-      [reviewResultId],
-    );
+    const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(0);
     expect(spy).not.toHaveBeenCalled();
     vi.restoreAllMocks();
@@ -526,10 +515,7 @@ describe('agent exec log routes', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);
-    const { rows } = await db.query(
-      'SELECT * FROM limit_order WHERE review_result_id = $1',
-      [reviewResultId],
-    );
+    const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(0);
     expect(spy).not.toHaveBeenCalled();
     vi.restoreAllMocks();
@@ -652,10 +638,7 @@ describe('agent exec log routes', () => {
     expect(res.json()).toEqual({
       error: 'Invalid API-key, IP, or permissions for action.',
     });
-    const { rows } = await db.query(
-      'SELECT status, cancellation_reason FROM limit_order WHERE review_result_id = $1',
-      [reviewResultId],
-    );
+    const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe('canceled');
     expect(rows[0].cancellation_reason).toBe(

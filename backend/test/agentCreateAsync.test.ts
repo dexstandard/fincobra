@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { insertUser } from './repos/users.js';
-import { setAiKey, setBinanceKey } from '../src/repos/api-keys.js';
+import { insertUserWithKeys } from './repos/users.js';
 
 const reviewAgentPortfolioMock = vi.fn<
   (log: unknown, agentId: string) => Promise<unknown>
@@ -10,24 +9,14 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
 }));
 
 import buildServer from '../src/server.js';
-import { encrypt } from '../src/util/crypto.js';
 import { authCookies } from './helpers.js';
 import { db } from '../src/db/index.js';
 
-async function addUser(id: string) {
-  const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
-  const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
-  const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-  const userId = await insertUser(id, null);
-  await setAiKey(userId, ai);
-  await setBinanceKey(userId, bk, bs);
-  return userId;
-}
 
 describe('agent creation', () => {
   it('does not await initial review', async () => {
     const app = await buildServer();
-    const userId = await addUser('1');
+    const userId = await insertUserWithKeys('1');
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -89,7 +78,7 @@ describe('agent creation', () => {
 
   it('saves multiple tokens', async () => {
     const app = await buildServer();
-    const userId = await addUser('2');
+    const userId = await insertUserWithKeys('2');
 
     const payload = {
       model: 'm',

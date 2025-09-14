@@ -2,10 +2,17 @@ import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
 import { getActivePortfolioWorkflowById, getAgent } from '../src/repos/portfolio-workflow.js';
-import { db } from '../src/db/index.js';
-import { insertUser } from './repos/users.js';
-import { setAiKey, setBinanceKey, shareAiKey } from '../src/repos/api-keys.js';
-import { setAgentStatus } from './repos/portfolio-workflow.js';
+import { insertUser, insertUserWithKeys } from './repos/users.js';
+import { setAiKey, shareAiKey } from '../src/repos/api-keys.js';
+import {
+  setAgentStatus,
+  getPortfolioWorkflowStatus,
+} from './repos/portfolio-workflow.js';
+import { insertReviewResult } from './repos/agent-review-result.js';
+import {
+  insertLimitOrder,
+  getLimitOrdersByReviewResult,
+} from './repos/limit-orders.js';
 import { cancelOpenOrders } from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
 
@@ -21,25 +28,11 @@ vi.mock('../src/services/binance.js', async () => {
   return { ...actual, cancelOpenOrders: vi.fn().mockResolvedValue(undefined) };
 });
 
-async function addUser(id: string) {
-  const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
-  const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
-  const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-  const userId = await insertUser(id, null);
-  await setAiKey(userId, ai);
-  await setBinanceKey(userId, bk, bs);
-  return userId;
-}
-
-async function addUserNoKeys(id: string) {
-  const userId = await insertUser(id);
-  return userId;
-}
 
 describe('agent routes', () => {
   it('performs CRUD operations', async () => {
     const app = await buildServer();
-    const userId = await addUser('1');
+    const userId = await insertUserWithKeys('1');
 
     const fetchMock = vi.fn();
     fetchMock
@@ -162,14 +155,14 @@ describe('agent routes', () => {
     expect(res.json()).toMatchObject({ total: 1, page: 1, pageSize: 10 });
     expect(res.json().items).toHaveLength(1);
 
-    const execRes = await db.query(
-      "INSERT INTO agent_review_result (agent_id, log) VALUES ($1, '') RETURNING id",
-      [id],
-    );
-    await db.query(
-      'INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, $3, $4, $5)',
-      [userId, '{}', 'open', execRes.rows[0].id, '123'],
-    );
+    const execId = await insertReviewResult({ portfolioId: id, log: '' });
+    await insertLimitOrder({
+      userId,
+      planned: {},
+      status: 'open',
+      reviewResultId: execId,
+      orderId: '123',
+    });
 
     res = await app.inject({
       method: 'DELETE',
@@ -177,18 +170,13 @@ describe('agent routes', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
-    const deletedRow = await db.query('SELECT status FROM portfolio_workflow WHERE id = $1', [
-      id,
-    ]);
-    expect(deletedRow.rows[0].status).toBe('retired');
+    const deletedStatus = await getPortfolioWorkflowStatus(id);
+    expect(deletedStatus).toBe('retired');
     expect(await getAgent(id)).toBeUndefined();
     expect(await getActivePortfolioWorkflowById(id)).toBeUndefined();
     expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
-    const execRow = await db.query(
-      'SELECT status FROM limit_order WHERE review_result_id = $1',
-      [execRes.rows[0].id],
-    );
-    expect(execRow.rows[0].status).toBe('canceled');
+    const execOrders = await getLimitOrdersByReviewResult(execId);
+    expect(execOrders[0].status).toBe('canceled');
 
     res = await app.inject({
       method: 'GET',
@@ -218,7 +206,7 @@ describe('agent routes', () => {
 
   it('returns null api key ids when keys missing', async () => {
     const app = await buildServer();
-    const userId = await addUserNoKeys('nokeys');
+    const userId = await insertUser('nokeys');
     const payload = {
       model: 'm',
       name: 'NoKeys',
@@ -253,7 +241,7 @@ describe('agent routes', () => {
 
   it('starts and stops agent', async () => {
     const app = await buildServer();
-    const starterId = await addUser('starter');
+    const starterId = await insertUserWithKeys('starter');
     const draftPayload = {
       model: 'm',
       name: 'Draft',
@@ -327,7 +315,7 @@ describe('agent routes', () => {
 
   it('updates running agent and refreshes start balance', async () => {
     const app = await buildServer();
-    const updateUserId = await addUser('update-user');
+    const updateUserId = await insertUserWithKeys('update-user');
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -423,7 +411,7 @@ describe('agent routes', () => {
 
   it('handles drafts and api key validation', async () => {
     const app = await buildServer();
-    const u1Id = await addUserNoKeys('1');
+    const u1Id = await insertUser('1');
 
     const basePayload = {
       model: 'm',
@@ -455,7 +443,7 @@ describe('agent routes', () => {
     expect(res.statusCode).toBe(200);
     const draftId = res.json().id as string;
 
-    const u2Id = await addUser('2');
+    const u2Id = await insertUserWithKeys('2');
     const fetchMock = vi.fn();
     fetchMock
       .mockResolvedValueOnce({
@@ -510,7 +498,7 @@ describe('agent routes', () => {
 
   it('checks duplicates based on status and tokens', async () => {
     const app = await buildServer();
-    const dupId = await addUser('dupUser');
+    const dupId = await insertUserWithKeys('dupUser');
     const fetchMock = vi.fn();
     fetchMock
       .mockResolvedValueOnce({
@@ -602,7 +590,7 @@ describe('agent routes', () => {
 
   it('detects identical drafts', async () => {
     const app = await buildServer();
-    const draftUserId = await addUserNoKeys('draftUser');
+    const draftUserId = await insertUser('draftUser');
 
     const draftPayload = {
       model: 'm',
@@ -649,7 +637,7 @@ describe('agent routes', () => {
 
   it('rejects duplicate draft updates', async () => {
     const app = await buildServer();
-    const updId = await addUserNoKeys('updUser');
+    const updId = await insertUser('updUser');
 
     const base = {
       model: 'm1',
@@ -703,7 +691,7 @@ describe('agent routes', () => {
 
   it('fails to start agent without model', async () => {
     const app = await buildServer();
-    const nomodelId = await addUser('nomodel');
+    const nomodelId = await insertUserWithKeys('nomodel');
     const payload = {
       model: '',
       name: 'Draft',
@@ -736,7 +724,7 @@ describe('agent routes', () => {
 
   it('rejects allocations exceeding 95%', async () => {
     const app = await buildServer();
-    const allocId = await addUserNoKeys('allocUser');
+    const allocId = await insertUser('allocUser');
     const payload = {
       model: 'm',
       name: 'Bad',

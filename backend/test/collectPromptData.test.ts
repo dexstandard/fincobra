@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
+import { mockLogger } from './helpers.js';
 import type { ActivePortfolioWorkflowRow } from '../src/repos/portfolio-workflow.js';
 
 vi.mock('../src/services/binance.js', () => ({
@@ -43,10 +43,6 @@ vi.mock('../src/repos/limit-orders.js', () => ({
   }),
 }));
 
-function createLogger(): FastifyBaseLogger {
-  return { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
-}
-
 describe('collectPromptData', () => {
   it('includes start balance and PnL in prompt', async () => {
     const { collectPromptData } = await import('../src/agents/main-trader.js');
@@ -66,7 +62,7 @@ describe('collectPromptData', () => {
       portfolio_id: '1',
     };
 
-    const prompt = await collectPromptData(row, createLogger());
+    const prompt = await collectPromptData(row, mockLogger());
     expect(prompt?.portfolio.start_balance_usd).toBe(20000);
     expect(prompt?.portfolio.start_balance_ts).toBe('2025-01-01T00:00:00.000Z');
     expect(prompt?.portfolio.pnl_usd).toBeCloseTo(1000);
@@ -91,7 +87,7 @@ describe('collectPromptData', () => {
       portfolio_id: '1',
     };
 
-    const prompt = await collectPromptData(row, createLogger());
+    const prompt = await collectPromptData(row, mockLogger());
     expect(prompt?.previous_reports).toHaveLength(5);
     expect(prompt?.previous_reports?.[0]).toMatchObject({
       datetime: '2025-01-01T00:00:00.000Z',
@@ -129,7 +125,7 @@ describe('collectPromptData', () => {
       portfolio_id: '1',
     };
 
-    const prompt = await collectPromptData(row, createLogger());
+    const prompt = await collectPromptData(row, mockLogger());
     expect(prompt?.portfolio.positions).toHaveLength(3);
     expect(prompt?.cash).toBe('USDT');
     expect(prompt?.routes).toHaveLength(3);

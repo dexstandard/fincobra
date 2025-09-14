@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
+import { mockLogger } from './helpers.js';
 
 const callAiMock = vi.fn(() =>
   Promise.resolve(
@@ -36,11 +36,6 @@ vi.mock('../src/util/ai.js', () => ({
   rebalanceResponseSchema: {},
 }));
 
-function createLogger(): FastifyBaseLogger {
-  const log = { info: () => {}, error: () => {}, child: () => log } as unknown as FastifyBaseLogger;
-  return log;
-}
-
 describe('main trader step', () => {
   beforeEach(() => {
     callAiMock.mockClear();
@@ -58,7 +53,7 @@ describe('main trader step', () => {
     };
     const decision = await run(
       {
-        log: createLogger(),
+        log: mockLogger(),
         model: 'gpt',
         apiKey: 'key',
         portfolioId: 'agent1',

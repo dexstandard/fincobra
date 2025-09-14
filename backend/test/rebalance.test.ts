@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
-import { getLimitOrders } from './repos/limit-orders.js';
+import { getLimitOrders, clearLimitOrders } from './repos/limit-orders.js';
+import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/agent-review-result.js';
@@ -24,10 +24,10 @@ import { createLimitOrder, fetchPairData, fetchPairInfo } from '../src/services/
 
 describe('createRebalanceLimitOrder', () => {
   beforeEach(async () => {
-    await db.query('TRUNCATE limit_order RESTART IDENTITY CASCADE');
+    await clearLimitOrders();
   });
   it('saves execution with status and exec result', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('1');
     const agent = await insertAgent({
       userId,
@@ -80,7 +80,7 @@ describe('createRebalanceLimitOrder', () => {
   });
 
   it('handles pairs where second token is the base asset', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('5');
     const agent = await insertAgent({
       userId,
@@ -127,7 +127,7 @@ describe('createRebalanceLimitOrder', () => {
   });
 
   it('allows manual overrides and sets flag', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('2');
     const agent = await insertAgent({
       userId,
@@ -171,7 +171,7 @@ describe('createRebalanceLimitOrder', () => {
   });
 
   it('skips orders below minimum value', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('3');
     const agent = await insertAgent({
       userId,
@@ -208,7 +208,7 @@ describe('createRebalanceLimitOrder', () => {
   });
 
   it('skips orders below exchange min notional', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('7');
     const agent = await insertAgent({
       userId,
@@ -254,7 +254,7 @@ describe('createRebalanceLimitOrder', () => {
   });
 
   it('rounds price and quantity to exchange precision', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('4');
     const agent = await insertAgent({
       userId,
@@ -306,12 +306,12 @@ describe('createRebalanceLimitOrder', () => {
 
 describe('createDecisionLimitOrders', () => {
   beforeEach(async () => {
-    await db.query('TRUNCATE limit_order RESTART IDENTITY CASCADE');
+    await clearLimitOrders();
     vi.mocked(createLimitOrder).mockClear();
   });
 
   it('keeps side when quantity is given in quote asset', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('10');
     const agent = await insertAgent({
       userId,
@@ -372,7 +372,7 @@ describe('createDecisionLimitOrders', () => {
   });
 
   it('uses final price for quote-denominated quantity', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('13');
     const agent = await insertAgent({
       userId,
@@ -436,7 +436,7 @@ describe('createDecisionLimitOrders', () => {
   });
 
   it('applies price delta relative to base price', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('11');
     const agent = await insertAgent({
       userId,
@@ -500,7 +500,7 @@ describe('createDecisionLimitOrders', () => {
   });
 
   it('cancels order when price diverges beyond threshold', async () => {
-    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const log = mockLogger();
     const userId = await insertUser('12');
     const agent = await insertAgent({
       userId,

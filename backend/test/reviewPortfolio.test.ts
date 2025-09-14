@@ -1,24 +1,30 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import type { FastifyBaseLogger } from 'fastify';
-import { db } from '../src/db/index.js';
+import { mockLogger } from './helpers.js';
+import { insertUser } from './repos/users.js';
+import { insertAgent } from './repos/portfolio-workflow.js';
+import { setAiKey } from '../src/repos/api-keys.js';
+import { getPortfolioReviewRawPromptsResponses } from './repos/agent-review-raw-log.js';
+import { getRecentReviewResults } from '../src/repos/agent-review-result.js';
 
-const sampleIndicators = {
-  ret: { '1h': 0, '4h': 0, '24h': 0, '7d': 0, '30d': 0 },
-  sma_dist: { '20': 0, '50': 0, '200': 0 },
-  macd_hist: 0,
-  vol: { rv_7d: 0, rv_30d: 0, atr_pct: 0 },
-  range: { bb_bw: 0, donchian20: 0 },
-  volume: { z_1h: 0, z_24h: 0 },
-  corr: { BTC_30d: 0 },
-  regime: { BTC: 'range' },
-  osc: { rsi_14: 0, stoch_k: 0, stoch_d: 0 },
-};
-
-const sampleTimeseries = {
-  minute_60: [[1, 2, 3, 4]],
-  hourly_24h: [[5, 6, 7, 8]],
-  monthly_24m: [[9, 10, 11]],
-};
+const { sampleIndicators, sampleTimeseries } = vi.hoisted(() => ({
+  sampleIndicators: {
+    ret: { '1h': 0, '4h': 0, '24h': 0, '7d': 0, '30d': 0 },
+    sma_dist: { '20': 0, '50': 0, '200': 0 },
+    macd_hist: 0,
+    vol: { rv_7d: 0, rv_30d: 0, atr_pct: 0 },
+    range: { bb_bw: 0, donchian20: 0 },
+    volume: { z_1h: 0, z_24h: 0 },
+    corr: { BTC_30d: 0 },
+    regime: { BTC: 'range' },
+    osc: { rsi_14: 0, stoch_k: 0, stoch_d: 0 },
+  },
+  sampleTimeseries: {
+    minute_60: [[1, 2, 3, 4]],
+    hourly_24h: [[5, 6, 7, 8]],
+    monthly_24m: [[9, 10, 11]],
+  },
+}));
 
 const flatIndicators = {
   ret_1h: 0,
@@ -122,64 +128,49 @@ beforeEach(() => {
   ['1', '2', '3', '4', '5'].forEach((id) => removeWorkflowFromSchedule(id));
 });
 
-async function setupAgent(id: string, tokens: string[], manual = false) {
-  await db.query('INSERT INTO users (id) VALUES ($1)', [id]);
-  await db.query(
-    "INSERT INTO ai_api_keys (user_id, provider, api_key_enc) VALUES ($1, 'openai', $2)",
-    [id, 'enc'],
-  );
-  await db.query(
-    "INSERT INTO portfolio_workflow (id, user_id, model, status, name, cash_token, risk, review_interval, agent_instructions, manual_rebalance) VALUES ($1, $2, 'gpt', 'active', 'Agent', 'USDT', 'low', '1h', 'inst', $3)",
-    [id, id, manual],
-  );
-  const params: any[] = [id];
-  const values: string[] = [];
-  tokens.forEach((t, i) => {
-    values.push(`($1, $${i * 2 + 2}, $${i * 2 + 3}, ${i + 1})`);
-    params.push(t, (i + 1) * 10);
+async function setupAgent(tokens: string[], manual = false) {
+  const userId = await insertUser();
+  await setAiKey(userId, 'enc');
+  const agent = await insertAgent({
+    userId,
+    model: 'gpt',
+    status: 'active',
+    startBalance: null,
+    name: 'Agent',
+    cashToken: 'USDT',
+    tokens: tokens.map((t, i) => ({ token: t, minAllocation: (i + 1) * 10 })),
+    risk: 'low',
+    reviewInterval: '1h',
+    agentInstructions: 'inst',
+    manualRebalance: manual,
+    useEarn: false,
   });
-  if (values.length)
-    await db.query(
-      `INSERT INTO portfolio_workflow_tokens (portfolio_workflow_id, token, min_allocation, position) VALUES ${values.join(', ')}`,
-      params,
-    );
-}
-
-function createLogger(): FastifyBaseLogger {
-  const log = { info: () => {}, error: () => {}, child: () => log } as unknown as FastifyBaseLogger;
-  return log;
+  return { userId, agentId: agent.id };
 }
 
 describe('reviewPortfolio', () => {
   it('saves decision and logs', async () => {
-    await setupAgent('1', ['BTC']);
+    const { agentId } = await setupAgent(['BTC']);
     const decision = {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
       shortReport: 'ok',
     };
     runMainTrader.mockResolvedValue(decision);
-    const log = createLogger();
-    await reviewAgentPortfolio(log, '1');
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agentId);
     expect(runMainTrader).toHaveBeenCalledTimes(1);
     expect(runNewsAnalyst).toHaveBeenCalled();
     expect(runTechnicalAnalyst).toHaveBeenCalled();
-    const { rows } = await db.query(
-      'SELECT prompt, response FROM agent_review_raw_log WHERE agent_id=$1',
-      ['1'],
-    );
-    const row = rows[0] as { prompt: string; response: string };
-    expect(JSON.parse(row.response)).toEqual(decision);
-    const { rows: resRows } = await db.query(
-      'SELECT rebalance, short_report FROM agent_review_result WHERE agent_id=$1',
-      ['1'],
-    );
-    const res = resRows[0] as { rebalance: boolean; short_report: string };
+    const rows = await getPortfolioReviewRawPromptsResponses(agentId);
+    const row = rows[0];
+    expect(JSON.parse(row.response!)).toEqual(decision);
+    const [res] = await getRecentReviewResults(agentId, 1);
     expect(res.rebalance).toBe(true);
-    expect(res.short_report).toBe('ok');
+    expect(res.shortReport).toBe('ok');
   });
 
   it('calls createDecisionLimitOrders when orders requested', async () => {
-    await setupAgent('2', ['BTC', 'ETH']);
+    const { userId: user2, agentId: agent2 } = await setupAgent(['BTC', 'ETH']);
     const decision = {
       orders: [
         { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
@@ -188,58 +179,50 @@ describe('reviewPortfolio', () => {
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
-    const log = createLogger();
-    await reviewAgentPortfolio(log, '2');
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent2);
     expect(createDecisionLimitOrders).toHaveBeenCalledTimes(1);
     const args = createDecisionLimitOrders.mock.calls[0][0];
-    expect(args.userId).toBe('2');
+    expect(args.userId).toBe(user2);
     expect(args.orders).toHaveLength(2);
   });
 
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
-    await setupAgent('3', ['BTC'], true);
+    const { agentId: agent3 } = await setupAgent(['BTC'], true);
     const decision = {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
-    const log = createLogger();
-    await reviewAgentPortfolio(log, '3');
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent3);
     expect(createDecisionLimitOrders).not.toHaveBeenCalled();
   });
 
   it('records error when pair is invalid', async () => {
-    await setupAgent('4', ['BTC']);
+    const { agentId: agent4 } = await setupAgent(['BTC']);
     const decision = {
       orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', quantity: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
-    const log = createLogger();
-    await reviewAgentPortfolio(log, '4');
-    const { rows } = await db.query(
-      'SELECT error FROM agent_review_result WHERE agent_id=$1',
-      ['4'],
-    );
-    const row = rows[0] as { error: string | null };
-    expect(row.error).not.toBeNull();
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent4);
+    const [row] = await getRecentReviewResults(agent4, 1);
+    expect(row.error).toBeTruthy();
   });
 
   it('records error when quantity is invalid', async () => {
-    await setupAgent('5', ['BTC']);
+    const { agentId: agent5 } = await setupAgent(['BTC']);
     const decision = {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 0 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
-    const log = createLogger();
-    await reviewAgentPortfolio(log, '5');
-    const { rows } = await db.query(
-      'SELECT error FROM agent_review_result WHERE agent_id=$1',
-      ['5'],
-    );
-    const row = rows[0] as { error: string | null };
-    expect(row.error).not.toBeNull();
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent5);
+    const [row] = await getRecentReviewResults(agent5, 1);
+    expect(row.error).toBeTruthy();
   });
 });
 

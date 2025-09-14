@@ -19,10 +19,10 @@ import {
   setAiKey,
   setBinanceKey,
   shareAiKey,
+  hasAiKeyShare,
 } from '../src/repos/api-keys.js';
-import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertAgent, getPortfolioWorkflow } from './repos/portfolio-workflow.js';
 import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
-import { db } from '../src/db/index.js';
 import { encrypt } from '../src/util/crypto.js';
 import { removeWorkflowFromSchedule } from '../src/workflows/portfolio-review.js';
 import { cancelOpenOrders } from '../src/services/binance.js';
@@ -392,10 +392,8 @@ describe('key deletion effects on agents', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
-    const row = await db.query('SELECT status FROM portfolio_workflow WHERE id = $1', [
-      agent.id,
-    ]);
-    expect(row.rows[0].status).toBe('inactive');
+    const row = await getPortfolioWorkflow(agent.id);
+    expect(row?.status).toBe('inactive');
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
     expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
     await app.close();
@@ -432,11 +430,8 @@ describe('key deletion effects on agents', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
-    const row = await db.query('SELECT status, model FROM portfolio_workflow WHERE id = $1', [
-      agent.id,
-    ]);
-    expect(row.rows[0].status).toBe('draft');
-    expect(row.rows[0].model).toBeNull();
+    const row = await getPortfolioWorkflow(agent.id);
+    expect(row).toMatchObject({ status: 'draft', model: null });
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
     expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
     await app.close();
@@ -482,11 +477,8 @@ describe('key deletion effects on agents', () => {
       payload: { email: 'user@example.com' },
     });
     expect(res.statusCode).toBe(200);
-    const row = await db.query('SELECT status, model FROM portfolio_workflow WHERE id = $1', [
-      agent.id,
-    ]);
-    expect(row.rows[0].status).toBe('draft');
-    expect(row.rows[0].model).toBeNull();
+    const row = await getPortfolioWorkflow(agent.id);
+    expect(row).toMatchObject({ status: 'draft', model: null });
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
     expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
     await app.close();
@@ -531,20 +523,14 @@ describe('key deletion effects on agents', () => {
       cookies: authCookies(adminId),
     });
     expect(res.statusCode).toBe(200);
-    const row = await db.query('SELECT status, model FROM portfolio_workflow WHERE id = $1', [
-      agent.id,
-    ]);
-    expect(row.rows[0].status).toBe('draft');
-    expect(row.rows[0].model).toBeNull();
+    const row = await getPortfolioWorkflow(agent.id);
+    expect(row).toMatchObject({ status: 'draft', model: null });
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
     expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
     const keyRow = await getUserApiKeys(userId);
     expect(keyRow?.ai_api_key_enc).toBeNull();
-    const shareRow = await db.query(
-      'SELECT 1 FROM ai_api_key_shares WHERE owner_user_id = $1 AND target_user_id = $2',
-      [adminId, userId],
-    );
-    expect(shareRow.rowCount).toBe(0);
+    const shareExists = await hasAiKeyShare(adminId, userId);
+    expect(shareExists).toBe(false);
     await app.close();
   });
 
@@ -590,11 +576,8 @@ describe('key deletion effects on agents', () => {
       payload: { email: 'user@example.com' },
     });
     expect(res.statusCode).toBe(200);
-    const row = await db.query('SELECT status, model FROM portfolio_workflow WHERE id = $1', [
-      agent.id,
-    ]);
-    expect(row.rows[0].status).toBe('active');
-    expect(row.rows[0].model).toBe('gpt-5');
+    const row = await getPortfolioWorkflow(agent.id);
+    expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
     expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
     expect(cancelOpenOrders).not.toHaveBeenCalled();
     const keyRow = await getUserApiKeys(userId);
@@ -643,11 +626,8 @@ describe('key deletion effects on agents', () => {
       payload: { email: 'user@example.com' },
     });
     expect(res.statusCode).toBe(404);
-    const row = await db.query('SELECT status, model FROM portfolio_workflow WHERE id = $1', [
-      agent.id,
-    ]);
-    expect(row.rows[0].status).toBe('active');
-    expect(row.rows[0].model).toBe('gpt-5');
+    const row = await getPortfolioWorkflow(agent.id);
+    expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
     expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
     expect(cancelOpenOrders).not.toHaveBeenCalled();
     await app.close();
