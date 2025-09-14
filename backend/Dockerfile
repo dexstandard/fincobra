@@ -6,7 +6,7 @@ EXPOSE 3000
 COPY package*.json ./
 # Install production dependencies inside the image so native modules
 # are built against the Alpine base rather than the CI environment.
-RUN npm ci --omit=dev && rm -rf dist
+RUN npm ci --omit=dev
 COPY dist ./dist
 RUN mkdir -p /data && chown -R node:node /app /data
 USER node
