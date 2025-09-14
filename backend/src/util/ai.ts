@@ -1,4 +1,3 @@
-
 export async function callAi(
   model: string,
   developerInstructions: string,
