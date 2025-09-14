@@ -30,6 +30,7 @@ import * as binance from '../services/binance.js';
 import {
   cancelOpenLimitOrdersByAgent,
   getLimitOrdersByReviewResult,
+  getOpenLimitOrdersForAgent,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
 import {
@@ -534,17 +535,25 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { userId, id, log, agent } = ctx;
+      const { userId, id, log } = ctx;
       await repoDeleteAgent(id);
       removeWorkflowFromSchedule(id);
-      const token1 = agent.tokens[0].token;
-      const token2 = agent.tokens[1].token;
-      try {
-        await binance.cancelOpenOrders(userId, {
-          symbol: `${token1}${token2}`,
-        });
-      } catch (err) {
-        log.error({ err }, 'failed to cancel open orders');
+      const openOrders = await getOpenLimitOrdersForAgent(id);
+      const symbols = new Set<string>();
+      for (const o of openOrders) {
+        try {
+          const planned = JSON.parse(o.planned_json);
+          if (typeof planned.symbol === 'string') symbols.add(planned.symbol);
+        } catch (err) {
+          log.error({ err, orderId: o.order_id }, 'failed to parse planned order');
+        }
+      }
+      for (const symbol of symbols) {
+        try {
+          await binance.cancelOpenOrders(userId, { symbol });
+        } catch (err) {
+          log.error({ err, symbol }, 'failed to cancel open orders');
+        }
       }
       await cancelOpenLimitOrdersByAgent(id);
       log.info('deleted workflow');

@@ -158,7 +158,7 @@ describe('agent routes', () => {
     const execId = await insertReviewResult({ portfolioId: id, log: '' });
     await insertLimitOrder({
       userId,
-      planned: {},
+      planned: { symbol: 'BTCETH' },
       status: 'open',
       reviewResultId: execId,
       orderId: '123',
