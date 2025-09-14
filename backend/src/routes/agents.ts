@@ -372,7 +372,7 @@ export default async function agentRoutes(app: FastifyInstance) {
 
   app.post(
     '/portfolio-workflows/:id/exec-log/:logId/orders/:orderId/cancel',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    { config: { rateLimit: RATE_LIMITS.RELAXED } },
     async (req, reply) => {
       const ctx = await getAgentForRequest(req, reply);
       if (!ctx) return;
