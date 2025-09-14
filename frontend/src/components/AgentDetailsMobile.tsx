@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function AgentDetailsMobile({ agent }: Props) {
+  const tokens = [agent.cashToken, ...agent.tokens.map((t) => t.token)];
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
@@ -20,18 +21,15 @@ export default function AgentDetailsMobile({ agent }: Props) {
         <FormattedDate date={agent.createdAt} />
       </p>
       <p className="flex items-center gap-1 mt-2">
-        {agent.tokens.map((t, i) => (
-          <span key={i} className="flex items-center gap-1">
+        {tokens.map((tok, i) => (
+          <span key={tok} className="flex items-center gap-1">
             {i > 0 && <span>/</span>}
-            <TokenDisplay token={t.token} />
+            <TokenDisplay token={tok} />
           </span>
         ))}
       </p>
-      <DerivativesSummary symbol={agent.tokens.map((t) => t.token).join('').toUpperCase()} />
-      <AgentPnlMobile
-        tokens={agent.tokens.map((t) => t.token)}
-        startBalanceUsd={agent.startBalanceUsd}
-      />
+      <DerivativesSummary symbol={`${agent.tokens[0]?.token.toUpperCase() ?? ''}${agent.cashToken.toUpperCase()}`} />
+      <AgentPnlMobile tokens={tokens} startBalanceUsd={agent.startBalanceUsd} />
     </div>
   );
 }

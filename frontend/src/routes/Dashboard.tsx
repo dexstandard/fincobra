@@ -23,6 +23,7 @@ interface Agent {
   userId: string;
   model: string;
   status: 'active' | 'inactive' | 'draft';
+  cashToken: string;
   tokens?: { token: string }[];
   startBalanceUsd?: number | null;
   reviewInterval: string;
@@ -36,9 +37,11 @@ function AgentRow({
   onDelete: (id: string) => void;
 }) {
   const t = useTranslation();
-  const { balance, isLoading } = useAgentBalanceUsd(
-    agent.tokens ? agent.tokens.map((t) => t.token) : [],
-  );
+  const tokenList = [
+    agent.cashToken,
+    ...(agent.tokens ? agent.tokens.map((t) => t.token) : []),
+  ];
+  const { balance, isLoading } = useAgentBalanceUsd(tokenList);
   const balanceText =
     balance === null ? '-' : isLoading ? t('loading') : `$${balance.toFixed(2)}`;
   const pnl =
@@ -86,12 +89,12 @@ function AgentRow({
   return (
     <tr key={agent.id}>
       <td>
-        {agent.tokens && agent.tokens.length ? (
+        {tokenList.length ? (
           <span className="inline-flex items-center gap-1">
-            {agent.tokens.map((t, i) => (
-              <span key={t.token} className="flex items-center gap-1">
+            {tokenList.map((tok, i) => (
+              <span key={tok} className="flex items-center gap-1">
                 {i > 0 && <span>/</span>}
-                <TokenDisplay token={t.token} />
+                <TokenDisplay token={tok} />
               </span>
             ))}
           </span>
@@ -143,9 +146,11 @@ function AgentBlock({
   onDelete: (id: string) => void;
 }) {
   const t = useTranslation();
-  const { balance, isLoading } = useAgentBalanceUsd(
-    agent.tokens ? agent.tokens.map((t) => t.token) : [],
-  );
+  const tokenList = [
+    agent.cashToken,
+    ...(agent.tokens ? agent.tokens.map((t) => t.token) : []),
+  ];
+  const { balance, isLoading } = useAgentBalanceUsd(tokenList);
   const balanceText =
     balance === null ? '-' : isLoading ? t('loading') : `$${balance.toFixed(2)}`;
   const pnl =
@@ -193,12 +198,12 @@ function AgentBlock({
   return (
     <div className="border rounded p-3 text-sm">
       <div className="mb-2 flex items-center gap-1 font-medium">
-        {agent.tokens && agent.tokens.length ? (
+        {tokenList.length ? (
           <span className="inline-flex items-center gap-1">
-            {agent.tokens.map((t, i) => (
-              <span key={t.token} className="flex items-center gap-1">
+            {tokenList.map((tok, i) => (
+              <span key={tok} className="flex items-center gap-1">
                 {i > 0 && <span>/</span>}
-                <TokenDisplay token={t.token} />
+                <TokenDisplay token={tok} />
               </span>
             ))}
           </span>

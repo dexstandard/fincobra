@@ -16,6 +16,7 @@ export default function AgentDetailsDesktop({ agent }: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
   const t = useTranslation();
 
+  const tokens = [agent.cashToken, ...agent.tokens.map((t) => t.token)];
   return (
     <div>
       <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
@@ -29,14 +30,14 @@ export default function AgentDetailsDesktop({ agent }: Props) {
       </p>
       <p className="flex items-center gap-1 mt-2">
         <strong>{t('tokens')}:</strong>
-        {agent.tokens.map((t, i) => (
-          <span key={i} className="flex items-center gap-1">
+        {tokens.map((tok, i) => (
+          <span key={tok} className="flex items-center gap-1">
             {i > 0 && <span>/</span>}
-            <TokenDisplay token={t.token} />
+            <TokenDisplay token={tok} />
           </span>
         ))}
       </p>
-      <DerivativesSummary symbol={agent.tokens.map((t) => t.token).join('').toUpperCase()} />
+      <DerivativesSummary symbol={`${agent.tokens[0]?.token.toUpperCase() ?? ''}${agent.cashToken.toUpperCase()}`} />
       <div className="mt-2">
         <div className="flex items-center gap-1">
           <h2 className="text-l font-bold">{t('trading_instructions')}</h2>
@@ -58,10 +59,7 @@ export default function AgentDetailsDesktop({ agent }: Props) {
           </pre>
         )}
       </div>
-      <AgentPnl
-        tokens={agent.tokens.map((t) => t.token)}
-        startBalanceUsd={agent.startBalanceUsd}
-      />
+      <AgentPnl tokens={tokens} startBalanceUsd={agent.startBalanceUsd} />
     </div>
   );
 }
