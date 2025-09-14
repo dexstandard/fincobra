@@ -18,12 +18,20 @@ describe('callAi structured output', () => {
           { sym: 'USDT', qty: 1, price_usdt: 1, value_usdt: 1 },
         ],
       },
-      marketData: { currentPrice: 1, minNotional: 10 },
-      previous_responses: [
-        { shortReport: 'p1' },
+      marketData: {},
+      reviewInterval: '1h',
+      previous_reports: [
+        { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
         {
+          datetime: '2025-01-02T00:00:00.000Z',
           orders: [
-            { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
+            {
+              symbol: 'BTCUSDT',
+              side: 'BUY',
+              quantity: 1,
+              status: 'filled',
+              datetime: '2025-01-02T00:00:00.000Z',
+            },
           ],
           shortReport: 'p2',
         },
@@ -38,10 +46,19 @@ describe('callAi structured output', () => {
     expect(body.instructions).toMatch(/On error, return \{error:"message"\}/i);
     expect(typeof body.input).toBe('string');
     const parsed = JSON.parse(body.input);
-    expect(parsed.previous_responses).toEqual([
-      { shortReport: 'p1' },
+    expect(parsed.previous_reports).toEqual([
+      { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
       {
-        orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 }],
+        datetime: '2025-01-02T00:00:00.000Z',
+        orders: [
+          {
+            symbol: 'BTCUSDT',
+            side: 'BUY',
+            quantity: 1,
+            status: 'filled',
+            datetime: '2025-01-02T00:00:00.000Z',
+          },
+        ],
         shortReport: 'p2',
       },
     ]);

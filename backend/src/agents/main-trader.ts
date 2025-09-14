@@ -4,24 +4,16 @@ import {
   developerInstructions,
   rebalanceResponseSchema,
   type RebalancePosition,
-  type PreviousResponse,
+  type PreviousReport,
   type RebalancePrompt,
   extractJson,
 } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import { fetchAccount, fetchPairData } from '../services/binance.js';
 import { getRecentReviewResults } from '../repos/agent-review-result.js';
-import { getRecentLimitOrders } from '../repos/limit-orders.js';
+import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import type { ActivePortfolioWorkflowRow } from '../repos/portfolio-workflow.js';
 import type { RunParams } from './types.js';
-
-function extractPreviousResponse(r: any): PreviousResponse | undefined {
-  const res: PreviousResponse = {};
-  if (Array.isArray(r.orders)) res.orders = r.orders;
-  if (typeof r.shortReport === 'string') res.shortReport = r.shortReport;
-  if (r.error !== undefined && r.error !== null) res.error = r.error;
-  return Object.keys(res).length ? res : undefined;
-}
 
 export async function collectPromptData(
   row: ActivePortfolioWorkflowRow,
@@ -72,26 +64,32 @@ export async function collectPromptData(
     portfolio.pnl_usd = totalValue - row.start_balance;
   }
 
-  const [prevRows, prevOrdersRows] = await Promise.all([
-    getRecentReviewResults(row.id, 5),
-    getRecentLimitOrders(row.id, 5),
-  ]);
-  const previousResponses = prevRows
-    .map(extractPreviousResponse)
-    .filter(Boolean) as PreviousResponse[];
-  const prevOrders = prevOrdersRows.map((o) => {
-    const planned = JSON.parse(o.planned_json);
-    return {
-      symbol: planned.symbol,
-      side: planned.side,
-      quantity: planned.quantity,
-      datetime: o.created_at.toISOString(),
-      status: o.status,
-    } as const;
-  });
+  const prevRows = await getRecentReviewResults(row.id, 5);
+  const previousReports: PreviousReport[] = [];
+  for (const r of prevRows) {
+    const ordersRows = await getLimitOrdersByReviewResult(row.id, r.id);
+    const orders = ordersRows.map((o) => {
+      const planned = JSON.parse(o.planned_json);
+      return {
+        symbol: planned.symbol,
+        side: planned.side,
+        quantity: planned.quantity,
+        status: o.status,
+        datetime: o.created_at.toISOString(),
+      } as const;
+    });
+    const report: PreviousReport = {
+      datetime: r.created_at.toISOString(),
+      ...(r.shortReport !== undefined ? { shortReport: r.shortReport } : {}),
+      ...(r.error !== undefined ? { error: r.error } : {}),
+      ...(orders.length ? { orders } : {}),
+    };
+    previousReports.push(report);
+  }
 
   const prompt: RebalancePrompt = {
     instructions: row.agent_instructions,
+    reviewInterval: row.review_interval,
     policy: { floor },
     cash,
     portfolio,
@@ -100,11 +98,8 @@ export async function collectPromptData(
       .filter((t) => !isStablecoin(t))
       .map((token) => ({ token, news: null, tech: null })),
   };
-  if (previousResponses.length) {
-    prompt.previous_responses = previousResponses;
-  }
-  if (prevOrders.length) {
-    prompt.prev_orders = prevOrders;
+  if (previousReports.length) {
+    prompt.previous_reports = previousReports;
   }
   return prompt;
 }
@@ -114,6 +109,10 @@ export interface MainTraderOrder {
   token: string;
   side: string;
   quantity: number;
+  delta: number | null;
+  limitPrice: number | null;
+  basePrice: number | null;
+  maxPriceDivergence: number | null;
 }
 
 export interface MainTraderDecision {

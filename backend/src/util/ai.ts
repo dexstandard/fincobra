@@ -1,5 +1,4 @@
 import type { Analysis } from '../agents/types.js';
-import {MainTraderDecision} from "../agents/main-trader.js";
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
@@ -7,7 +6,8 @@ export const developerInstructions = [
   '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
   '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
   '- Verify limit orders meet minNotional to avoid cancellations, especially for small amounts.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number},...],shortReport}.',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,delta:number|null,limitPrice:number|null,basePrice:number|null,maxPriceDivergence:number|null},...],shortReport}.',
+  '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
   '- shortReport ≤255 chars.',
   '- On error, return {error:"message"}.',
 ].join('\n');
@@ -46,14 +46,22 @@ export interface RebalancePosition {
   value_usdt: number;
 }
 
-export interface PreviousResponse {
-  orders?: { pair: string; token: string; side: string; quantity: number }[];
+export interface PreviousReport {
+  datetime: string;
+  orders?: {
+    symbol: string;
+    side: string;
+    quantity: number;
+    status: string;
+    datetime: string;
+  }[];
   shortReport?: string;
   error?: unknown;
 }
 
 export interface RebalancePrompt {
   instructions: string;
+  reviewInterval: string;
   policy: { floor: Record<string, number> };
   cash: string;
   portfolio: {
@@ -63,29 +71,14 @@ export interface RebalancePrompt {
     start_balance_ts?: string;
     pnl_usd?: number;
   };
-  /**
-   * Summary of recent limit orders placed by the agent. Only essential
-   * attributes are included to minimize token usage in the prompt.
-   */
-  prev_orders?: {
-    symbol: string;
-    side: string;
-    quantity: number;
-    datetime: string;
-    status: string;
-  }[];
   marketData: {
     indicators?: Record<string, TokenMetrics>;
     market_timeseries?: Record<string, MarketTimeseries>;
     fearGreedIndex?: { value: number; classification: string };
     openInterest?: number;
     fundingRate?: number;
-    /**
-     * News analyst report for each token.
-     */
-    newsReports?: Record<string, Analysis>;
   };
-  previous_responses?: PreviousResponse[];
+  previous_reports?: PreviousReport[];
   reports?: {
     token: string;
     news: Analysis | null;
@@ -110,8 +103,21 @@ export const rebalanceResponseSchema = {
                     token: { type: 'string' },
                     side: { type: 'string', enum: ['BUY', 'SELL'] },
                     quantity: { type: 'number' },
+                    delta: { type: ['number', 'null'] },
+                    limitPrice: { type: ['number', 'null'] },
+                    basePrice: { type: ['number', 'null'] },
+                    maxPriceDivergence: { type: ['number', 'null'] },
                   },
-                  required: ['pair', 'token', 'side', 'quantity'],
+                  required: [
+                    'pair',
+                    'token',
+                    'side',
+                    'quantity',
+                    'delta',
+                    'limitPrice',
+                    'basePrice',
+                    'maxPriceDivergence',
+                  ],
                   additionalProperties: false,
                 },
               },

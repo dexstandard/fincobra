@@ -340,7 +340,144 @@ describe('createDecisionLimitOrders', () => {
     });
     await createDecisionLimitOrders({
       userId,
-      orders: [{ pair: 'BTCUSDT', token: 'USDT', side: 'BUY', quantity: 100 }],
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'USDT',
+          side: 'BUY',
+          quantity: 100,
+          delta: null,
+          limitPrice: null,
+          basePrice: null,
+          maxPriceDivergence: null,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const row = (await getLimitOrders())[0];
+    expect(JSON.parse(row.planned_json)).toMatchObject({
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 1.001001,
+      price: 99.9,
+      manuallyEdited: false,
+    });
+    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 1.001001,
+      price: 99.9,
+    });
+  });
+
+  it('uses final price for quote-denominated quantity', async () => {
+    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const userId = await insertUser('13');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 8,
+      minNotional: 0,
+    });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'USDT',
+          side: 'BUY',
+          quantity: 100,
+          delta: -0.05,
+          limitPrice: null,
+          basePrice: 100,
+          maxPriceDivergence: null,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const row2 = (await getLimitOrders())[0];
+    expect(JSON.parse(row2.planned_json)).toMatchObject({
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 1.05263158,
+      price: 95,
+      basePrice: 100,
+      delta: -0.05,
+      manuallyEdited: false,
+    });
+    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 1.05263158,
+      price: 95,
+    });
+  });
+
+  it('applies price delta relative to base price', async () => {
+    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const userId = await insertUser('11');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 8,
+      minNotional: 0,
+    });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 1,
+          delta: -0.05,
+          limitPrice: null,
+          basePrice: 100,
+          maxPriceDivergence: null,
+        },
+      ],
       reviewResultId,
       log,
     });
@@ -349,14 +486,67 @@ describe('createDecisionLimitOrders', () => {
       symbol: 'BTCUSDT',
       side: 'BUY',
       quantity: 1,
-      price: 99.9,
+      price: 95,
+      basePrice: 100,
+      delta: -0.05,
       manuallyEdited: false,
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'BUY',
       quantity: 1,
-      price: 99.9,
+      price: 95,
     });
+  });
+
+  it('cancels order when price diverges beyond threshold', async () => {
+    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const userId = await insertUser('12');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 8,
+      minNotional: 0,
+    });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 105 });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 1,
+          delta: null,
+          limitPrice: null,
+          basePrice: 100,
+          maxPriceDivergence: 0.02,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const row = (await getLimitOrders())[0];
+    expect(row.status).toBe('canceled');
+    expect(createLimitOrder).not.toHaveBeenCalled();
   });
 });

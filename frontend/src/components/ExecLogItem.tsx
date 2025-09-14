@@ -29,7 +29,16 @@ export interface ExecLog {
     rebalance: boolean;
     newAllocation?: number;
     shortReport: string;
-    orders?: { pair: string; token: string; side: string; quantity: number }[];
+    orders?: {
+      pair: string;
+      token: string;
+      side: string;
+      quantity: number;
+      delta: number | null;
+      limitPrice: number | null;
+      basePrice: number | null;
+      maxPriceDivergence: number | null;
+    }[];
   };
   error?: Record<string, unknown>;
   createdAt: number;
