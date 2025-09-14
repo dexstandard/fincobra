@@ -19,7 +19,7 @@ vi.mock('../src/services/binance.js', () => ({
   createLimitOrder: vi.fn().mockResolvedValue({ orderId: 1 }),
 }));
 
-import { createRebalanceLimitOrder } from '../src/services/rebalance.js';
+import { createRebalanceLimitOrder, createDecisionLimitOrders } from '../src/services/rebalance.js';
 import { createLimitOrder, fetchPairData, fetchPairInfo } from '../src/services/binance.js';
 
 describe('createRebalanceLimitOrder', () => {
@@ -300,6 +300,63 @@ describe('createRebalanceLimitOrder', () => {
       side: 'BUY',
       quantity: 0.123,
       price: 1.23,
+    });
+  });
+});
+
+describe('createDecisionLimitOrders', () => {
+  beforeEach(async () => {
+    await db.query('TRUNCATE limit_order RESTART IDENTITY CASCADE');
+    vi.mocked(createLimitOrder).mockClear();
+  });
+
+  it('keeps side when quantity is given in quote asset', async () => {
+    const log = { info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
+    const userId = await insertUser('10');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 8,
+      minNotional: 0,
+    });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [{ pair: 'BTCUSDT', token: 'USDT', side: 'BUY', quantity: 100 }],
+      reviewResultId,
+      log,
+    });
+    const row = (await getLimitOrders())[0];
+    expect(JSON.parse(row.planned_json)).toMatchObject({
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 1,
+      price: 99.9,
+      manuallyEdited: false,
+    });
+    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: 1,
+      price: 99.9,
     });
   });
 });
