@@ -128,7 +128,16 @@ function splitPair(pair: string): [string, string] {
 
 export async function createDecisionLimitOrders(opts: {
   userId: string;
-  orders: { pair: string; token: string; side: string; quantity: number }[];
+  orders: {
+    pair: string;
+    token: string;
+    side: string;
+    quantity: number;
+    delta?: number | null;
+    limitPrice?: number | null;
+    basePrice?: number | null;
+    maxPriceDivergence?: number | null;
+  }[];
   reviewResultId: string;
   log: FastifyBaseLogger;
 }) {
@@ -138,25 +147,57 @@ export async function createDecisionLimitOrders(opts: {
     const info = await fetchPairInfo(a, b);
     const { currentPrice } = await fetchPairData(a, b);
     const side = o.side as 'BUY' | 'SELL';
+    const basePrice = o.basePrice ?? currentPrice;
     let quantity: number;
     if (o.token === info.baseAsset) {
       quantity = o.quantity;
     } else if (o.token === info.quoteAsset) {
-      quantity = o.quantity / currentPrice;
+      quantity = o.quantity / basePrice;
     } else {
       continue;
     }
-    const price = currentPrice * (side === 'BUY' ? 0.999 : 1.001);
+    const rawPrice =
+      o.limitPrice ??
+      basePrice *
+        (o.delta !== undefined && o.delta !== null
+          ? 1 + o.delta
+          : side === 'BUY'
+            ? 0.999
+            : 1.001);
     const qty = Number(quantity.toFixed(info.quantityPrecision));
-    const prc = Number(price.toFixed(info.pricePrecision));
-    if (qty * prc < info.minNotional) continue;
+    const prc = Number(rawPrice.toFixed(info.pricePrecision));
     const params = { symbol: info.symbol, side, quantity: qty, price: prc } as const;
+    const planned = {
+      ...params,
+      manuallyEdited: false,
+      ...(o.delta !== undefined && o.delta !== null ? { delta: o.delta } : {}),
+      ...(o.limitPrice !== undefined && o.limitPrice !== null ? { limitPrice: o.limitPrice } : {}),
+      ...(o.basePrice !== undefined && o.basePrice !== null ? { basePrice: o.basePrice } : {}),
+      ...(o.maxPriceDivergence !== undefined && o.maxPriceDivergence !== null
+        ? { maxPriceDivergence: o.maxPriceDivergence }
+        : {}),
+    };
+    if (
+      typeof o.maxPriceDivergence === 'number' &&
+      Math.abs(currentPrice - basePrice) / basePrice > o.maxPriceDivergence
+    ) {
+      await insertLimitOrder({
+        userId: opts.userId,
+        planned,
+        status: 'canceled' as LimitOrderStatus,
+        reviewResultId: opts.reviewResultId,
+        orderId: String(Date.now()),
+        cancellationReason: 'price divergence too high',
+      });
+      continue;
+    }
+    if (qty * prc < info.minNotional) continue;
     try {
       const res = await createLimitOrder(opts.userId, params);
       if (!res || res.orderId === undefined || res.orderId === null) {
         await insertLimitOrder({
           userId: opts.userId,
-          planned: { ...params, manuallyEdited: false },
+          planned,
           status: 'canceled' as LimitOrderStatus,
           reviewResultId: opts.reviewResultId,
           orderId: String(Date.now()),
@@ -166,7 +207,7 @@ export async function createDecisionLimitOrders(opts: {
       }
       await insertLimitOrder({
         userId: opts.userId,
-        planned: { ...params, manuallyEdited: false },
+        planned,
         status: 'open' as LimitOrderStatus,
         reviewResultId: opts.reviewResultId,
         orderId: String(res.orderId),
@@ -177,7 +218,7 @@ export async function createDecisionLimitOrders(opts: {
         parseBinanceError(err) || (err instanceof Error ? err.message : 'unknown error');
       await insertLimitOrder({
         userId: opts.userId,
-        planned: { ...params, manuallyEdited: false },
+        planned,
         status: 'canceled' as LimitOrderStatus,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),

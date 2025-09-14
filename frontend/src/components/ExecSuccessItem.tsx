@@ -13,7 +13,16 @@ interface Props {
     rebalance: boolean;
     newAllocation?: number;
     shortReport: string;
-    orders?: { pair: string; token: string; side: string; quantity: number }[];
+    orders?: {
+      pair: string;
+      token: string;
+      side: string;
+      quantity: number;
+      delta?: number;
+      limitPrice?: number;
+      basePrice?: number;
+      maxPriceDivergence?: number;
+    }[];
   };
   promptIcon?: ReactNode;
 }
