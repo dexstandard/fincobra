@@ -2,8 +2,17 @@ import { describe, it, expect } from 'vitest';
 import buildServer from '../src/server.js';
 
 describe('health route', () => {
-  it('returns ok with security headers', async () => {
+  it('returns 503 before server start', async () => {
     const app = await buildServer();
+    const res = await app.inject({ method: 'GET', url: '/api/health' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ ok: false });
+    await app.close();
+  });
+
+  it('returns ok with security headers when started', async () => {
+    const app = await buildServer();
+    app.isStarted = true;
     const res = await app.inject({ method: 'GET', url: '/api/health' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ ok: true });
