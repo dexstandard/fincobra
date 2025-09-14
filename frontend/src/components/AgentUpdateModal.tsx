@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
+import { FormProvider, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-import { normalizeAllocations } from '../lib/allocations';
 import api from '../lib/axios';
+import {
+  portfolioReviewSchema,
+  type PortfolioReviewFormValues,
+} from '../lib/constants';
 import { usePrerequisites } from '../lib/usePrerequisites';
 import { useToast } from '../lib/useToast';
 import { useTranslation } from '../lib/i18n';
@@ -12,7 +17,7 @@ import type { Agent } from '../lib/useAgentData';
 import AgentInstructions from './AgentInstructions';
 import ApiKeyProviderSelector from './forms/ApiKeyProviderSelector';
 import SelectInput from './forms/SelectInput';
-import StrategyForm from './StrategyForm';
+import PortfolioWorkflowFields from './forms/PortfolioWorkflowFields';
 import WalletBalances from './WalletBalances';
 import Button from './ui/Button';
 import ConfirmDialog from './ui/ConfirmDialog';
@@ -33,31 +38,64 @@ export default function AgentUpdateModal({
 }: Props) {
   const toast = useToast();
   const t = useTranslation();
-  const [data, setData] = useState({
-    tokens: agent.tokens,
-    risk: agent.risk,
-    reviewInterval: agent.reviewInterval,
-    agentInstructions: agent.agentInstructions,
+  const methods = useForm<PortfolioReviewFormValues>({
+    resolver: zodResolver(portfolioReviewSchema),
+    defaultValues: {
+      tokens: [
+        { token: agent.cashToken, minAllocation: 0 },
+        ...agent.tokens.map((t) => ({
+          token: t.token,
+          minAllocation: t.minAllocation,
+        })),
+      ],
+      risk: agent.risk,
+      reviewInterval: agent.reviewInterval,
+    },
   });
+  const { reset, getValues } = methods;
+  const [agentInstructions, setAgentInstructions] = useState(
+    agent.agentInstructions,
+  );
+  const [useEarn, setUseEarn] = useState(agent.useEarn);
+  const [tokenSymbols, setTokenSymbols] = useState<string[]>([
+    agent.cashToken,
+    ...agent.tokens.map((t) => t.token),
+  ]);
 
-  const tokens = [agent.cashToken, ...data.tokens.map((t) => t.token)];
-  const { hasOpenAIKey, hasBinanceKey, models, balances } =
-    usePrerequisites(tokens);
+  const {
+    hasOpenAIKey,
+    hasBinanceKey,
+    models,
+    balances,
+    accountBalances,
+    isAccountLoading,
+  } = usePrerequisites(tokenSymbols);
   const [model, setModel] = useState(agent.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
   const [exchangeProvider, setExchangeProvider] = useState('binance');
 
   useEffect(() => {
     if (open) {
-      setData({
-        tokens: agent.tokens,
+      reset({
+        tokens: [
+          { token: agent.cashToken, minAllocation: 0 },
+          ...agent.tokens.map((t) => ({
+            token: t.token,
+            minAllocation: t.minAllocation,
+          })),
+        ],
         risk: agent.risk,
         reviewInterval: agent.reviewInterval,
-        agentInstructions: agent.agentInstructions,
       });
+      setAgentInstructions(agent.agentInstructions);
+      setUseEarn(agent.useEarn);
       setModel(agent.model || '');
+      setTokenSymbols([
+        agent.cashToken,
+        ...agent.tokens.map((t) => t.token),
+      ]);
     }
-  }, [open, agent]);
+  }, [open, agent, reset]);
 
   useEffect(() => {
     if (!hasOpenAIKey) {
@@ -69,20 +107,22 @@ export default function AgentUpdateModal({
 
   const updateMut = useMutation({
     mutationFn: async () => {
+      const values = getValues();
+      const [cashToken, ...positions] = values.tokens;
       await api.put(`/portfolio-workflows/${agent.id}`, {
         model,
         status: agent.status,
         name: agent.name,
-        cash: agent.cashToken.toUpperCase(),
-        tokens: data.tokens.map((t) => ({
+        cash: cashToken.token.toUpperCase(),
+        tokens: positions.map((t) => ({
           token: t.token.toUpperCase(),
           minAllocation: t.minAllocation,
         })),
-        risk: data.risk,
-        reviewInterval: data.reviewInterval,
-        agentInstructions: data.agentInstructions,
+        risk: values.risk,
+        reviewInterval: values.reviewInterval,
+        agentInstructions,
         manualRebalance: agent.manualRebalance,
-        useEarn: agent.useEarn,
+        useEarn,
       });
     },
     onSuccess: () => {
@@ -103,34 +143,21 @@ export default function AgentUpdateModal({
   return (
     <Modal open={open} onClose={onClose}>
       <h2 className="text-xl font-bold mb-2">{t('update_agent')}</h2>
-      <div className="max-w-2xl">
-        <StrategyForm
-          data={data}
-          onChange={(key, value) =>
-            setData((d) => {
-              const updated = { ...d, [key]: value } as typeof data;
-              const norm = normalizeAllocations(
-                updated.tokens[0].minAllocation,
-                updated.tokens[1].minAllocation,
-              );
-              const tokens = [
-                {
-                  ...updated.tokens[0],
-                  minAllocation: norm.minTokenAAllocation,
-                },
-                {
-                  ...updated.tokens[1],
-                  minAllocation: norm.minTokenBAllocation,
-                },
-              ];
-              return { ...updated, tokens };
-            })
-          }
-        />
-      </div>
+      <FormProvider {...methods}>
+        <div className="max-w-2xl">
+          <PortfolioWorkflowFields
+            onTokensChange={setTokenSymbols}
+            balances={balances}
+            accountBalances={accountBalances}
+            accountLoading={isAccountLoading}
+            useEarn={useEarn}
+            onUseEarnChange={setUseEarn}
+          />
+        </div>
+      </FormProvider>
       <AgentInstructions
-        value={data.agentInstructions}
-        onChange={(v) => setData((d) => ({ ...d, agentInstructions: v }))}
+        value={agentInstructions}
+        onChange={setAgentInstructions}
       />
       <div className="mt-4 max-w-2xl">
         <div className="grid grid-cols-2 gap-4">
