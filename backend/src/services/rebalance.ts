@@ -133,10 +133,10 @@ export async function createDecisionLimitOrders(opts: {
     token: string;
     side: string;
     quantity: number;
-    delta?: number | null;
-    limitPrice?: number | null;
-    basePrice?: number | null;
-    maxPriceDivergence?: number | null;
+    delta: number | null;
+    limitPrice: number | null;
+    basePrice: number | null;
+    maxPriceDivergence: number | null;
   }[];
   reviewResultId: string;
   log: FastifyBaseLogger;
@@ -157,28 +157,22 @@ export async function createDecisionLimitOrders(opts: {
       continue;
     }
     const rawPrice =
-      o.limitPrice ??
-      basePrice *
-        (o.delta !== undefined && o.delta !== null
-          ? 1 + o.delta
-          : side === 'BUY'
-            ? 0.999
-            : 1.001);
+      o.limitPrice !== null
+        ? o.limitPrice
+        : basePrice * (o.delta !== null ? 1 + o.delta : side === 'BUY' ? 0.999 : 1.001);
     const qty = Number(quantity.toFixed(info.quantityPrecision));
     const prc = Number(rawPrice.toFixed(info.pricePrecision));
     const params = { symbol: info.symbol, side, quantity: qty, price: prc } as const;
     const planned = {
       ...params,
       manuallyEdited: false,
-      ...(o.delta !== undefined && o.delta !== null ? { delta: o.delta } : {}),
-      ...(o.limitPrice !== undefined && o.limitPrice !== null ? { limitPrice: o.limitPrice } : {}),
-      ...(o.basePrice !== undefined && o.basePrice !== null ? { basePrice: o.basePrice } : {}),
-      ...(o.maxPriceDivergence !== undefined && o.maxPriceDivergence !== null
-        ? { maxPriceDivergence: o.maxPriceDivergence }
-        : {}),
+      ...(o.delta !== null ? { delta: o.delta } : {}),
+      ...(o.limitPrice !== null ? { limitPrice: o.limitPrice } : {}),
+      ...(o.basePrice !== null ? { basePrice: o.basePrice } : {}),
+      ...(o.maxPriceDivergence !== null ? { maxPriceDivergence: o.maxPriceDivergence } : {}),
     };
     if (
-      typeof o.maxPriceDivergence === 'number' &&
+      o.maxPriceDivergence !== null &&
       Math.abs(currentPrice - basePrice) / basePrice > o.maxPriceDivergence
     ) {
       await insertLimitOrder({

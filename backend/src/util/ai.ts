@@ -7,7 +7,7 @@ export const developerInstructions = [
   '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
   '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
   '- Verify limit orders meet minNotional to avoid cancellations, especially for small amounts.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,delta?:number,limitPrice?:number,basePrice?:number,maxPriceDivergence?:number},...],shortReport}.',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,delta:number|null,limitPrice:number|null,basePrice:number|null,maxPriceDivergence:number|null},...],shortReport}.',
   '- shortReport ≤255 chars.',
   '- On error, return {error:"message"}.',
 ].join('\n');
@@ -52,10 +52,10 @@ export interface PreviousResponse {
     token: string;
     side: string;
     quantity: number;
-    delta?: number;
-    limitPrice?: number;
-    basePrice?: number;
-    maxPriceDivergence?: number;
+    delta: number | null;
+    limitPrice: number | null;
+    basePrice: number | null;
+    maxPriceDivergence: number | null;
   }[];
   shortReport?: string;
   error?: unknown;
@@ -119,12 +119,21 @@ export const rebalanceResponseSchema = {
                     token: { type: 'string' },
                     side: { type: 'string', enum: ['BUY', 'SELL'] },
                     quantity: { type: 'number' },
-                    delta: { type: 'number' },
-                    limitPrice: { type: 'number' },
-                    basePrice: { type: 'number' },
-                    maxPriceDivergence: { type: 'number' },
+                    delta: { type: ['number', 'null'] },
+                    limitPrice: { type: ['number', 'null'] },
+                    basePrice: { type: ['number', 'null'] },
+                    maxPriceDivergence: { type: ['number', 'null'] },
                   },
-                  required: ['pair', 'token', 'side', 'quantity'],
+                  required: [
+                    'pair',
+                    'token',
+                    'side',
+                    'quantity',
+                    'delta',
+                    'limitPrice',
+                    'basePrice',
+                    'maxPriceDivergence',
+                  ],
                   additionalProperties: false,
                 },
               },

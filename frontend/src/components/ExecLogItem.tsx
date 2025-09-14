@@ -34,10 +34,10 @@ export interface ExecLog {
       token: string;
       side: string;
       quantity: number;
-      delta?: number;
-      limitPrice?: number;
-      basePrice?: number;
-      maxPriceDivergence?: number;
+      delta: number | null;
+      limitPrice: number | null;
+      basePrice: number | null;
+      maxPriceDivergence: number | null;
     }[];
   };
   error?: Record<string, unknown>;

@@ -340,7 +340,18 @@ describe('createDecisionLimitOrders', () => {
     });
     await createDecisionLimitOrders({
       userId,
-      orders: [{ pair: 'BTCUSDT', token: 'USDT', side: 'BUY', quantity: 100 }],
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'USDT',
+          side: 'BUY',
+          quantity: 100,
+          delta: null,
+          limitPrice: null,
+          basePrice: null,
+          maxPriceDivergence: null,
+        },
+      ],
       reviewResultId,
       log,
     });
@@ -397,8 +408,10 @@ describe('createDecisionLimitOrders', () => {
           token: 'BTC',
           side: 'BUY',
           quantity: 1,
-          basePrice: 100,
           delta: -0.05,
+          limitPrice: null,
+          basePrice: 100,
+          maxPriceDivergence: null,
         },
       ],
       reviewResultId,
@@ -459,6 +472,8 @@ describe('createDecisionLimitOrders', () => {
           token: 'BTC',
           side: 'BUY',
           quantity: 1,
+          delta: null,
+          limitPrice: null,
           basePrice: 100,
           maxPriceDivergence: 0.02,
         },

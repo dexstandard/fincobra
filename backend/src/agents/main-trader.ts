@@ -114,6 +114,10 @@ export interface MainTraderOrder {
   token: string;
   side: string;
   quantity: number;
+  delta: number | null;
+  limitPrice: number | null;
+  basePrice: number | null;
+  maxPriceDivergence: number | null;
 }
 
 export interface MainTraderDecision {
