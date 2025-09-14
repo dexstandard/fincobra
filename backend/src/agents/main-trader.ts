@@ -21,6 +21,7 @@ export async function collectPromptData(
 ): Promise<RebalancePrompt | undefined> {
   const cash = row.cash_token;
   const tokens = row.tokens.map((t) => t.token);
+  const allTokens = [cash, ...tokens];
 
   const account = await fetchAccount(row.user_id).catch((err) => {
     log.error({ err }, 'failed to fetch balance');
@@ -30,6 +31,7 @@ export async function collectPromptData(
 
   const floor: Record<string, number> = {};
   const positions: RebalancePosition[] = [];
+  const routes: RebalancePrompt['routes'] = [];
 
   const balCash = account.balances.find((b) => b.asset === cash);
   const cashQty = balCash ? Number(balCash.free) + Number(balCash.locked) : 0;
@@ -50,6 +52,17 @@ export async function collectPromptData(
       value_usdt: currentPrice * qty,
     });
     floor[t.token] = t.min_allocation;
+  }
+
+  for (let i = 0; i < allTokens.length; i++) {
+    for (let j = i + 1; j < allTokens.length; j++) {
+      try {
+        const { symbol, currentPrice } = await fetchPairData(allTokens[i], allTokens[j]);
+        routes.push({ pair: symbol, price: currentPrice });
+      } catch (err) {
+        log.error({ err }, 'failed to fetch pair data');
+      }
+    }
   }
 
   const portfolio: RebalancePrompt['portfolio'] = {
@@ -93,6 +106,7 @@ export async function collectPromptData(
     policy: { floor },
     cash,
     portfolio,
+    routes,
     marketData: {},
     reports: tokens
       .filter((t) => !isStablecoin(t))
