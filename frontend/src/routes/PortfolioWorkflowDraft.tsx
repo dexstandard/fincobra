@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from '../lib/i18n';
 import AgentName from '../components/AgentName';
 import AgentInstructions from '../components/AgentInstructions';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
@@ -15,53 +14,46 @@ import AgentStartButton from '../components/AgentStartButton';
 import SelectInput from '../components/forms/SelectInput';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { portfolioReviewSchema, type PortfolioReviewFormValues } from '../lib/constants';
+import {
+  portfolioReviewSchema,
+  portfolioReviewDefaults,
+  DEFAULT_AGENT_INSTRUCTIONS,
+  type PortfolioReviewFormValues,
+} from '../lib/constants';
 import PortfolioWorkflowFields from '../components/forms/PortfolioWorkflowFields';
-
-interface WorkflowDraftDetails {
-  name: string;
-  tokens: { token: string; minAllocation: number }[];
-  risk: PortfolioReviewFormValues['risk'];
-  reviewInterval: PortfolioReviewFormValues['reviewInterval'];
-  agentInstructions: string;
-  manualRebalance: boolean;
-  useEarn: boolean;
-}
-
-interface SavedDraft extends WorkflowDraftDetails {
-  id: string;
-  userId: string;
-  model: string | null;
-}
+import type { Agent } from '../lib/useAgentData';
 
 interface Props {
-  draft?: SavedDraft;
+  draft?: Agent;
 }
 
 export default function PortfolioWorkflowDraft({ draft }: Props) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const locationData = location.state as WorkflowDraftDetails | undefined;
   const { user } = useUser();
   const toast = useToast();
   const t = useTranslation();
-  const data = draft ?? locationData;
+
+  const defaultValues = draft
+    ? {
+        tokens: [
+          { token: draft.cashToken, minAllocation: 0 },
+          ...draft.tokens,
+        ],
+        risk: draft.risk,
+        reviewInterval: draft.reviewInterval,
+      }
+    : portfolioReviewDefaults;
+
   const [model, setModel] = useState(draft?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
-  const [useEarn, setUseEarn] = useState(data?.useEarn ?? true);
+  const [useEarn, setUseEarn] = useState(draft?.useEarn ?? true);
   const [tokenSymbols, setTokenSymbols] = useState(
-    data ? data.tokens.map((t) => t.token) : [],
+    defaultValues.tokens.map((t) => t.token),
   );
 
   const methods = useForm<PortfolioReviewFormValues>({
     resolver: zodResolver(portfolioReviewSchema),
-    defaultValues: data
-      ? {
-          tokens: data.tokens,
-          risk: data.risk,
-          reviewInterval: data.reviewInterval,
-        }
-      : undefined,
+    defaultValues,
   });
   const {
     hasOpenAIKey,
@@ -72,12 +64,14 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
     isAccountLoading,
   } = usePrerequisites(tokenSymbols);
 
-  const [name, setName] = useState(data?.name || '');
+  const [name, setName] = useState(
+    draft?.name || tokenSymbols.map((t) => t.toUpperCase()).join(' / '),
+  );
   const [agentInstructions, setAgentInstructions] = useState(
-    data?.agentInstructions || '',
+    draft?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS,
   );
   const [manualRebalance, setManualRebalance] = useState(
-    data?.manualRebalance || false,
+    draft?.manualRebalance || false,
   );
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const values = methods.watch();
@@ -94,7 +88,11 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
     }
   }, [hasOpenAIKey, models, draft?.model, model]);
 
-  if (!data) return <div className="p-4">{t('no_preview_data')}</div>;
+  useEffect(() => {
+    if (!draft) {
+      setName(tokenSymbols.map((t) => t.toUpperCase()).join(' / '));
+    }
+  }, [tokenSymbols, draft]);
 
   function WarningSign({ children }: { children: ReactNode }) {
     return (
@@ -123,6 +121,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
             accountLoading={isAccountLoading}
             useEarn={useEarn}
             onUseEarnChange={setUseEarn}
+            autoPopulateTopTokens={!draft}
           />
         </div>
       </FormProvider>
