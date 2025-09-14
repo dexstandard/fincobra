@@ -148,18 +148,18 @@ export async function createDecisionLimitOrders(opts: {
     const { currentPrice } = await fetchPairData(a, b);
     const side = o.side as 'BUY' | 'SELL';
     const basePrice = o.basePrice ?? currentPrice;
-    let quantity: number;
-    if (o.token === info.baseAsset) {
-      quantity = o.quantity;
-    } else if (o.token === info.quoteAsset) {
-      quantity = o.quantity / basePrice;
-    } else {
-      continue;
-    }
     const rawPrice =
       o.limitPrice !== null
         ? o.limitPrice
         : basePrice * (o.delta !== null ? 1 + o.delta : side === 'BUY' ? 0.999 : 1.001);
+    let quantity: number;
+    if (o.token === info.baseAsset) {
+      quantity = o.quantity;
+    } else if (o.token === info.quoteAsset) {
+      quantity = o.quantity / rawPrice;
+    } else {
+      continue;
+    }
     const qty = Number(quantity.toFixed(info.quantityPrecision));
     const prc = Number(rawPrice.toFixed(info.pricePrecision));
     const params = { symbol: info.symbol, side, quantity: qty, price: prc } as const;

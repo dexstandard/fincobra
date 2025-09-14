@@ -32,15 +32,19 @@ export async function insertReviewResult(entry: ReviewResultInsert): Promise<str
 
 export async function getRecentReviewResults(portfolioId: string, limit: number) {
   const { rows } = await db.query(
-    'SELECT rebalance, new_allocation, short_report, error FROM agent_review_result WHERE agent_id = $1 ORDER BY created_at DESC LIMIT $2',
+    'SELECT id, created_at, rebalance, new_allocation, short_report, error FROM agent_review_result WHERE agent_id = $1 ORDER BY created_at DESC LIMIT $2',
     [portfolioId, limit],
   );
   return (rows as {
+    id: string;
+    created_at: Date;
     rebalance: boolean | null;
     new_allocation: number | null;
     short_report: string | null;
     error: string | null;
   }[]).map((r) => ({
+    id: r.id,
+    created_at: r.created_at,
     ...(r.rebalance !== null ? { rebalance: r.rebalance } : {}),
     ...(r.new_allocation !== null ? { newAllocation: r.new_allocation } : {}),
     ...(r.short_report !== null ? { shortReport: r.short_report } : {}),

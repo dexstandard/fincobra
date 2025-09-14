@@ -14,17 +14,29 @@ vi.mock('../src/services/binance.js', () => ({
 }));
 
 vi.mock('../src/repos/agent-review-result.js', () => ({
-  getRecentReviewResults: vi.fn().mockResolvedValue([]),
+  getRecentReviewResults: vi.fn().mockResolvedValue(
+    Array.from({ length: 5 }, (_, i) => ({
+      id: `r${i + 1}`,
+      created_at: new Date(`2025-01-0${i + 1}T00:00:00.000Z`),
+      shortReport: `p${i + 1}`,
+      error: null,
+    })),
+  ),
 }));
 
 vi.mock('../src/repos/limit-orders.js', () => ({
-  getRecentLimitOrders: vi.fn().mockResolvedValue(
-    Array.from({ length: 5 }, (_, i) => ({
-      planned_json: JSON.stringify({ symbol: 'BTCUSDT', side: 'BUY', quantity: i + 1 }),
-      status: 'filled',
-      created_at: new Date(`2025-01-0${i + 1}T00:00:00.000Z`),
-    })),
-  ),
+  getLimitOrdersByReviewResult: vi.fn().mockImplementation(async (_agentId, reviewId) => {
+    const i = Number(reviewId.slice(1));
+    return [
+      {
+        planned_json: JSON.stringify({ symbol: 'BTCUSDT', side: 'BUY', quantity: i }),
+        status: 'filled',
+        created_at: new Date(`2025-01-0${i}T00:00:00.000Z`),
+        order_id: String(i),
+        cancellation_reason: null,
+      },
+    ];
+  }),
 }));
 
 function createLogger(): FastifyBaseLogger {
@@ -54,6 +66,7 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.start_balance_usd).toBe(20000);
     expect(prompt?.portfolio.start_balance_ts).toBe('2025-01-01T00:00:00.000Z');
     expect(prompt?.portfolio.pnl_usd).toBeCloseTo(1000);
+    expect(prompt?.reviewInterval).toBe('1h');
   });
 
   it('includes recent limit orders in prompt', async () => {
@@ -75,13 +88,19 @@ describe('collectPromptData', () => {
     };
 
     const prompt = await collectPromptData(row, createLogger());
-    expect(prompt?.prev_orders).toHaveLength(5);
-    expect(prompt?.prev_orders?.[0]).toMatchObject({
-      symbol: 'BTCUSDT',
-      side: 'BUY',
-      quantity: 1,
+    expect(prompt?.previous_reports).toHaveLength(5);
+    expect(prompt?.previous_reports?.[0]).toMatchObject({
       datetime: '2025-01-01T00:00:00.000Z',
-      status: 'filled',
+      orders: [
+        {
+          symbol: 'BTCUSDT',
+          side: 'BUY',
+          quantity: 1,
+          status: 'filled',
+          datetime: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+      shortReport: 'p1',
     });
   });
 
