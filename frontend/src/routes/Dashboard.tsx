@@ -340,21 +340,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">{t('my_agents')}</h2>
             </div>
-            <table className="w-full mb-4 hidden md:table">
-              <thead>
-                <tr>
-                  <th className="text-left">{t('tokens')}</th>
-                  <th className="text-left">{t('balance_usd')}</th>
-                  <th className="text-left">{t('pnl_usd')}</th>
-                  <th className="text-left">{t('model')}</th>
-                  <th className="text-left">{t('interval')}</th>
-                  <th className="text-left">{t('status')}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-            <div className="md:hidden flex flex-col gap-2 mb-4" />
+            <p>{t('no_agents_yet')}</p>
           </div>
         </ErrorBoundary>
       </div>
