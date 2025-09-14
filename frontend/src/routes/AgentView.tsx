@@ -143,7 +143,7 @@ export default function AgentView() {
                                 log={log}
                                 agentId={id!}
                                 manualRebalance={data.manualRebalance}
-                                tokens={data.tokens.map((t) => t.token)}
+                                tokens={[data.tokens[0]?.token, data.cashToken].filter(Boolean) as string[]}
                               />
                             </td>
                           </tr>
@@ -160,7 +160,7 @@ export default function AgentView() {
                             log={log}
                             agentId={id!}
                             manualRebalance={data.manualRebalance}
-                            tokens={data.tokens.map((t) => t.token)}
+                            tokens={[data.tokens[0]?.token, data.cashToken].filter(Boolean) as string[]}
                           />
                         </div>
                       ))}

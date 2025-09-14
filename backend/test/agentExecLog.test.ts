@@ -54,6 +54,7 @@ describe('agent exec log routes', () => {
           side: 'BUY',
           quantity: 1,
           price: 100,
+          symbol: 'BTCETH',
           status: 'open',
           createdAt: expect.any(Number),
         },

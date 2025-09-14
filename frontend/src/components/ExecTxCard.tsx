@@ -37,6 +37,7 @@ export default function ExecTxCard({ agentId, logId, orders, onCancel }: Props) 
         <thead>
           <tr>
             <th className="pr-2">Time</th>
+            <th className="pr-2">Symbol</th>
             <th className="pr-2">Side</th>
             <th className="pr-2">Qty</th>
             <th className="pr-2">Price</th>
@@ -48,6 +49,7 @@ export default function ExecTxCard({ agentId, logId, orders, onCancel }: Props) 
           {orders.map((o) => (
             <tr key={o.id}>
               <td className="pr-2">{new Date(o.createdAt).toLocaleString()}</td>
+              <td className="pr-2">{o.symbol}</td>
               <td className="pr-2">{o.side}</td>
               <td className="pr-2">{o.quantity}</td>
               <td className="pr-2">{o.price}</td>
