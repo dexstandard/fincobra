@@ -12,6 +12,13 @@ import { fetchOutputIp } from './util/output-ip.js';
 import { migrate } from './db/index.js';
 import { tryGetUserId } from './util/auth.js';
 
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** Indicates whether the HTTP server finished booting */
+    isStarted: boolean;
+  }
+}
+
 function sanitize(obj: unknown): unknown {
   if (!obj || typeof obj !== 'object') return obj;
   const forbidden = ['password', 'token', 'key', 'secret'];
@@ -35,6 +42,8 @@ export default async function buildServer(
     },
     disableRequestLogging: true,
   });
+
+  app.decorate('isStarted', false);
 
 
   await app.register(cookie);
