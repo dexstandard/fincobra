@@ -21,7 +21,12 @@ describe('callAi structured output', () => {
       marketData: { currentPrice: 1, minNotional: 10 },
       previous_responses: [
         { shortReport: 'p1' },
-        { rebalance: true, newAllocation: 50 },
+        {
+          orders: [
+            { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
+          ],
+          shortReport: 'p2',
+        },
       ],
     };
     await callAi('gpt-test', developerInstructions, rebalanceResponseSchema, prompt, 'key');
@@ -35,7 +40,10 @@ describe('callAi structured output', () => {
     const parsed = JSON.parse(body.input);
     expect(parsed.previous_responses).toEqual([
       { shortReport: 'p1' },
-      { rebalance: true, newAllocation: 50 },
+      {
+        orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 }],
+        shortReport: 'p2',
+      },
     ]);
     expect(body.tools).toBeUndefined();
     expect(body.text.format.type).toBe('json_schema');

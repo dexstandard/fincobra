@@ -10,7 +10,17 @@ const callAiMock = vi.fn(() =>
           content: [
             {
               text: JSON.stringify({
-                result: { rebalance: true, newAllocation: 50, shortReport: 'ok' },
+                result: {
+                  orders: [
+                    {
+                      pair: 'BTCUSDT',
+                      token: 'BTC',
+                      side: 'SELL',
+                      quantity: 1,
+                    },
+                  ],
+                  shortReport: 'ok',
+                },
               }),
             },
           ],
@@ -54,7 +64,9 @@ describe('main trader step', () => {
       },
       prompt,
     );
-    expect(decision?.rebalance).toBe(true);
+    expect(decision?.orders).toEqual([
+      { pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 },
+    ]);
     expect(callAiMock).toHaveBeenCalled();
   });
 });

@@ -7,7 +7,7 @@ export const developerInstructions = [
   '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
   '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
   '- Verify limit orders meet minNotional to avoid cancellations, especially for small amounts.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",side:"BUY"|"SELL",quantity:number},...],shortReport}.',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number},...],shortReport}.',
   '- shortReport ≤255 chars.',
   '- On error, return {error:"message"}.',
 ].join('\n');
@@ -47,7 +47,7 @@ export interface RebalancePosition {
 }
 
 export interface PreviousResponse {
-  orders?: { pair: string; side: string; quantity: number }[];
+  orders?: { pair: string; token: string; side: string; quantity: number }[];
   shortReport?: string;
   error?: unknown;
 }
@@ -70,7 +70,7 @@ export interface RebalancePrompt {
   prev_orders?: {
     symbol: string;
     side: string;
-    amount: number;
+    quantity: number;
     datetime: string;
     status: string;
   }[];
@@ -107,10 +107,11 @@ export const rebalanceResponseSchema = {
                   type: 'object',
                   properties: {
                     pair: { type: 'string' },
+                    token: { type: 'string' },
                     side: { type: 'string', enum: ['BUY', 'SELL'] },
                     quantity: { type: 'number' },
                   },
-                  required: ['pair', 'side', 'quantity'],
+                  required: ['pair', 'token', 'side', 'quantity'],
                   additionalProperties: false,
                 },
               },

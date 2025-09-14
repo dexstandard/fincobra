@@ -128,7 +128,7 @@ function splitPair(pair: string): [string, string] {
 
 export async function createDecisionLimitOrders(opts: {
   userId: string;
-  orders: { pair: string; side: string; quantity: number }[];
+  orders: { pair: string; token: string; side: string; quantity: number }[];
   reviewResultId: string;
   log: FastifyBaseLogger;
 }) {
@@ -137,11 +137,21 @@ export async function createDecisionLimitOrders(opts: {
     if (!a || !b) continue;
     const info = await fetchPairInfo(a, b);
     const { currentPrice } = await fetchPairData(a, b);
-    const price = currentPrice * (o.side === 'BUY' ? 0.999 : 1.001);
-    const qty = Number(o.quantity.toFixed(info.quantityPrecision));
+    let side = o.side as any;
+    let quantity: number;
+    if (o.token === info.baseAsset) {
+      quantity = o.quantity;
+    } else if (o.token === info.quoteAsset) {
+      side = o.side === 'BUY' ? 'SELL' : 'BUY';
+      quantity = o.quantity / currentPrice;
+    } else {
+      continue;
+    }
+    const price = currentPrice * (side === 'BUY' ? 0.999 : 1.001);
+    const qty = Number(quantity.toFixed(info.quantityPrecision));
     const prc = Number(price.toFixed(info.pricePrecision));
     if (qty * prc < info.minNotional) continue;
-    const params = { symbol: info.symbol, side: o.side as any, quantity: qty, price: prc } as const;
+    const params = { symbol: info.symbol, side, quantity: qty, price: prc } as const;
     try {
       const res = await createLimitOrder(opts.userId, params);
       if (!res || res.orderId === undefined || res.orderId === null) {

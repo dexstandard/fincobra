@@ -153,7 +153,10 @@ function createLogger(): FastifyBaseLogger {
 describe('reviewPortfolio', () => {
   it('saves decision and logs', async () => {
     await setupAgent('1', ['BTC']);
-    const decision = { orders: [{ pair: 'BTCUSDT', side: 'SELL', quantity: 1 }], shortReport: 'ok' };
+    const decision = {
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
+      shortReport: 'ok',
+    };
     runMainTrader.mockResolvedValue(decision);
     const log = createLogger();
     await reviewAgentPortfolio(log, '1');
@@ -177,7 +180,13 @@ describe('reviewPortfolio', () => {
 
   it('calls createDecisionLimitOrders when orders requested', async () => {
     await setupAgent('2', ['BTC', 'ETH']);
-    const decision = { orders: [{ pair: 'BTCUSDT', side: 'BUY', quantity: 1 }, { pair: 'ETHBTC', side: 'SELL', quantity: 0.5 }], shortReport: 's' };
+    const decision = {
+      orders: [
+        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
+        { pair: 'ETHBTC', token: 'ETH', side: 'SELL', quantity: 0.5 },
+      ],
+      shortReport: 's',
+    };
     runMainTrader.mockResolvedValue(decision);
     const log = createLogger();
     await reviewAgentPortfolio(log, '2');
@@ -189,7 +198,10 @@ describe('reviewPortfolio', () => {
 
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
     await setupAgent('3', ['BTC'], true);
-    const decision = { orders: [{ pair: 'BTCUSDT', side: 'BUY', quantity: 1 }], shortReport: 's' };
+    const decision = {
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 }],
+      shortReport: 's',
+    };
     runMainTrader.mockResolvedValue(decision);
     const log = createLogger();
     await reviewAgentPortfolio(log, '3');
@@ -198,7 +210,10 @@ describe('reviewPortfolio', () => {
 
   it('records error when pair is invalid', async () => {
     await setupAgent('4', ['BTC']);
-    const decision = { orders: [{ pair: 'FOO', side: 'BUY', quantity: 1 }], shortReport: 's' };
+    const decision = {
+      orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', quantity: 1 }],
+      shortReport: 's',
+    };
     runMainTrader.mockResolvedValue(decision);
     const log = createLogger();
     await reviewAgentPortfolio(log, '4');
@@ -212,7 +227,10 @@ describe('reviewPortfolio', () => {
 
   it('records error when quantity is invalid', async () => {
     await setupAgent('5', ['BTC']);
-    const decision = { orders: [{ pair: 'BTCUSDT', side: 'BUY', quantity: 0 }], shortReport: 's' };
+    const decision = {
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 0 }],
+      shortReport: 's',
+    };
     runMainTrader.mockResolvedValue(decision);
     const log = createLogger();
     await reviewAgentPortfolio(log, '5');

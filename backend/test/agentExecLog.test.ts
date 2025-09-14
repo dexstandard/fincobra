@@ -261,7 +261,7 @@ describe('agent exec log routes', () => {
           content: [
             {
               type: 'output_text',
-              text: '{"result":{"orders":[{"pair":"BTCUSDT","side":"SELL","quantity":1}],"shortReport":"s"}}',
+              text: '{"result":{"orders":[{"pair":"BTCUSDT","token":"BTC","side":"SELL","quantity":1}],"shortReport":"s"}}',
             },
           ],
         },
@@ -293,7 +293,7 @@ describe('agent exec log routes', () => {
 
     const parsedLog = parseExecLog(body.items[0].log);
     expect(parsedLog.response).toMatchObject({
-      orders: [{ pair: 'BTCUSDT', side: 'SELL', quantity: 1 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
       shortReport: 's',
     });
 

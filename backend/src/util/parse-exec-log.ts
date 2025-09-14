@@ -106,18 +106,28 @@ export function validateExecResponse(
 ): string | undefined {
   if (!response) return undefined;
   for (const o of response.orders || []) {
-    if (typeof o.pair !== 'string' || typeof o.side !== 'string')
+    if (
+      typeof o.pair !== 'string' ||
+      typeof o.token !== 'string' ||
+      typeof o.side !== 'string'
+    )
       return 'invalid order';
-    let valid = false;
+    let base = '';
+    let quote = '';
     for (const sym of TOKEN_SYMBOLS) {
       if (o.pair.startsWith(sym)) {
         const rest = o.pair.slice(sym.length);
-        if (allowedTokens.includes(sym) && allowedTokens.includes(rest)) {
-          valid = true;
+        if (TOKEN_SYMBOLS.includes(rest)) {
+          base = sym;
+          quote = rest;
+          break;
         }
       }
     }
-    if (!valid) return 'invalid pair';
+    if (!base || !quote) return 'invalid pair';
+    if (!allowedTokens.includes(base) || !allowedTokens.includes(quote))
+      return 'invalid pair';
+    if (o.token !== base && o.token !== quote) return 'invalid token';
     if (typeof o.quantity !== 'number' || o.quantity <= 0)
       return 'invalid quantity';
   }

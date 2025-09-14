@@ -79,7 +79,7 @@ describe('collectPromptData', () => {
     expect(prompt?.prev_orders?.[0]).toMatchObject({
       symbol: 'BTCUSDT',
       side: 'BUY',
-      amount: 1,
+      quantity: 1,
       datetime: '2025-01-01T00:00:00.000Z',
       status: 'filled',
     });

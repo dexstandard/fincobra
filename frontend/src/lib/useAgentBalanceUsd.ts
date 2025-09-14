@@ -5,6 +5,9 @@ import { useUser } from './useUser';
 
 export function useAgentBalanceUsd(tokens: string[]) {
   const { user } = useUser();
+  const uniqTokens = Array.from(
+    new Set(tokens.map((t) => t.toUpperCase())),
+  );
   const { data: binanceKey } = useQuery<string | null>({
     queryKey: ['binance-key', user?.id],
     enabled: !!user,
@@ -19,10 +22,10 @@ export function useAgentBalanceUsd(tokens: string[]) {
     },
   });
 
-  const enabled = !!user && !!binanceKey && tokens.length > 0;
+  const enabled = !!user && !!binanceKey && uniqTokens.length > 0;
   const balanceQueries = useQueries({
     queries: enabled
-      ? tokens.map((token) => ({
+      ? uniqTokens.map((token) => ({
           queryKey: ['binance-balance-usd', user?.id, token.toUpperCase()],
           enabled,
           queryFn: async () => {

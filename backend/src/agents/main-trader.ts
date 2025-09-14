@@ -84,7 +84,7 @@ export async function collectPromptData(
     return {
       symbol: planned.symbol,
       side: planned.side,
-      amount: planned.quantity,
+      quantity: planned.quantity,
       datetime: o.created_at.toISOString(),
       status: o.status,
     } as const;
@@ -111,6 +111,7 @@ export async function collectPromptData(
 
 export interface MainTraderOrder {
   pair: string;
+  token: string;
   side: string;
   quantity: number;
 }
