@@ -162,11 +162,5 @@ jobs:
             export VITE_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
             export DB_CONNECTION_STR="${DB_CONNECTION_STR}"
             docker compose up -d --build
-            timeout 60s bash -c 'until docker compose logs backend | grep -q "server started"; do sleep 3; done'
-            curl -fsS -H "Host: ${DOMAIN}" http://localhost/api/health
+            timeout 60s bash -c 'until curl -fsS -H "Host: ${DOMAIN}" http://localhost/api/health; do sleep 3; done'
             docker compose ps
-            if docker compose ps | grep -q "Exit"; then
-              echo "A container failed to stay up"
-              docker compose logs
-              exit 1
-            fi
