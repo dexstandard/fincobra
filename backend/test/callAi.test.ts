@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { callAi, developerInstructions, rebalanceResponseSchema, type RebalancePrompt } from '../src/util/ai.js';
+import { callAi } from '../src/util/ai.js';
+import { developerInstructions, rebalanceResponseSchema } from '../src/agents/main-trader.js';
+import { type RebalancePrompt } from '../src/agents/types.js';
 
 describe('callAi structured output', () => {
   it('includes json schema in request', async () => {

@@ -1,19 +1,86 @@
 import type { FastifyBaseLogger } from 'fastify';
-import {
-  callAi,
-  developerInstructions,
-  rebalanceResponseSchema,
-  type RebalancePosition,
-  type PreviousReport,
-  type RebalancePrompt,
-  extractJson,
-} from '../util/ai.js';
+import { callAi } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import { fetchAccount, fetchPairData } from '../services/binance.js';
 import { getRecentReviewResults } from '../repos/agent-review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import type { ActivePortfolioWorkflowRow } from '../repos/portfolio-workflow.js';
-import type { RunParams } from './types.js';
+import type {
+  RunParams,
+  RebalancePosition,
+  PreviousReport,
+  RebalancePrompt,
+} from './types.js';
+
+export const developerInstructions = [
+  '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
+  '- You lead a crypto analyst team (news, technical). Reports from each member are attached.',
+  '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
+  '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
+  '- Verify limit orders meet minNotional to avoid cancellations, especially for small amounts.',
+  '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
+  '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
+  '- The prompt lists all supported trading pairs with their current prices for easy reference.',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,delta:number|null,limitPrice:number|null,basePrice:number|null,maxPriceDivergence:number|null},...],shortReport}.',
+  '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
+  '- shortReport ≤255 chars.',
+  '- On error, return {error:"message"}.',
+].join('\n');
+
+export const rebalanceResponseSchema = {
+  type: 'object',
+  properties: {
+    result: {
+      anyOf: [
+        {
+          type: 'object',
+          properties: {
+            orders: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  pair: { type: 'string' },
+                  token: { type: 'string' },
+                  side: { type: 'string', enum: ['BUY', 'SELL'] },
+                  quantity: { type: 'number' },
+                  delta: { type: ['number', 'null'] },
+                  limitPrice: { type: ['number', 'null'] },
+                  basePrice: { type: ['number', 'null'] },
+                  maxPriceDivergence: { type: ['number', 'null'] },
+                },
+                required: [
+                  'pair',
+                  'token',
+                  'side',
+                  'quantity',
+                  'delta',
+                  'limitPrice',
+                  'basePrice',
+                  'maxPriceDivergence',
+                ],
+                additionalProperties: false,
+              },
+            },
+            shortReport: { type: 'string' },
+          },
+          required: ['orders', 'shortReport'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+          },
+          required: ['error'],
+          additionalProperties: false,
+        },
+      ],
+    },
+  },
+  required: ['result'],
+  additionalProperties: false,
+};
 
 export async function collectPromptData(
   row: ActivePortfolioWorkflowRow,

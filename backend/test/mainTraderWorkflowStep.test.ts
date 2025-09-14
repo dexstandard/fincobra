@@ -34,8 +34,6 @@ const callAiMock = vi.hoisted(() =>
 
 vi.mock('../src/util/ai.js', () => ({
   callAi: callAiMock,
-  developerInstructions: '',
-  rebalanceResponseSchema: {},
 }));
 
 import { run } from '../src/agents/main-trader.js';
