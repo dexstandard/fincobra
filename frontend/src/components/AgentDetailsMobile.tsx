@@ -2,7 +2,6 @@ import AgentStatusLabel from './AgentStatusLabel';
 import TokenDisplay from './TokenDisplay';
 import AgentPnlMobile from './AgentPnlMobile';
 import FormattedDate from './ui/FormattedDate';
-import DerivativesSummary from './DerivativesSummary';
 import type { Agent } from '../lib/useAgentData';
 
 interface Props {
@@ -28,7 +27,6 @@ export default function AgentDetailsMobile({ agent }: Props) {
           </span>
         ))}
       </p>
-      <DerivativesSummary symbol={`${agent.tokens[0]?.token.toUpperCase() ?? ''}${agent.cashToken.toUpperCase()}`} />
       <AgentPnlMobile tokens={tokens} startBalanceUsd={agent.startBalanceUsd} />
     </div>
   );

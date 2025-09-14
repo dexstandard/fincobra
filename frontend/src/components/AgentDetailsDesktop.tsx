@@ -5,7 +5,6 @@ import AgentStatusLabel from './AgentStatusLabel';
 import TokenDisplay from './TokenDisplay';
 import AgentPnl from './AgentPnl';
 import FormattedDate from './ui/FormattedDate';
-import DerivativesSummary from './DerivativesSummary';
 import type { Agent } from '../lib/useAgentData';
 
 interface Props {
@@ -37,7 +36,6 @@ export default function AgentDetailsDesktop({ agent }: Props) {
           </span>
         ))}
       </p>
-      <DerivativesSummary symbol={`${agent.tokens[0]?.token.toUpperCase() ?? ''}${agent.cashToken.toUpperCase()}`} />
       <div className="mt-2">
         <div className="flex items-center gap-1">
           <h2 className="text-l font-bold">{t('trading_instructions')}</h2>
