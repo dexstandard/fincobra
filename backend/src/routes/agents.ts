@@ -153,6 +153,15 @@ export default async function agentRoutes(app: FastifyInstance) {
       log.info('fetched exec log');
       return {
         items: rows.map((r) => {
+          let orders: unknown[] | undefined;
+          try {
+            const parsed = JSON.parse(r.log);
+            if (parsed && Array.isArray(parsed.orders)) {
+              orders = parsed.orders;
+            }
+          } catch {
+            // ignore JSON parse errors and leave orders undefined
+          }
           const resp =
             r.rebalance === null
               ? undefined
@@ -162,6 +171,7 @@ export default async function agentRoutes(app: FastifyInstance) {
                     ? { newAllocation: r.new_allocation }
                     : {}),
                   shortReport: r.short_report ?? '',
+                  ...(orders ? { orders } : {}),
                 };
           return {
             id: r.id,
