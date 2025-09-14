@@ -453,6 +453,7 @@ async function fetchSymbolData(symbol: string) {
   };
   const yearJson = (await yearRes.json()) as Kline[];
   return {
+    symbol,
     currentPrice: Number(priceJson.price),
     orderBook: {
       bids: depthJson.bids.map(([p, q]) => [Number(p), Number(q)]),

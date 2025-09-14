@@ -18,6 +18,7 @@ describe('callAi structured output', () => {
           { sym: 'USDT', qty: 1, price_usdt: 1, value_usdt: 1 },
         ],
       },
+      routes: [],
       marketData: {},
       reviewInterval: '1h',
       previous_reports: [

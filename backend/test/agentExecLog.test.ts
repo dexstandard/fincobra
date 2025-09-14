@@ -381,6 +381,7 @@ describe('agent exec log routes', () => {
       ],
     } as any);
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+      symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
@@ -446,6 +447,7 @@ describe('agent exec log routes', () => {
       ],
     } as any);
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+      symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
@@ -506,7 +508,7 @@ describe('agent exec log routes', () => {
         { asset: 'USDT', free: '105', locked: '0' },
       ],
     } as any);
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({ currentPrice: 100 } as any);
+    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -566,6 +568,7 @@ describe('agent exec log routes', () => {
       ],
     } as any);
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+      symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
@@ -624,6 +627,7 @@ describe('agent exec log routes', () => {
       ],
     } as any);
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+      symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({

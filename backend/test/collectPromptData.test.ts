@@ -10,7 +10,11 @@ vi.mock('../src/services/binance.js', () => ({
       { asset: 'ETH', free: '5', locked: '0' },
     ],
   }),
-  fetchPairData: vi.fn().mockResolvedValue({ currentPrice: 20000 }),
+  fetchPairData: vi
+    .fn()
+    .mockImplementation((t1: string, t2: string) =>
+      Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 }),
+    ),
 }));
 
 vi.mock('../src/repos/agent-review-result.js', () => ({
@@ -128,6 +132,7 @@ describe('collectPromptData', () => {
     const prompt = await collectPromptData(row, createLogger());
     expect(prompt?.portfolio.positions).toHaveLength(3);
     expect(prompt?.cash).toBe('USDT');
+    expect(prompt?.routes).toHaveLength(3);
   });
 });
 

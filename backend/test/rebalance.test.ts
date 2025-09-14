@@ -7,7 +7,7 @@ import { insertReviewResult } from './repos/agent-review-result.js';
 import { db } from '../src/db/index.js';
 
 vi.mock('../src/services/binance.js', () => ({
-  fetchPairData: vi.fn().mockResolvedValue({ currentPrice: 100 }),
+  fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
     baseAsset: 'BTC',

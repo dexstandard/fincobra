@@ -26,9 +26,9 @@ describe('fetchTokenIndicators', () => {
     (fetchPairData as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       async (token: string) => {
         if (token === 'BTC') {
-          return { currentPrice: 400, day: {}, year: makeYear(2) };
+          return { symbol: `${token}USDT`, currentPrice: 400, day: {}, year: makeYear(2) };
         }
-        return { currentPrice: 200, day: {}, year: makeYear(1) };
+        return { symbol: `${token}USDT`, currentPrice: 200, day: {}, year: makeYear(1) };
       },
     );
 

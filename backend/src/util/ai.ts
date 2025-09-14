@@ -6,6 +6,9 @@ export const developerInstructions = [
   '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
   '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
   '- Verify limit orders meet minNotional to avoid cancellations, especially for small amounts.',
+  '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
+  '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
+  '- The prompt lists all supported trading pairs with their current prices for easy reference.',
   '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,delta:number|null,limitPrice:number|null,basePrice:number|null,maxPriceDivergence:number|null},...],shortReport}.',
   '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
   '- shortReport ≤255 chars.',
@@ -59,6 +62,11 @@ export interface PreviousReport {
   error?: unknown;
 }
 
+export interface RoutePrice {
+  pair: string;
+  price: number;
+}
+
 export interface RebalancePrompt {
   instructions: string;
   reviewInterval: string;
@@ -71,6 +79,7 @@ export interface RebalancePrompt {
     start_balance_ts?: string;
     pnl_usd?: number;
   };
+  routes: RoutePrice[];
   marketData: {
     indicators?: Record<string, TokenMetrics>;
     market_timeseries?: Record<string, MarketTimeseries>;
