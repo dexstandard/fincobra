@@ -129,7 +129,9 @@ export default function PortfolioWorkflowFields({
 
   const handleAddToken = () => {
     const available = tokens.filter(
-      (t) => !tokensWatch.some((tw) => tw.token === t.value),
+      (t) =>
+        !tokensWatch.some((tw) => tw.token === t.value) &&
+        !stableCoins.includes(t.value),
     );
     const newToken = available[0]?.value || tokens[0].value;
     append({ token: newToken, minAllocation: 0 });
@@ -176,13 +178,17 @@ export default function PortfolioWorkflowFields({
                     id={`token-${index}`}
                     value={field.value}
                     onChange={field.onChange}
-                    options={tokens.filter(
-                      (t) =>
-                        !tokensWatch.some(
-                          (tw, i) => tw.token === t.value && i !== index,
-                        ),
-                    )}
-                    disabled={index === 0}
+                    options={tokens.filter((t) => {
+                      const isSelected = tokensWatch.some(
+                        (tw, i) => tw.token === t.value && i !== index,
+                      );
+                      if (index === 0) {
+                        return stableCoins.includes(t.value) && !isSelected;
+                      }
+                      return (
+                        !stableCoins.includes(t.value) && !isSelected
+                      );
+                    })}
                   />
                 )}
               />
