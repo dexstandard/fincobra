@@ -220,12 +220,12 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
               </div>
             );
           })}
-          {workflowData.tokens.length < 5 && (
+          {workflowData.tokens.length < 4 && (
             <button
               type="button"
               onClick={handleAddToken}
               className="flex items-center gap-1 text-blue-600"
-            >
+          >
               <Plus className="w-4 h-4" />
             </button>
           )}
