@@ -55,7 +55,7 @@ export const portfolioReviewSchema = z
         }),
       )
       .min(2)
-      .max(5),
+      .max(4),
     risk: z.enum(['low', 'medium', 'high']),
     reviewInterval: z.enum([
       '10m',

@@ -77,7 +77,7 @@ export default function PortfolioWorkflowFields({
     if (topTokens.length > 0) {
       const newTokens = [stable, ...topTokens]
         .filter((t): t is string => Boolean(t))
-        .slice(0, 5);
+        .slice(0, 4);
       replace(
         newTokens.map((t) => ({
           token: t,
@@ -235,7 +235,7 @@ export default function PortfolioWorkflowFields({
             </div>
           );
         })}
-        {fields.length < 5 && (
+        {fields.length < 4 && (
           <button
             type="button"
             onClick={handleAddToken}
