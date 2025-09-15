@@ -143,17 +143,22 @@ async function getUserCreds(id: string): Promise<UserCreds | null> {
   return { key, secret };
 }
 
-export function parseBinanceError(err: unknown): string | null {
+export function parseBinanceError(
+  err: unknown,
+): { code?: number; msg?: string } {
   if (err instanceof Error) {
     const match = err.message.match(/\{.+\}$/);
     if (match) {
       try {
         const body = JSON.parse(match[0]);
-        if (typeof body.msg === 'string') return body.msg;
+        const res: { code?: number; msg?: string } = {};
+        if (typeof body.code === 'number') res.code = body.code;
+        if (typeof body.msg === 'string') res.msg = body.msg;
+        return res;
       } catch {}
     }
   }
-  return null;
+  return {};
 }
 
 export async function fetchAccount(id: string) {

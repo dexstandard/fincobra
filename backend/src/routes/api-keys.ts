@@ -62,11 +62,10 @@ async function cancelOrdersForAgent(agentId: string, log: FastifyBaseLogger) {
       await cancelOrder(o.user_id, { symbol, orderId: Number(o.order_id) });
       await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
     } catch (err) {
-      const msg = parseBinanceError(err);
-      if (msg && /UNKNOWN_ORDER/i.test(msg))
+      const { code } = parseBinanceError(err);
+      if (code === -2013)
         await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
-      else
-        log.error({ err, orderId: o.order_id }, 'failed to cancel order');
+      else log.error({ err, orderId: o.order_id }, 'failed to cancel order');
     }
   }
 }

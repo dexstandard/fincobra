@@ -30,8 +30,9 @@ vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
 }));
 
-const { cancelOrder } = vi.hoisted(() => ({
+const { cancelOrder, parseBinanceError } = vi.hoisted(() => ({
   cancelOrder: vi.fn().mockResolvedValue(undefined),
+  parseBinanceError: vi.fn().mockReturnValue({}),
 }));
 vi.mock('../src/services/binance.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
@@ -51,7 +52,7 @@ vi.mock('../src/services/binance.js', () => ({
     minNotional: 0,
   }),
   cancelOrder,
-  parseBinanceError: vi.fn().mockReturnValue(null),
+  parseBinanceError,
 }));
 
 vi.mock('../src/services/indicators.js', () => ({
@@ -163,5 +164,46 @@ describe('cleanup open orders', () => {
       { order_id: '123', status: 'canceled' },
       { order_id: '456', status: 'canceled' },
     ]);
+  });
+
+  it('marks order filled when Binance reports unknown order', async () => {
+    cancelOrder.mockRejectedValueOnce(new Error('err'));
+    parseBinanceError.mockReturnValueOnce({ code: -2013 });
+    const userId = await insertUser('1');
+    await setAiKey(userId, 'enc');
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioId: agent.id,
+      log: 'log',
+      rebalance: true,
+      newAllocation: 50,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '123',
+    });
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent.id);
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders[0].status).toBe('filled');
   });
 });

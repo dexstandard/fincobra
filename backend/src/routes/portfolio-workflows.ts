@@ -405,8 +405,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           manuallyEdited: body?.manuallyEdited,
         });
       } catch (err) {
-        const msg = parseBinanceError(err) || 'failed to create limit order';
-        return reply.code(400).send(errorResponse(msg));
+        const { msg } = parseBinanceError(err);
+        return reply
+          .code(400)
+          .send(errorResponse(msg || 'failed to create limit order'));
       }
       log.info({ execLogId: logId }, 'created manual order');
       return reply.code(201).send({ ok: true });
@@ -446,8 +448,8 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return { ok: true } as const;
       } catch (err) {
         log.error({ err, execLogId: logId, orderId }, 'failed to cancel order');
-        const msg = parseBinanceError(err) || 'failed to cancel order';
-        return reply.code(500).send(errorResponse(msg));
+        const { msg } = parseBinanceError(err);
+        return reply.code(500).send(errorResponse(msg || 'failed to cancel order'));
       }
     },
   );
@@ -557,10 +559,11 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           });
           await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
         } catch (err) {
-          const msg = parseBinanceError(err);
-          if (msg && /UNKNOWN_ORDER/i.test(msg))
+          const { code } = parseBinanceError(err);
+          if (code === -2013)
             await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
-          else log.error({ err, symbol, orderId: o.order_id }, 'failed to cancel order');
+          else
+            log.error({ err, symbol, orderId: o.order_id }, 'failed to cancel order');
         }
       }
       log.info('deleted workflow');
