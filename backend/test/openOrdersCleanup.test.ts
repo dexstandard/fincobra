@@ -206,4 +206,45 @@ describe('cleanup open orders', () => {
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe('filled');
   });
+
+  it('marks order filled when cancel returns FILLED', async () => {
+    cancelOrder.mockResolvedValueOnce({ status: 'FILLED' } as any);
+    const userId = await insertUser('2');
+    await setAiKey(userId, 'enc');
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioId: agent.id,
+      log: 'log',
+      rebalance: true,
+      newAllocation: 50,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '789',
+    });
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent.id);
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders[0].status).toBe('filled');
+    expect(orders[0].cancellation_reason).toBeNull();
+  });
 });

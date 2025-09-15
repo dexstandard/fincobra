@@ -3,12 +3,8 @@ import {
   getAllOpenLimitOrders,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
-import {
-  cancelOrder,
-  fetchOpenOrders,
-  parseBinanceError,
-  type OpenOrder,
-} from '../services/binance.js';
+import { fetchOpenOrders, type OpenOrder } from '../services/binance.js';
+import { cancelLimitOrder } from '../services/limit-order.js';
 
 interface Order {
   user_id: string;
@@ -70,23 +66,13 @@ async function reconcileOrder(
   }
   if (o.agent_status !== 'active') {
     try {
-      await cancelOrder(o.user_id, {
+      await cancelLimitOrder(o.user_id, {
         symbol,
-        orderId: Number(o.order_id),
+        orderId: o.order_id,
+        reason: 'Agent inactive',
       });
-      await updateLimitOrderStatus(
-        o.user_id,
-        o.order_id,
-        'canceled',
-        'Agent inactive',
-      );
     } catch (err) {
-      const { code } = parseBinanceError(err);
-      if (code === -2013) {
-        await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
-      } else {
-        log.error({ err }, 'failed to cancel order');
-      }
+      log.error({ err }, 'failed to cancel order');
     }
   }
 }
