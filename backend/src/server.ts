@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import pino from 'pino';
 import rateLimit from '@fastify/rate-limit';
 import cookie from '@fastify/cookie';
 import csrf from '@fastify/csrf-protection';
@@ -36,6 +37,8 @@ export default async function buildServer(
   await migrate();
   const app = Fastify({
     logger: {
+      base: undefined,
+      timestamp: pino.stdTimeFunctions.isoTime,
       formatters: {
         level: (label) => ({ level: label.toUpperCase() }),
       },
@@ -94,9 +97,10 @@ export default async function buildServer(
       (req.params as any)?.workflowId ??
       (req.body as any)?.workflowId ??
       (req.query as any)?.workflowId;
-    (req as any).logContext = { userId, workflowId };
+    const route = req.routerPath ? `/api${req.routerPath}` : req.raw.url;
+    (req as any).logContext = { userId, workflowId, route };
     const params = sanitize({ params: req.params, query: req.query, body: req.body });
-    req.log.info({ userId, workflowId, params }, 'request start');
+    req.log.info({ userId, workflowId, route, params }, 'request start');
     done();
   });
 
