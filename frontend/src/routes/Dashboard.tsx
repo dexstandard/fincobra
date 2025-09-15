@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Eye, Trash, Clock } from 'lucide-react';
+import { Eye, Trash, Clock, Plus } from 'lucide-react';
 import axios from 'axios';
 import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
@@ -10,7 +10,6 @@ import TokenDisplay from '../components/TokenDisplay';
 import { useAgentBalanceUsd } from '../lib/useAgentBalanceUsd';
 import Button from '../components/ui/Button';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import PortfolioReviewForm from '../components/forms/PortfolioReviewForm';
 import ExchangeApiKeySection from '../components/forms/ExchangeApiKeySection';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useToast } from '../lib/useToast';
@@ -263,28 +262,13 @@ function AgentBlock({
 export default function Dashboard() {
   const { user } = useUser();
   const [page, setPage] = useState(1);
-  const [tokens, setTokens] = useState(['USDT']);
   const [onlyActive, setOnlyActive] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
   const t = useTranslation();
-  const {
-    hasBinanceKey,
-    balances,
-    accountBalances,
-    isAccountLoading,
-  } = usePrerequisites(tokens, {
+  const { hasBinanceKey } = usePrerequisites([], {
     includeAiKey: false,
   });
-
-  const handleTokensChange = useCallback((newTokens: string[]) => {
-    setTokens((prev) => {
-      if (prev.length === newTokens.length && prev.every((t, i) => t === newTokens[i])) {
-        return prev;
-      }
-      return newTokens;
-    });
-  }, []);
 
   const { data } = useQuery({
     queryKey: ['agents', page, user?.id, onlyActive],
@@ -350,32 +334,34 @@ export default function Dashboard() {
   return (
     <>
       <div className="flex flex-col gap-3 w-full">
-      <div className="flex flex-col md:flex-row gap-3 items-stretch">
-        <div className="flex-1 flex flex-col gap-4">
-          {!hasBinanceKey ? (
-            <ExchangeApiKeySection
-              exchange="binance"
-              label={t('connect_binance_api')}
-            />
-          ) : (
-            <PortfolioReviewForm
-              balances={balances}
-              accountBalances={accountBalances}
-              onTokensChange={handleTokensChange}
-              accountLoading={isAccountLoading}
-            />
-          )}
-        </div>
-      </div>
+        {!hasBinanceKey && (
+          <div className="flex flex-col md:flex-row gap-3 items-stretch">
+            <div className="flex-1 flex flex-col gap-4">
+              <ExchangeApiKeySection
+                exchange="binance"
+                label={t('connect_binance_api')}
+              />
+            </div>
+          </div>
+        )}
         <ErrorBoundary>
           <div className="bg-white shadow-md border border-gray-200 rounded p-6 w-full">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">{t('my_agents')}</h2>
-              <Toggle
-                label={t('only_active')}
-                checked={onlyActive}
-                onChange={setOnlyActive}
-              />
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/portfolio-workflow-draft"
+                  className="text-blue-600 underline inline-flex"
+                  aria-label={t('create_agent')}
+                >
+                  <Plus className="w-4 h-4" />
+                </Link>
+                <Toggle
+                  label={t('only_active')}
+                  checked={onlyActive}
+                  onChange={setOnlyActive}
+                />
+              </div>
             </div>
             {items.length === 0 ? (
               <p>{t('no_agents_yet')}</p>
