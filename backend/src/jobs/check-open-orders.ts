@@ -74,7 +74,12 @@ async function reconcileOrder(
         symbol,
         orderId: Number(o.order_id),
       });
-      await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+      await updateLimitOrderStatus(
+        o.user_id,
+        o.order_id,
+        'canceled',
+        'Agent inactive',
+      );
     } catch (err) {
       const { code } = parseBinanceError(err);
       if (code === -2013) {

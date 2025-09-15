@@ -443,7 +443,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           symbol: planned.symbol,
           orderId: Number(orderId),
         });
-        await updateLimitOrderStatus(userId, orderId, 'canceled');
+        await updateLimitOrderStatus(
+          userId,
+          orderId,
+          'canceled',
+          'Canceled by user',
+        );
         log.info({ execLogId: logId, orderId }, 'canceled order');
         return { ok: true } as const;
       } catch (err) {
@@ -549,7 +554,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           log.error({ err, orderId: o.order_id }, 'failed to parse planned order');
         }
         if (!symbol) {
-          await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+          await updateLimitOrderStatus(
+            o.user_id,
+            o.order_id,
+            'canceled',
+            'Workflow deleted',
+          );
           continue;
         }
         try {
@@ -557,7 +567,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
             symbol,
             orderId: Number(o.order_id),
           });
-          await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+          await updateLimitOrderStatus(
+            o.user_id,
+            o.order_id,
+            'canceled',
+            'Workflow deleted',
+          );
         } catch (err) {
           const { code } = parseBinanceError(err);
           if (code === -2013)

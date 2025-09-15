@@ -207,7 +207,7 @@ describe('createRebalanceLimitOrder', () => {
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
 
-  it('skips orders below exchange min notional', async () => {
+  it('records orders below exchange min notional as canceled', async () => {
     const log = mockLogger();
     const userId = await insertUser('7');
     const agent = await insertAgent({
@@ -249,7 +249,9 @@ describe('createRebalanceLimitOrder', () => {
       reviewResultId,
     });
     const rows = await getLimitOrders();
-    expect(rows).toHaveLength(0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].cancellation_reason).toBe('order below min notional');
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
 
@@ -547,6 +549,58 @@ describe('createDecisionLimitOrders', () => {
     });
     const row = (await getLimitOrders())[0];
     expect(row.status).toBe('canceled');
+    expect(createLimitOrder).not.toHaveBeenCalled();
+  });
+
+  it('records decision orders below min notional as canceled', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('15');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 8,
+      minNotional: 10,
+    });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.05,
+          delta: null,
+          limitPrice: null,
+          basePrice: null,
+          maxPriceDivergence: null,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const rows = await getLimitOrders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].cancellation_reason).toBe('order below min notional');
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
 });

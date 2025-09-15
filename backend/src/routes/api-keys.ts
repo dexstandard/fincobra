@@ -55,12 +55,22 @@ async function cancelOrdersForAgent(agentId: string, log: FastifyBaseLogger) {
       log.error({ err, orderId: o.order_id }, 'failed to parse planned order');
     }
     if (!symbol) {
-      await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+      await updateLimitOrderStatus(
+        o.user_id,
+        o.order_id,
+        'canceled',
+        'API key removed',
+      );
       continue;
     }
     try {
       await cancelOrder(o.user_id, { symbol, orderId: Number(o.order_id) });
-      await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+      await updateLimitOrderStatus(
+        o.user_id,
+        o.order_id,
+        'canceled',
+        'API key removed',
+      );
     } catch (err) {
       const { code } = parseBinanceError(err);
       if (code === -2013)
