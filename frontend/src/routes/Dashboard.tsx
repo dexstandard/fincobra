@@ -324,7 +324,9 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">{t('my_agents')}</h2>
             </div>
-            <p>{t('no_agents_yet')}</p>
+            <p>{
+              hasBinanceKey ? t('no_agents_yet_connected') : t('no_agents_yet')
+            }</p>
           </div>
         </ErrorBoundary>
       </div>
@@ -366,7 +368,13 @@ export default function Dashboard() {
               />
             </div>
             {items.length === 0 ? (
-              <p>{t('no_agents_yet')}</p>
+              <p>
+                {
+                  hasBinanceKey
+                    ? t('no_agents_yet_connected')
+                    : t('no_agents_yet')
+                }
+              </p>
             ) : (
               <>
                 <table className="w-full mb-4 hidden md:table">
