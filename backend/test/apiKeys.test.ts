@@ -8,7 +8,7 @@ vi.mock('../src/services/binance.js', async () => {
   const actual = await vi.importActual<typeof import('../src/services/binance.js')>(
     '../src/services/binance.js',
   );
-  return { ...actual, cancelOpenOrders: vi.fn().mockResolvedValue(undefined) };
+  return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
 });
 
 import buildServer from '../src/server.js';
@@ -23,9 +23,11 @@ import {
 } from '../src/repos/api-keys.js';
 import { insertAgent, getPortfolioWorkflow } from './repos/portfolio-workflow.js';
 import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
+import { insertReviewResult } from './repos/agent-review-result.js';
+import { insertLimitOrder } from './repos/limit-orders.js';
 import { encrypt } from '../src/util/crypto.js';
 import { removeWorkflowFromSchedule } from '../src/workflows/portfolio-review.js';
-import { cancelOpenOrders } from '../src/services/binance.js';
+import { cancelOrder } from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
 
 describe('AI API key routes', () => {
@@ -359,7 +361,7 @@ describe('Binance API key routes', () => {
 describe('key deletion effects on agents', () => {
   beforeEach(() => {
     (removeWorkflowFromSchedule as any).mockClear();
-    (cancelOpenOrders as any).mockClear();
+    (cancelOrder as any).mockClear();
   });
   it('stops agents when binance key is deleted', async () => {
     const app = await buildServer();
@@ -386,6 +388,15 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
+    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH' },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '1',
+    });
+
     const res = await app.inject({
       method: 'DELETE',
       url: `/api/users/${userId}/binance-key`,
@@ -395,7 +406,10 @@ describe('key deletion effects on agents', () => {
     const row = await getPortfolioWorkflow(agent.id);
     expect(row?.status).toBe('inactive');
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
-    expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
+    expect(cancelOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCETH',
+      orderId: 1,
+    });
     await app.close();
   });
 
@@ -424,6 +438,15 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
+    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH' },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '2',
+    });
+
     const res = await app.inject({
       method: 'DELETE',
       url: `/api/users/${userId}/ai-key`,
@@ -433,7 +456,10 @@ describe('key deletion effects on agents', () => {
     const row = await getPortfolioWorkflow(agent.id);
     expect(row).toMatchObject({ status: 'draft', model: null });
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
-    expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
+    expect(cancelOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCETH',
+      orderId: 2,
+    });
     await app.close();
   });
 
@@ -470,6 +496,15 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
+    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH' },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '3',
+    });
+
     const res = await app.inject({
       method: 'DELETE',
       url: `/api/users/${adminId}/ai-key/share`,
@@ -480,7 +515,10 @@ describe('key deletion effects on agents', () => {
     const row = await getPortfolioWorkflow(agent.id);
     expect(row).toMatchObject({ status: 'draft', model: null });
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
-    expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
+    expect(cancelOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCETH',
+      orderId: 3,
+    });
     await app.close();
   });
 
@@ -517,6 +555,15 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
+    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH' },
+      status: 'open',
+      reviewResultId: rrId,
+      orderId: '4',
+    });
+
     const res = await app.inject({
       method: 'DELETE',
       url: `/api/users/${adminId}/ai-key`,
@@ -526,7 +573,10 @@ describe('key deletion effects on agents', () => {
     const row = await getPortfolioWorkflow(agent.id);
     expect(row).toMatchObject({ status: 'draft', model: null });
     expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
-    expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
+    expect(cancelOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCETH',
+      orderId: 4,
+    });
     const keyRow = await getUserApiKeys(userId);
     expect(keyRow?.ai_api_key_enc).toBeNull();
     const shareExists = await hasAiKeyShare(adminId, userId);
@@ -579,7 +629,7 @@ describe('key deletion effects on agents', () => {
     const row = await getPortfolioWorkflow(agent.id);
     expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
     expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
-    expect(cancelOpenOrders).not.toHaveBeenCalled();
+    expect(cancelOrder).not.toHaveBeenCalled();
     const keyRow = await getUserApiKeys(userId);
     expect(keyRow?.ai_api_key_enc).toBeDefined();
     await app.close();
@@ -629,7 +679,7 @@ describe('key deletion effects on agents', () => {
     const row = await getPortfolioWorkflow(agent.id);
     expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
     expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
-    expect(cancelOpenOrders).not.toHaveBeenCalled();
+    expect(cancelOrder).not.toHaveBeenCalled();
     await app.close();
   });
 });

@@ -28,7 +28,6 @@ import {
 } from '../util/agents.js';
 import * as binance from '../services/binance.js';
 import {
-  cancelOpenLimitOrdersByAgent,
   getLimitOrdersByReviewResult,
   getOpenLimitOrdersForAgent,
   updateLimitOrderStatus,
@@ -539,23 +538,31 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       await repoDeleteAgent(id);
       removeWorkflowFromSchedule(id);
       const openOrders = await getOpenLimitOrdersForAgent(id);
-      const symbols = new Set<string>();
       for (const o of openOrders) {
+        let symbol: string | undefined;
         try {
           const planned = JSON.parse(o.planned_json);
-          if (typeof planned.symbol === 'string') symbols.add(planned.symbol);
+          if (typeof planned.symbol === 'string') symbol = planned.symbol;
         } catch (err) {
           log.error({ err, orderId: o.order_id }, 'failed to parse planned order');
         }
-      }
-      for (const symbol of symbols) {
+        if (!symbol) {
+          await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+          continue;
+        }
         try {
-          await binance.cancelOpenOrders(userId, { symbol });
+          await binance.cancelOrder(userId, {
+            symbol,
+            orderId: Number(o.order_id),
+          });
+          await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
         } catch (err) {
-          log.error({ err, symbol }, 'failed to cancel open orders');
+          const msg = parseBinanceError(err);
+          if (msg && /UNKNOWN_ORDER/i.test(msg))
+            await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
+          else log.error({ err, symbol, orderId: o.order_id }, 'failed to cancel order');
         }
       }
-      await cancelOpenLimitOrdersByAgent(id);
       log.info('deleted workflow');
       return { ok: true };
     }

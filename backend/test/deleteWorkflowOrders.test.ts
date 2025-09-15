@@ -12,15 +12,15 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
   removeWorkflowFromSchedule: vi.fn(),
 }));
 
-const { cancelOpenOrders } = vi.hoisted(() => ({
-  cancelOpenOrders: vi.fn().mockResolvedValue(undefined),
+const { cancelOrder } = vi.hoisted(() => ({
+  cancelOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../src/services/binance.js', async () => {
   const actual = await vi.importActual<typeof import('../src/services/binance.js')>(
     '../src/services/binance.js',
   );
-  return { ...actual, cancelOpenOrders };
+  return { ...actual, cancelOrder };
 });
 
 describe('delete workflow cancels all orders', () => {
@@ -66,9 +66,15 @@ describe('delete workflow cancels all orders', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
-    expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
-    expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'ETHSOL' });
-    expect(cancelOpenOrders).toHaveBeenCalledTimes(2);
+    expect(cancelOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCETH',
+      orderId: 1,
+    });
+    expect(cancelOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'ETHSOL',
+      orderId: 2,
+    });
+    expect(cancelOrder).toHaveBeenCalledTimes(2);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders.map((o) => o.status)).toEqual(['canceled', 'canceled']);
     await app.close();
