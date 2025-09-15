@@ -67,16 +67,24 @@ export async function createRebalanceLimitOrder(opts: {
   const prc = price ?? order.currentPrice * (side === 'BUY' ? 0.999 : 1.001);
   const roundedQty = Number(qty.toFixed(info.quantityPrecision));
   const roundedPrice = Number(prc.toFixed(info.pricePrecision));
-  if (roundedQty * roundedPrice < info.minNotional) {
-    log.info({ step: 'createLimitOrder' }, 'step success: order below min notional');
-    return;
-  }
   const params = {
     symbol: info.symbol,
     side,
     quantity: roundedQty,
     price: roundedPrice,
   } as const;
+  if (roundedQty * roundedPrice < info.minNotional) {
+    await insertLimitOrder({
+      userId,
+      planned: { ...params, manuallyEdited: manuallyEdited ?? false },
+      status: 'canceled' as LimitOrderStatus,
+      reviewResultId,
+      orderId: String(Date.now()),
+      cancellationReason: 'order below min notional',
+    });
+    log.info({ step: 'createLimitOrder' }, 'step success: order below min notional');
+    return;
+  }
   try {
     const res = await createLimitOrder(userId, params);
     if (!res || res.orderId === undefined || res.orderId === null) {
@@ -185,7 +193,17 @@ export async function createDecisionLimitOrders(opts: {
       });
       continue;
     }
-    if (qty * prc < info.minNotional) continue;
+    if (qty * prc < info.minNotional) {
+      await insertLimitOrder({
+        userId: opts.userId,
+        planned,
+        status: 'canceled' as LimitOrderStatus,
+        reviewResultId: opts.reviewResultId,
+        orderId: String(Date.now()),
+        cancellationReason: 'order below min notional',
+      });
+      continue;
+    }
     try {
       const res = await createLimitOrder(opts.userId, params);
       if (!res || res.orderId === undefined || res.orderId === null) {

@@ -43,7 +43,7 @@ export async function clearLimitOrders() {
 
 export async function getLimitOrders() {
   const { rows } = await db.query(
-    'SELECT user_id, planned_json, status, review_result_id, order_id FROM limit_order',
+    'SELECT user_id, planned_json, status, review_result_id, order_id, cancellation_reason FROM limit_order',
   );
   return rows as {
     user_id: string;
@@ -51,5 +51,6 @@ export async function getLimitOrders() {
     status: string;
     review_result_id: string;
     order_id: string;
+    cancellation_reason: string | null;
   }[];
 }
