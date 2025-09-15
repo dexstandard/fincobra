@@ -101,6 +101,7 @@ describe('cleanup open orders', () => {
     expect(cancelOrder).toHaveBeenCalledTimes(1);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe('canceled');
+    expect(orders[0].cancellation_reason).toBe('could not fill within interval');
   });
 
   it('cancels multiple open orders in parallel', async () => {
@@ -159,9 +160,23 @@ describe('cleanup open orders', () => {
     resolves.forEach((r) => r());
     await runPromise;
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders.map((o) => ({ order_id: o.order_id, status: o.status }))).toEqual([
-      { order_id: '123', status: 'canceled' },
-      { order_id: '456', status: 'canceled' },
+    expect(
+      orders.map((o) => ({
+        order_id: o.order_id,
+        status: o.status,
+        cancellation_reason: o.cancellation_reason,
+      })),
+    ).toEqual([
+      {
+        order_id: '123',
+        status: 'canceled',
+        cancellation_reason: 'could not fill within interval',
+      },
+      {
+        order_id: '456',
+        status: 'canceled',
+        cancellation_reason: 'could not fill within interval',
+      },
     ]);
   });
 });

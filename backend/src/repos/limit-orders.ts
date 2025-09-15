@@ -27,15 +27,16 @@ export async function insertLimitOrder(entry: LimitOrderEntry): Promise<void> {
 
 export async function cancelOpenLimitOrdersByAgent(
   agentId: string,
+  reason?: string,
 ): Promise<void> {
   await db.query(
     `UPDATE limit_order e
-        SET status = 'canceled'
+        SET status = 'canceled', cancellation_reason = COALESCE($2, cancellation_reason)
        FROM agent_review_result r
       WHERE e.status = 'open'
         AND e.review_result_id = r.id
         AND r.agent_id = $1`,
-    [agentId],
+    [agentId, reason ?? null],
   );
 }
 

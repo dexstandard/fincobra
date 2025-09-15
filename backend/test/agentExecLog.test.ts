@@ -108,6 +108,7 @@ describe('agent exec log routes', () => {
     });
     let row = await getLimitOrder('2');
     expect(row?.status).toBe('canceled');
+    expect(row?.cancellation_reason).toBe('canceled by user');
     res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/2/cancel`,
@@ -116,6 +117,7 @@ describe('agent exec log routes', () => {
     expect(res.statusCode).toBe(403);
     row = await getLimitOrder('2');
     expect(row?.status).toBe('canceled');
+    expect(row?.cancellation_reason).toBe('canceled by user');
     spy.mockRestore();
     await app.close();
   });

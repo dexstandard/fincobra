@@ -441,7 +441,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           symbol: planned.symbol,
           orderId: Number(orderId),
         });
-        await updateLimitOrderStatus(userId, orderId, 'canceled');
+        await updateLimitOrderStatus(
+          userId,
+          orderId,
+          'canceled',
+          'canceled by user',
+        );
         log.info({ execLogId: logId, orderId }, 'canceled order');
         return { ok: true } as const;
       } catch (err) {
@@ -539,18 +544,18 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       removeWorkflowFromSchedule(id);
       const token1 = agent.tokens[0].token;
       const token2 = agent.tokens[1].token;
-      try {
-        await binance.cancelOpenOrders(userId, {
-          symbol: `${token1}${token2}`,
-        });
-      } catch (err) {
-        log.error({ err }, 'failed to cancel open orders');
+        try {
+          await binance.cancelOpenOrders(userId, {
+            symbol: `${token1}${token2}`,
+          });
+        } catch (err) {
+          log.error({ err }, 'failed to cancel open orders');
+        }
+        await cancelOpenLimitOrdersByAgent(id, 'workflow deleted');
+        log.info('deleted workflow');
+        return { ok: true };
       }
-      await cancelOpenLimitOrdersByAgent(id);
-      log.info('deleted workflow');
-      return { ok: true };
-    }
-  );
+    );
 
   app.post(
     '/portfolio-workflows/:id/start',

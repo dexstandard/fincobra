@@ -106,7 +106,12 @@ async function cleanupOpenOrders(
             symbol: planned.symbol,
             orderId: Number(o.order_id),
           });
-          await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+          await updateLimitOrderStatus(
+            o.user_id,
+            o.order_id,
+            'canceled',
+            'could not fill within interval',
+          );
           log.info({ orderId: o.order_id }, 'canceled stale order');
         } catch (err) {
           const msg = parseBinanceError(err);
