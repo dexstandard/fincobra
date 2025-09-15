@@ -101,8 +101,8 @@ export async function createRebalanceLimitOrder(opts: {
     });
     log.info({ step: 'createLimitOrder', orderId: res.orderId, order: params }, 'step success');
   } catch (err) {
-    const reason =
-      parseBinanceError(err) || (err instanceof Error ? err.message : 'unknown error');
+    const { msg } = parseBinanceError(err);
+    const reason = msg || (err instanceof Error ? err.message : 'unknown error');
     await insertLimitOrder({
       userId,
       planned: { ...params, manuallyEdited: manuallyEdited ?? false },
@@ -208,8 +208,8 @@ export async function createDecisionLimitOrders(opts: {
       });
       opts.log.info({ step: 'createLimitOrder', orderId: res.orderId }, 'step success');
     } catch (err) {
-      const reason =
-        parseBinanceError(err) || (err instanceof Error ? err.message : 'unknown error');
+      const { msg } = parseBinanceError(err);
+      const reason = msg || (err instanceof Error ? err.message : 'unknown error');
       await insertLimitOrder({
         userId: opts.userId,
         planned,

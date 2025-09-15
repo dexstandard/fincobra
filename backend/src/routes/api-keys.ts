@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 import { RATE_LIMITS } from '../rate-limit.js';
 import {
@@ -20,7 +20,14 @@ import {
   draftAgentsByUser,
 } from '../repos/portfolio-workflow.js';
 import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
-import { cancelOpenOrders } from '../services/binance.js';
+import {
+  cancelOrder,
+  parseBinanceError,
+} from '../services/binance.js';
+import {
+  getOpenLimitOrdersForAgent,
+  updateLimitOrderStatus,
+} from '../repos/limit-orders.js';
 import { requireUserIdMatch, requireAdmin } from '../util/auth.js';
 import {
   ApiKeyType,
@@ -36,6 +43,32 @@ import { findUserByEmail } from '../repos/users.js';
 import { parseParams } from '../util/validation.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
+
+async function cancelOrdersForAgent(agentId: string, log: FastifyBaseLogger) {
+  const openOrders = await getOpenLimitOrdersForAgent(agentId);
+  for (const o of openOrders) {
+    let symbol: string | undefined;
+    try {
+      const planned = JSON.parse(o.planned_json);
+      if (typeof planned.symbol === 'string') symbol = planned.symbol;
+    } catch (err) {
+      log.error({ err, orderId: o.order_id }, 'failed to parse planned order');
+    }
+    if (!symbol) {
+      await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+      continue;
+    }
+    try {
+      await cancelOrder(o.user_id, { symbol, orderId: Number(o.order_id) });
+      await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+    } catch (err) {
+      const { code } = parseBinanceError(err);
+      if (code === -2013)
+        await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
+      else log.error({ err, orderId: o.order_id }, 'failed to cancel order');
+    }
+  }
+}
 
 export default async function apiKeyRoutes(app: FastifyInstance) {
   app.post(
@@ -132,14 +165,10 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       const agents = await getActivePortfolioWorkflowsByUser(id);
       for (const agent of agents) {
         removeWorkflowFromSchedule(agent.id);
-        const token1 = agent.tokens[0].token;
-        const token2 = agent.tokens[1].token;
         try {
-          await cancelOpenOrders(id, {
-            symbol: `${token1}${token2}`,
-          });
+          await cancelOrdersForAgent(agent.id, req.log);
         } catch (err) {
-          req.log.error({ err, agentId: agent.id }, 'failed to cancel open orders');
+          req.log.error({ err, agentId: agent.id }, 'failed to cancel orders');
         }
       }
       await draftAgentsByUser(id);
@@ -151,12 +180,10 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
           const tAgents = await getActivePortfolioWorkflowsByUser(targetId);
           for (const agent of tAgents) {
             removeWorkflowFromSchedule(agent.id);
-            const token1 = agent.tokens[0].token;
-            const token2 = agent.tokens[1].token;
             try {
-              await cancelOpenOrders(targetId, { symbol: `${token1}${token2}` });
+              await cancelOrdersForAgent(agent.id, req.log);
             } catch (err) {
-              req.log.error({ err, agentId: agent.id }, 'failed to cancel open orders');
+              req.log.error({ err, agentId: agent.id }, 'failed to cancel orders');
             }
           }
           await draftAgentsByUser(targetId);
@@ -209,12 +236,10 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
         const agents = await getActivePortfolioWorkflowsByUser(target.id);
         for (const agent of agents) {
           removeWorkflowFromSchedule(agent.id);
-          const token1 = agent.tokens[0].token;
-          const token2 = agent.tokens[1].token;
           try {
-            await cancelOpenOrders(target.id, { symbol: `${token1}${token2}` });
+            await cancelOrdersForAgent(agent.id, req.log);
           } catch (err) {
-            req.log.error({ err, agentId: agent.id }, 'failed to cancel open orders');
+            req.log.error({ err, agentId: agent.id }, 'failed to cancel orders');
           }
         }
         await draftAgentsByUser(target.id);
@@ -326,14 +351,10 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       const agents = await getActivePortfolioWorkflowsByUser(id);
       for (const agent of agents) {
         removeWorkflowFromSchedule(agent.id);
-        const token1 = agent.tokens[0].token;
-        const token2 = agent.tokens[1].token;
         try {
-          await cancelOpenOrders(id, {
-            symbol: `${token1}${token2}`,
-          });
+          await cancelOrdersForAgent(agent.id, req.log);
         } catch (err) {
-          req.log.error({ err, agentId: agent.id }, 'failed to cancel open orders');
+          req.log.error({ err, agentId: agent.id }, 'failed to cancel orders');
         }
       }
       await deactivateAgentsByUser(id);

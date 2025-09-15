@@ -28,8 +28,8 @@ import {
 } from '../util/agents.js';
 import * as binance from '../services/binance.js';
 import {
-  cancelOpenLimitOrdersByAgent,
   getLimitOrdersByReviewResult,
+  getOpenLimitOrdersForAgent,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
 import {
@@ -405,8 +405,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           manuallyEdited: body?.manuallyEdited,
         });
       } catch (err) {
-        const msg = parseBinanceError(err) || 'failed to create limit order';
-        return reply.code(400).send(errorResponse(msg));
+        const { msg } = parseBinanceError(err);
+        return reply
+          .code(400)
+          .send(errorResponse(msg || 'failed to create limit order'));
       }
       log.info({ execLogId: logId }, 'created manual order');
       return reply.code(201).send({ ok: true });
@@ -446,8 +448,8 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return { ok: true } as const;
       } catch (err) {
         log.error({ err, execLogId: logId, orderId }, 'failed to cancel order');
-        const msg = parseBinanceError(err) || 'failed to cancel order';
-        return reply.code(500).send(errorResponse(msg));
+        const { msg } = parseBinanceError(err);
+        return reply.code(500).send(errorResponse(msg || 'failed to cancel order'));
       }
     },
   );
@@ -534,19 +536,36 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { userId, id, log, agent } = ctx;
+      const { userId, id, log } = ctx;
       await repoDeleteAgent(id);
       removeWorkflowFromSchedule(id);
-      const token1 = agent.tokens[0].token;
-      const token2 = agent.tokens[1].token;
-      try {
-        await binance.cancelOpenOrders(userId, {
-          symbol: `${token1}${token2}`,
-        });
-      } catch (err) {
-        log.error({ err }, 'failed to cancel open orders');
+      const openOrders = await getOpenLimitOrdersForAgent(id);
+      for (const o of openOrders) {
+        let symbol: string | undefined;
+        try {
+          const planned = JSON.parse(o.planned_json);
+          if (typeof planned.symbol === 'string') symbol = planned.symbol;
+        } catch (err) {
+          log.error({ err, orderId: o.order_id }, 'failed to parse planned order');
+        }
+        if (!symbol) {
+          await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+          continue;
+        }
+        try {
+          await binance.cancelOrder(userId, {
+            symbol,
+            orderId: Number(o.order_id),
+          });
+          await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+        } catch (err) {
+          const { code } = parseBinanceError(err);
+          if (code === -2013)
+            await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
+          else
+            log.error({ err, symbol, orderId: o.order_id }, 'failed to cancel order');
+        }
       }
-      await cancelOpenLimitOrdersByAgent(id);
       log.info('deleted workflow');
       return { ok: true };
     }

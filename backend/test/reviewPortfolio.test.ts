@@ -103,7 +103,7 @@ vi.mock('../src/services/binance.js', () => ({
     minNotional: 0,
   }),
   cancelOrder: vi.fn().mockResolvedValue(undefined),
-  parseBinanceError: vi.fn().mockReturnValue(null),
+  parseBinanceError: vi.fn().mockReturnValue({}),
   fetchFearGreedIndex: vi
     .fn()
     .mockResolvedValue({ value: 50, classification: 'Neutral' }),

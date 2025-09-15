@@ -109,8 +109,8 @@ async function cleanupOpenOrders(
           await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
           log.info({ orderId: o.order_id }, 'canceled stale order');
         } catch (err) {
-          const msg = parseBinanceError(err);
-          if (msg && /UNKNOWN_ORDER/i.test(msg)) {
+          const { code } = parseBinanceError(err);
+          if (code === -2013) {
             await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
           } else {
             log.error({ err }, 'failed to cancel order');

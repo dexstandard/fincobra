@@ -13,7 +13,7 @@ import {
   insertLimitOrder,
   getLimitOrdersByReviewResult,
 } from './repos/limit-orders.js';
-import { cancelOpenOrders } from '../src/services/binance.js';
+import { cancelOrder } from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
 
 vi.mock('../src/workflows/portfolio-review.js', () => ({
@@ -25,7 +25,7 @@ vi.mock('../src/services/binance.js', async () => {
   const actual = await vi.importActual<typeof import('../src/services/binance.js')>(
     '../src/services/binance.js',
   );
-  return { ...actual, cancelOpenOrders: vi.fn().mockResolvedValue(undefined) };
+  return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
 });
 
 
@@ -158,7 +158,7 @@ describe('agent routes', () => {
     const execId = await insertReviewResult({ portfolioId: id, log: '' });
     await insertLimitOrder({
       userId,
-      planned: {},
+      planned: { symbol: 'BTCETH' },
       status: 'open',
       reviewResultId: execId,
       orderId: '123',
@@ -174,7 +174,10 @@ describe('agent routes', () => {
     expect(deletedStatus).toBe('retired');
     expect(await getAgent(id)).toBeUndefined();
     expect(await getActivePortfolioWorkflowById(id)).toBeUndefined();
-    expect(cancelOpenOrders).toHaveBeenCalledWith(userId, { symbol: 'BTCETH' });
+    expect(cancelOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCETH',
+      orderId: 123,
+    });
     const execOrders = await getLimitOrdersByReviewResult(execId);
     expect(execOrders[0].status).toBe('canceled');
 

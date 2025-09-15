@@ -25,20 +25,6 @@ export async function insertLimitOrder(entry: LimitOrderEntry): Promise<void> {
   );
 }
 
-export async function cancelOpenLimitOrdersByAgent(
-  agentId: string,
-): Promise<void> {
-  await db.query(
-    `UPDATE limit_order e
-        SET status = 'canceled'
-       FROM agent_review_result r
-      WHERE e.status = 'open'
-        AND e.review_result_id = r.id
-        AND r.agent_id = $1`,
-    [agentId],
-  );
-}
-
 export async function getLimitOrdersByReviewResult(
   agentId: string,
   reviewResultId: string,
