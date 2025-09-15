@@ -347,21 +347,23 @@ export default function Dashboard() {
         <ErrorBoundary>
           <div className="bg-white shadow-md border border-gray-200 rounded p-6 w-full">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">{t('my_agents')}</h2>
               <div className="flex items-center gap-2">
-                <Link
-                  to="/portfolio-workflow-draft"
-                  className="text-blue-600 underline inline-flex"
-                  aria-label={t('create_agent')}
-                >
-                  <Plus className="w-4 h-4" />
-                </Link>
-                <Toggle
-                  label={t('only_active')}
-                  checked={onlyActive}
-                  onChange={setOnlyActive}
-                />
+                <h2 className="text-xl font-bold">{t('my_agents')}</h2>
+                {hasBinanceKey && (
+                  <Link
+                    to="/portfolio-workflow-draft"
+                    className="text-blue-600 inline-flex"
+                    aria-label={t('create_agent')}
+                  >
+                    <Plus className="w-6 h-6" strokeWidth={3} />
+                  </Link>
+                )}
               </div>
+              <Toggle
+                label={t('only_active')}
+                checked={onlyActive}
+                onChange={setOnlyActive}
+              />
             </div>
             {items.length === 0 ? (
               <p>{t('no_agents_yet')}</p>
