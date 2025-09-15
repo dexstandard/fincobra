@@ -16,6 +16,9 @@ const fetchTokenIndicatorsMock = vi.hoisted(() =>
   }),
 );
 const callAiMock = vi.hoisted(() => vi.fn());
+const fetchFearGreedIndexMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ value: 50, classification: 'Neutral' }),
+);
 const extractJson = vi.hoisted(() => (res: string) => {
   try {
     const json = JSON.parse(res);
@@ -28,6 +31,9 @@ const extractJson = vi.hoisted(() => (res: string) => {
 
 vi.mock('../src/services/derivatives.js', () => ({
   fetchOrderBook: vi.fn().mockResolvedValue({ bid: [0, 0], ask: [0, 0] }),
+}));
+vi.mock('../src/services/binance.js', () => ({
+  fetchFearGreedIndex: fetchFearGreedIndexMock,
 }));
 vi.mock('../src/repos/agent-review-raw-log.js', () => ({
   insertReviewRawLog: insertReviewRawLogMock,
@@ -75,11 +81,22 @@ const indicators = {
 } as const;
 
 describe('technical analyst', () => {
-  beforeEach(() => callAiMock.mockReset());
+  beforeEach(() => {
+    callAiMock.mockReset();
+    resetTechnicalAnalystCache();
+  });
 
   it('returns outlook', async () => {
     callAiMock.mockResolvedValue(responseJson);
-    const res = await getTechnicalOutlook('BTC', indicators, 'gpt', 'key', mockLogger());
+    const res = await getTechnicalOutlook(
+      'BTC',
+      indicators,
+      { bid: [0, 0], ask: [0, 0] },
+      { value: 50, classification: 'Neutral' },
+      'gpt',
+      'key',
+      mockLogger(),
+    );
     expect(res.analysis?.comment).toBe('outlook text');
     expect(res.prompt).toBeTruthy();
     expect(res.response).toBe(responseJson);
@@ -88,17 +105,49 @@ describe('technical analyst', () => {
 
   it('falls back when AI response is malformed', async () => {
     callAiMock.mockResolvedValue('{"output":[]}');
-    const res = await getTechnicalOutlook('BTC', indicators, 'gpt', 'key', mockLogger());
+    const res = await getTechnicalOutlook(
+      'BTC',
+      indicators,
+      { bid: [0, 0], ask: [0, 0] },
+      { value: 50, classification: 'Neutral' },
+      'gpt',
+      'key',
+      mockLogger(),
+    );
     expect(res.analysis?.comment).toBe('Analysis unavailable');
     expect(res.analysis?.score).toBe(0);
   });
 
   it('caches token outlooks and dedupes concurrent calls', async () => {
     callAiMock.mockResolvedValue(responseJson);
-    const p1 = getTechnicalOutlookCached('BTC', indicators, 'gpt', 'key', mockLogger());
-    const p2 = getTechnicalOutlookCached('BTC', indicators, 'gpt', 'key', mockLogger());
+    const p1 = getTechnicalOutlookCached(
+      'BTC',
+      indicators,
+      { bid: [0, 0], ask: [0, 0] },
+      { value: 50, classification: 'Neutral' },
+      'gpt',
+      'key',
+      mockLogger(),
+    );
+    const p2 = getTechnicalOutlookCached(
+      'BTC',
+      indicators,
+      { bid: [0, 0], ask: [0, 0] },
+      { value: 50, classification: 'Neutral' },
+      'gpt',
+      'key',
+      mockLogger(),
+    );
     await Promise.all([p1, p2]);
-    await getTechnicalOutlookCached('BTC', indicators, 'gpt', 'key', mockLogger());
+    await getTechnicalOutlookCached(
+      'BTC',
+      indicators,
+      { bid: [0, 0], ask: [0, 0] },
+      { value: 50, classification: 'Neutral' },
+      'gpt',
+      'key',
+      mockLogger(),
+    );
     expect(callAiMock).toHaveBeenCalledTimes(1);
   });
 });
@@ -108,6 +157,7 @@ describe('technical analyst step', () => {
     resetTechnicalAnalystCache();
     insertReviewRawLogMock.mockClear();
     fetchTokenIndicatorsMock.mockClear();
+    fetchFearGreedIndexMock.mockClear();
     callAiMock.mockClear();
     callAiMock.mockResolvedValue(responseJson);
   });
@@ -133,6 +183,17 @@ describe('technical analyst step', () => {
     expect(report?.tech?.comment).toBe('outlook text');
     expect(prompt.reports?.find((r: any) => r.token === 'USDC')?.tech).toBeNull();
     expect(prompt.marketData.indicators.BTC).toBeDefined();
+    expect(prompt.marketData.orderBooks.BTC).toEqual({ bid: [0, 0], ask: [0, 0] });
+    expect(prompt.marketData.fearGreedIndex).toEqual({
+      value: 50,
+      classification: 'Neutral',
+    });
+    const aiPrompt = callAiMock.mock.calls[0][3];
+    expect(aiPrompt.orderBook).toEqual({ bid: [0, 0], ask: [0, 0] });
+    expect(aiPrompt.fearGreedIndex).toEqual({
+      value: 50,
+      classification: 'Neutral',
+    });
     expect(insertReviewRawLogMock).toHaveBeenCalled();
     expect(callAiMock).toHaveBeenCalledTimes(1);
   });
