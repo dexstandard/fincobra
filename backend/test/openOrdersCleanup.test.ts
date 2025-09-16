@@ -62,7 +62,7 @@ vi.mock('../src/services/indicators.js', () => ({
 }));
 
 vi.mock('../src/services/rebalance.js', () => ({
-  createRebalanceLimitOrder: vi.fn().mockResolvedValue(undefined),
+  createDecisionLimitOrders: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('cleanup open orders', () => {
@@ -98,7 +98,6 @@ describe('cleanup open orders', () => {
       portfolioId: agent.id,
       log: 'log',
       rebalance: true,
-      newAllocation: 50,
       shortReport: 's',
     });
     await insertLimitOrder({
@@ -146,7 +145,6 @@ describe('cleanup open orders', () => {
       portfolioId: agent.id,
       log: 'log',
       rebalance: true,
-      newAllocation: 50,
       shortReport: 's',
     });
     await insertLimitOrder({
@@ -202,7 +200,6 @@ describe('cleanup open orders', () => {
       portfolioId: agent.id,
       log: 'log',
       rebalance: true,
-      newAllocation: 50,
       shortReport: 's',
     });
     await insertLimitOrder({
@@ -245,7 +242,6 @@ describe('cleanup open orders', () => {
       portfolioId: agent.id,
       log: 'log',
       rebalance: true,
-      newAllocation: 50,
       shortReport: 's',
     });
     await insertLimitOrder({
@@ -286,7 +282,6 @@ describe('cleanup open orders', () => {
       portfolioId: agent.id,
       log: 'log',
       rebalance: true,
-      newAllocation: 50,
       shortReport: 's',
     });
     await insertLimitOrder({

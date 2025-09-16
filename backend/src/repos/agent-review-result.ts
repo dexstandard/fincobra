@@ -1,19 +1,20 @@
 import { db } from '../db/index.js';
 import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
+  ReviewRebalanceInfo,
   ReviewResultEntity,
   ReviewResultError,
   ReviewResultInsert,
+  ReviewResultSummary,
 } from './types.js';
 
 export async function insertReviewResult(entry: ReviewResultInsert): Promise<string> {
   const { rows } = await db.query(
-    'INSERT INTO agent_review_result (agent_id, log, rebalance, new_allocation, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+    'INSERT INTO agent_review_result (agent_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
     [
       entry.portfolioId,
       entry.log,
       entry.rebalance ?? false,
-      entry.newAllocation ?? null,
       entry.shortReport ?? null,
       entry.error ? JSON.stringify(entry.error) : null,
       entry.rawLogId ?? null,
@@ -22,27 +23,36 @@ export async function insertReviewResult(entry: ReviewResultInsert): Promise<str
   return rows[0].id as string;
 }
 
-export async function getRecentReviewResults(portfolioId: string, limit: number) {
+export async function getRecentReviewResults(
+  portfolioId: string,
+  limit: number,
+): Promise<ReviewResultSummary[]> {
   const { rows } = await db.query(
-    'SELECT id, created_at, rebalance, new_allocation, short_report, error, raw_log_id FROM agent_review_result WHERE agent_id = $1 ORDER BY created_at DESC LIMIT $2',
+    'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM agent_review_result WHERE agent_id = $1 ORDER BY created_at DESC LIMIT $2',
     [portfolioId, limit],
   );
   return rows.map((row) => {
-    const entity = convertKeysToCamelCase(row) as ReviewResultEntity;
-    return {
+    const entity = convertKeysToCamelCase(row) as Pick<
+      ReviewResultEntity,
+      'id' | 'createdAt' | 'rebalance' | 'shortReport' | 'error' | 'rawLogId'
+    >;
+    const summary: ReviewResultSummary = {
       id: entity.id,
       createdAt: entity.createdAt,
+      ...(entity.rawLogId !== null ? { rawLogId: entity.rawLogId } : {}),
       ...(entity.rebalance !== null ? { rebalance: entity.rebalance } : {}),
-      ...(entity.newAllocation !== null
-        ? { newAllocation: entity.newAllocation }
-        : {}),
       ...(entity.shortReport !== null
         ? { shortReport: entity.shortReport }
         : {}),
-      ...(entity.error !== null
-        ? { error: JSON.parse(entity.error) as ReviewResultError }
-        : {}),
     };
+    if (entity.error !== null) {
+      try {
+        summary.error = JSON.parse(entity.error) as ReviewResultError;
+      } catch {
+        summary.error = { message: entity.error };
+      }
+    }
+    return summary;
   });
 }
 
@@ -58,7 +68,7 @@ export async function getAgentReviewResults(
     [portfolioId],
   );
   const { rows } = await db.query(
-    `SELECT id, log, rebalance, new_allocation, short_report, error, created_at, raw_log_id FROM agent_review_result WHERE agent_id = $1${filter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    `SELECT id, log, rebalance, short_report, error, created_at, raw_log_id FROM agent_review_result WHERE agent_id = $1${filter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
     [portfolioId, limit, offset],
   );
   const entities = rows.map(
@@ -69,18 +79,16 @@ export async function getAgentReviewResults(
 
 export async function getRebalanceInfo(portfolioId: string, id: string) {
   const { rows } = await db.query(
-    'SELECT rebalance, new_allocation FROM agent_review_result WHERE id = $1 AND agent_id = $2',
+    'SELECT rebalance, log FROM agent_review_result WHERE id = $1 AND agent_id = $2',
     [id, portfolioId],
   );
-  const entity = rows[0]
-    ? (convertKeysToCamelCase(rows[0]) as Pick<
-        ReviewResultEntity,
-        'rebalance' | 'newAllocation'
-      >)
-    : undefined;
-  if (!entity) return undefined;
+  if (!rows[0]) return undefined;
+  const entity = convertKeysToCamelCase(rows[0]) as Pick<
+    ReviewResultEntity,
+    'rebalance' | 'log'
+  >;
   return {
     rebalance: entity.rebalance ?? null,
-    newAllocation: entity.newAllocation,
-  } as { rebalance: boolean | null; newAllocation: number | null };
+    log: entity.log,
+  } satisfies ReviewRebalanceInfo;
 }

@@ -27,21 +27,18 @@ import {
   ensureApiKeys,
   getStartBalance,
 } from '../util/agents.js';
-import * as binance from '../services/binance.js';
 import {
   getLimitOrdersByReviewResult,
   getOpenLimitOrdersForAgent,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
-import {
-  createRebalanceLimitOrder,
-  MIN_LIMIT_ORDER_USD,
-} from '../services/rebalance.js';
-import { parseBinanceError } from '../services/binance.js';
+import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { getRebalanceInfo } from '../repos/agent-review-result.js';
 import { getPromptForReviewResult } from '../repos/agent-review-raw-log.js';
 import { parseParams } from '../util/validation.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
+import { parseBinanceError } from '../services/binance.js';
+import type { MainTraderDecision, MainTraderOrder } from '../agents/main-trader.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
@@ -78,24 +75,12 @@ async function getWorkflowForRequest(
   return { userId, id, log, workflow };
 }
 
-async function prepareManualRebalanceData(
+async function loadManualDecision(
   log: FastifyBaseLogger,
-  workflow: PortfolioWorkflowRow,
-  userId: string,
   workflowId: string,
   logId: string,
-): Promise<
-  | {
-      token1: string;
-      token2: string;
-      positions: { sym: string; value_usdt: number }[];
-      newAllocation: number;
-      price1Data: { currentPrice: number };
-      price2Data: { currentPrice: number };
-      order: { diff: number; quantity: number; currentPrice: number };
-    }
-  | { code: number; body: { error: string } }
-> {
+): Promise<{ decision: MainTraderDecision } | { code: number; body: { error: string } }>
+{
   const existing = await getLimitOrdersByReviewResult(workflowId, logId);
   if (existing.length) {
     log.error({ execLogId: logId }, 'manual order exists');
@@ -105,67 +90,46 @@ async function prepareManualRebalanceData(
     };
   }
   const result = await getRebalanceInfo(workflowId, logId);
-  if (!result || !result.rebalance || result.newAllocation === null) {
+  if (!result || !result.rebalance) {
     log.error({ execLogId: logId }, 'no rebalance info');
     return { code: 400, body: errorResponse('no rebalance info') };
   }
-  const token1 = workflow.tokens[0].token;
-  const token2 = workflow.tokens[1].token;
-  const account = await binance.fetchAccount(userId);
-  if (!account) {
-    log.error('missing api keys');
-    return { code: 400, body: errorResponse('missing api keys') };
+  try {
+    const parsed = JSON.parse(result.log) as unknown;
+    if (!parsed || typeof parsed !== 'object') {
+      log.error({ execLogId: logId }, 'invalid decision payload');
+      return { code: 400, body: errorResponse('invalid decision payload') };
+    }
+    const maybeDecision = parsed as Partial<MainTraderDecision>;
+    const orders = Array.isArray(maybeDecision.orders)
+      ? maybeDecision.orders.filter(isValidManualOrder)
+      : [];
+    if (!orders.length) {
+      log.error({ execLogId: logId }, 'decision contains no orders');
+      return { code: 400, body: errorResponse('decision contains no orders') };
+    }
+    const shortReport = typeof maybeDecision.shortReport === 'string'
+      ? maybeDecision.shortReport
+      : '';
+    return { decision: { orders, shortReport } };
+  } catch {
+    log.error({ execLogId: logId }, 'failed to parse decision');
+    return { code: 400, body: errorResponse('invalid decision payload') };
   }
-  const bal1 = account.balances.find((b) => b.asset === token1);
-  const bal2 = account.balances.find((b) => b.asset === token2);
-  if (!bal1 || !bal2) {
-    log.error('missing balances');
-    return {
-      code: 400,
-      body: errorResponse('failed to fetch balances'),
-    };
-  }
-  const [price1Data, price2Data, pairPrice] = await Promise.all([
-    ['USDT', 'USDC'].includes(token1)
-      ? Promise.resolve({ currentPrice: 1 })
-      : binance.fetchPairData(token1, 'USDT'),
-    ['USDT', 'USDC'].includes(token2)
-      ? Promise.resolve({ currentPrice: 1 })
-      : binance.fetchPairData(token2, 'USDT'),
-    binance.fetchPairData(token1, token2),
-  ]);
-  const positions = [
-    {
-      sym: token1,
-      value_usdt:
-        (Number(bal1.free) + Number(bal1.locked)) * price1Data.currentPrice,
-    },
-    {
-      sym: token2,
-      value_usdt:
-        (Number(bal2.free) + Number(bal2.locked)) * price2Data.currentPrice,
-    },
-  ];
-  const total = positions[0].value_usdt + positions[1].value_usdt;
-  const target1 = (result.newAllocation / 100) * total;
-  const diff = target1 - positions[0].value_usdt;
-  if (!diff || Math.abs(diff) < MIN_LIMIT_ORDER_USD) {
-    log.error({ execLogId: logId }, 'order below minimum');
-    return {
-      code: 400,
-      body: errorResponse('order value below minimum'),
-    };
-  }
-  const quantity = Math.abs(diff) / pairPrice.currentPrice;
-  return {
-    token1,
-    token2,
-    positions,
-    newAllocation: result.newAllocation,
-    price1Data,
-    price2Data,
-    order: { diff, quantity, currentPrice: pairPrice.currentPrice },
-  };
+}
+
+function isValidManualOrder(value: unknown): value is MainTraderOrder {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.pair === 'string' &&
+    typeof record.token === 'string' &&
+    typeof record.side === 'string' &&
+    typeof record.quantity === 'number' &&
+    typeof record.limitPrice === 'number' &&
+    typeof record.basePrice === 'number' &&
+    typeof record.maxPriceDivergencePct === 'number'
+  );
 }
 
 export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
@@ -264,9 +228,6 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
               ? undefined
               : {
                   rebalance: !!r.rebalance,
-                  ...(r.newAllocation !== null
-                    ? { newAllocation: r.newAllocation }
-                    : {}),
                   shortReport: r.shortReport ?? '',
                   ...(orders ? { orders } : {}),
                 };
@@ -352,70 +313,68 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const lp = parseParams(logIdParams, req.params, reply);
       if (!lp) return;
       const { logId } = lp;
-      const prep = await prepareManualRebalanceData(log, workflow, userId, id, logId);
-      if ('code' in prep) return reply.code(prep.code).send(prep.body);
-      const {
-        token1,
-        token2,
-        positions,
-        newAllocation,
-        price1Data,
-        price2Data,
-        order,
-      } = prep;
+      const decisionResult = await loadManualDecision(log, id, logId);
+      if ('code' in decisionResult)
+        return reply.code(decisionResult.code).send(decisionResult.body);
       const body = req.body as
-        | { price?: number; quantity?: number; manuallyEdited?: boolean }
+        | {
+            price?: number;
+            quantity?: number;
+            manuallyEdited?: boolean;
+            orderIndex?: number;
+          }
         | undefined;
-      const info = await binance.fetchPairInfo(token1, token2);
-      const wantMoreToken1 = order.diff > 0;
-      const side = info.baseAsset === token1
-        ? (wantMoreToken1 ? 'BUY' : 'SELL')
-        : (wantMoreToken1 ? 'SELL' : 'BUY');
-      const defaultPrice = order.currentPrice * (side === 'BUY' ? 0.999 : 1.001);
-      const finalPriceRaw = body?.price ?? defaultPrice;
-      const finalQuantityRaw = body?.quantity ?? order.quantity;
-      const finalPrice = Number(finalPriceRaw.toFixed(info.pricePrecision));
-      const finalQuantity = Number(finalQuantityRaw.toFixed(info.quantityPrecision));
-      const notional = finalPrice * finalQuantity;
-      if (notional < info.minNotional) {
-        log.error({ execLogId: logId }, 'order below minimum');
-        return reply
-          .code(400)
-          .send(errorResponse('order value below minimum'));
+      const { decision } = decisionResult;
+      const orderIndex = body?.orderIndex ?? 0;
+      if (!Number.isInteger(orderIndex) || orderIndex < 0 || orderIndex >= decision.orders.length) {
+        log.error({ execLogId: logId, orderIndex }, 'invalid order index');
+        return reply.code(400).send(errorResponse('invalid order index'));
       }
-      const usdValue = (() => {
-        if (info.baseAsset === token1) {
-          return side === 'BUY'
-            ? finalPrice * finalQuantity * price2Data.currentPrice
-            : finalQuantity * price1Data.currentPrice;
+      const baseOrder = decision.orders[orderIndex];
+      const updatedOrder = { ...baseOrder } as MainTraderOrder & {
+        manuallyEdited?: boolean;
+      };
+      let manuallyEdited = body?.manuallyEdited ?? false;
+      if (body?.price !== undefined) {
+        if (!Number.isFinite(body.price) || body.price <= 0) {
+          log.error({ execLogId: logId }, 'invalid manual price');
+          return reply.code(400).send(errorResponse('invalid price'));
         }
-        return side === 'BUY'
-          ? finalPrice * finalQuantity * price1Data.currentPrice
-          : finalQuantity * price2Data.currentPrice;
-      })();
-      if (usdValue < MIN_LIMIT_ORDER_USD) {
-        log.error({ execLogId: logId }, 'order below minimum');
-        return reply
-          .code(400)
-          .send(errorResponse('order value below minimum'));
+        updatedOrder.limitPrice = body.price;
+        updatedOrder.basePrice = body.price;
+        manuallyEdited = true;
       }
-      try {
-        await createRebalanceLimitOrder({
-          userId,
-          tokens: [token1, token2],
-          positions,
-          newAllocation,
-          reviewResultId: logId,
-          log: log.child({ execLogId: logId }),
-          price: finalPrice,
-          quantity: finalQuantity,
-          manuallyEdited: body?.manuallyEdited,
-        });
-      } catch (err) {
-        const { msg } = parseBinanceError(err);
+      if (body?.quantity !== undefined) {
+        if (!Number.isFinite(body.quantity) || body.quantity <= 0) {
+          log.error({ execLogId: logId }, 'invalid manual quantity');
+          return reply.code(400).send(errorResponse('invalid quantity'));
+        }
+        updatedOrder.quantity = body.quantity;
+        manuallyEdited = true;
+      }
+      if (manuallyEdited) updatedOrder.manuallyEdited = true;
+      await createDecisionLimitOrders({
+        userId,
+        orders: [updatedOrder],
+        reviewResultId: logId,
+        log: log.child({ execLogId: logId }),
+      });
+      const orders = await getLimitOrdersByReviewResult(id, logId);
+      if (!orders.length) {
+        log.error({ execLogId: logId }, 'manual order not created');
         return reply
           .code(400)
-          .send(errorResponse(msg || 'failed to create limit order'));
+          .send(errorResponse('failed to create limit order'));
+      }
+      const latest = orders[orders.length - 1];
+      if (latest.status === 'canceled' && latest.cancellation_reason) {
+        log.error(
+          { execLogId: logId, reason: latest.cancellation_reason },
+          'manual order canceled',
+        );
+        return reply
+          .code(400)
+          .send(errorResponse(latest.cancellation_reason));
       }
       log.info({ execLogId: logId }, 'created manual order');
       return reply.code(201).send({ ok: true });
@@ -477,17 +436,25 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const lp = parseParams(logIdParams, req.params, reply);
       if (!lp) return;
       const { logId } = lp;
-      const prep = await prepareManualRebalanceData(log, workflow, userId, id, logId);
-      if ('code' in prep) return reply.code(prep.code).send(prep.body);
-      const { token1, token2, order } = prep;
-      const info = await binance.fetchPairInfo(token1, token2);
-      const wantMoreToken1 = order.diff > 0;
-      const side = info.baseAsset === token1
-        ? (wantMoreToken1 ? 'BUY' : 'SELL')
-        : (wantMoreToken1 ? 'SELL' : 'BUY');
-      const price = order.currentPrice * (side === 'BUY' ? 0.999 : 1.001);
+      const decisionResult = await loadManualDecision(log, id, logId);
+      if ('code' in decisionResult)
+        return reply.code(decisionResult.code).send(decisionResult.body);
+      const { decision } = decisionResult;
+      const { orderIndex: rawOrderIndex } = req.query as { orderIndex?: string };
+      const orderIndex = rawOrderIndex ? Number.parseInt(rawOrderIndex, 10) : 0;
+      if (!Number.isInteger(orderIndex) || orderIndex < 0 || orderIndex >= decision.orders.length) {
+        log.error({ execLogId: logId, orderIndex }, 'invalid order index');
+        return reply.code(400).send(errorResponse('invalid order index'));
+      }
+      const order = decision.orders[orderIndex];
       log.info({ execLogId: logId }, 'previewed manual order');
-      return { order: { side, quantity: order.quantity, price } };
+      return {
+        order: {
+          side: order.side,
+          quantity: order.quantity,
+          price: order.limitPrice,
+        },
+      };
     },
   );
 

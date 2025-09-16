@@ -60,7 +60,6 @@ vi.mock('../src/repos/agent-review-result.js', () => ({
       id: `r${i + 1}`,
       createdAt: new Date(`2025-01-0${i + 1}T00:00:00.000Z`),
       shortReport: `p${i + 1}`,
-      error: null,
     })),
   ),
 }));

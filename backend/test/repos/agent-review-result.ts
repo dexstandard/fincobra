@@ -6,7 +6,6 @@ export function insertReviewResult(entry: any) {
     portfolioId: entry.portfolioId,
     log: entry.log,
     rebalance: entry.rebalance,
-    newAllocation: entry.newAllocation,
     shortReport: entry.shortReport,
     error: entry.error,
     rawLogId: entry.rawLogId,

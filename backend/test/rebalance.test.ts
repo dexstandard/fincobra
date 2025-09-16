@@ -20,292 +20,8 @@ vi.mock('../src/services/binance.js', () => ({
   fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { createRebalanceLimitOrder, createDecisionLimitOrders } from '../src/services/rebalance.js';
+import { createDecisionLimitOrders } from '../src/services/rebalance.js';
 import { createLimitOrder, fetchPairData, fetchPairInfo } from '../src/services/binance.js';
-
-describe('createRebalanceLimitOrder', () => {
-  beforeEach(async () => {
-    await clearLimitOrders();
-  });
-  it('saves execution with status and exec result', async () => {
-    const log = mockLogger();
-    const userId = await insertUser('1');
-    const agent = await insertAgent({
-      userId,
-      model: 'm',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'BTC', minAllocation: 10 },
-        { token: 'ETH', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: false,
-      useEarn: true,
-    });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    await createRebalanceLimitOrder({
-      userId,
-      tokens: ['BTC', 'ETH'],
-      positions: [
-        { sym: 'BTC', value_usdt: 50 },
-        { sym: 'ETH', value_usdt: 150 },
-      ],
-      newAllocation: 50,
-      log,
-      reviewResultId,
-    });
-
-    const row = (await getLimitOrders())[0];
-
-    expect(row.user_id).toBe(userId);
-    expect(JSON.parse(row.planned_json)).toMatchObject({
-      symbol: 'BTCETH',
-      side: 'BUY',
-      quantity: 0.5,
-      price: 99.9,
-      manuallyEdited: false,
-    });
-    expect(row.status).toBe('open');
-    expect(row.review_result_id).toBe(reviewResultId);
-    expect(row.order_id).toBe('1');
-    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
-      symbol: 'BTCETH',
-      side: 'BUY',
-      quantity: 0.5,
-      price: 99.9,
-    });
-  });
-
-  it('handles pairs where second token is the base asset', async () => {
-    const log = mockLogger();
-    const userId = await insertUser('5');
-    const agent = await insertAgent({
-      userId,
-      model: 'm',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'ETH', minAllocation: 10 },
-        { token: 'BTC', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: false,
-      useEarn: true,
-    });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    await createRebalanceLimitOrder({
-      userId,
-      tokens: ['ETH', 'BTC'],
-      positions: [
-        { sym: 'ETH', value_usdt: 50 },
-        { sym: 'BTC', value_usdt: 150 },
-      ],
-      newAllocation: 50,
-      log,
-      reviewResultId,
-    });
-    const row = (await getLimitOrders())[0];
-    expect(JSON.parse(row.planned_json)).toMatchObject({
-      symbol: 'BTCETH',
-      side: 'SELL',
-      quantity: 0.5,
-      price: 100.1,
-      manuallyEdited: false,
-    });
-    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
-      symbol: 'BTCETH',
-      side: 'SELL',
-      quantity: 0.5,
-      price: 100.1,
-    });
-  });
-
-  it('allows manual overrides and sets flag', async () => {
-    const log = mockLogger();
-    const userId = await insertUser('2');
-    const agent = await insertAgent({
-      userId,
-      model: 'm',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'BTC', minAllocation: 10 },
-        { token: 'ETH', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: false,
-      useEarn: true,
-    });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    await createRebalanceLimitOrder({
-      userId,
-      tokens: ['BTC', 'ETH'],
-      positions: [
-        { sym: 'BTC', value_usdt: 50 },
-        { sym: 'ETH', value_usdt: 150 },
-      ],
-      newAllocation: 50,
-      log,
-      reviewResultId,
-      price: 120,
-      quantity: 0.3,
-      manuallyEdited: true,
-    });
-    const row = (await getLimitOrders())[0];
-    expect(JSON.parse(row.planned_json)).toMatchObject({
-      symbol: 'BTCETH',
-      side: 'BUY',
-      quantity: 0.3,
-      price: 120,
-      manuallyEdited: true,
-    });
-  });
-
-  it('skips orders below minimum value', async () => {
-    const log = mockLogger();
-    const userId = await insertUser('3');
-    const agent = await insertAgent({
-      userId,
-      model: 'm',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'BTC', minAllocation: 10 },
-        { token: 'ETH', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: false,
-      useEarn: true,
-    });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    vi.mocked(createLimitOrder).mockClear();
-    await createRebalanceLimitOrder({
-      userId,
-      tokens: ['BTC', 'ETH'],
-      positions: [
-        { sym: 'BTC', value_usdt: 100 },
-        { sym: 'ETH', value_usdt: 99.99 },
-      ],
-      newAllocation: 50,
-      log,
-      reviewResultId,
-    });
-    const rows = await getLimitOrders();
-    expect(rows).toHaveLength(0);
-    expect(createLimitOrder).not.toHaveBeenCalled();
-  });
-
-  it('records orders below exchange min notional as canceled', async () => {
-    const log = mockLogger();
-    const userId = await insertUser('7');
-    const agent = await insertAgent({
-      userId,
-      model: 'm',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'BTC', minAllocation: 10 },
-        { token: 'USDT', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: false,
-      useEarn: true,
-    });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 1 });
-    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
-      symbol: 'BTCUSDT',
-      baseAsset: 'BTC',
-      quoteAsset: 'USDT',
-      quantityPrecision: 8,
-      pricePrecision: 8,
-      minNotional: 10,
-    });
-    vi.mocked(createLimitOrder).mockClear();
-    await createRebalanceLimitOrder({
-      userId,
-      tokens: ['BTC', 'USDT'],
-      positions: [
-        { sym: 'BTC', value_usdt: 95 },
-        { sym: 'USDT', value_usdt: 105 },
-      ],
-      newAllocation: 50,
-      log,
-      reviewResultId,
-    });
-    const rows = await getLimitOrders();
-    expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('canceled');
-    expect(rows[0].cancellation_reason).toBe('order below min notional');
-    expect(createLimitOrder).not.toHaveBeenCalled();
-  });
-
-  it('rounds price and quantity to exchange precision', async () => {
-    const log = mockLogger();
-    const userId = await insertUser('4');
-    const agent = await insertAgent({
-      userId,
-      model: 'm',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'BTC', minAllocation: 10 },
-        { token: 'ETH', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: false,
-      useEarn: true,
-    });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
-      symbol: 'BTCETH',
-      baseAsset: 'BTC',
-      quoteAsset: 'ETH',
-      quantityPrecision: 3,
-      pricePrecision: 2,
-      minNotional: 0,
-    });
-    await createRebalanceLimitOrder({
-      userId,
-      tokens: ['BTC', 'ETH'],
-      positions: [
-        { sym: 'BTC', value_usdt: 50 },
-        { sym: 'ETH', value_usdt: 150 },
-      ],
-      newAllocation: 50,
-      log,
-      reviewResultId,
-      price: 1.2345,
-      quantity: 0.123456,
-      manuallyEdited: true,
-    });
-    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
-      symbol: 'BTCETH',
-      side: 'BUY',
-      quantity: 0.123,
-      price: 1.23,
-    });
-  });
-});
 
 describe('createDecisionLimitOrders', () => {
   beforeEach(async () => {
@@ -824,5 +540,54 @@ describe('createDecisionLimitOrders', () => {
     expect(rows[0].status).toBe('canceled');
     expect(rows[0].cancellation_reason).toBe('order below min notional');
     expect(createLimitOrder).not.toHaveBeenCalled();
+  });
+
+  it('preserves manuallyEdited flag when provided', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('20');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 8,
+      minNotional: 0,
+    });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.5,
+          limitPrice: 99.5,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+          manuallyEdited: true,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const planned = JSON.parse((await getLimitOrders())[0].planned_json);
+    expect(planned.manuallyEdited).toBe(true);
   });
 });

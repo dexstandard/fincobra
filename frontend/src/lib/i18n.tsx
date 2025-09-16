@@ -169,7 +169,6 @@ const translations: Record<Lang, Record<string, string>> = {
     model_required: 'Model is required',
     agent_started_success: 'Portfolio workflow started successfully',
     failed_start_agent: 'Failed to start portfolio workflow',
-    new_allocation: 'new allocation:',
     close: 'Close',
   },
   ru: {
@@ -337,7 +336,6 @@ const translations: Record<Lang, Record<string, string>> = {
     model_required: 'Требуется модель',
     agent_started_success: 'Портфолио успешно запущено',
     failed_start_agent: 'Не удалось запустить портфолио',
-    new_allocation: 'новое распределение:',
     close: 'Закрыть',
   },
 };
