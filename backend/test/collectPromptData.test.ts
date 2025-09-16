@@ -51,6 +51,7 @@ vi.mock('../src/services/binance.js', () => ({
         minNotional: 10,
       });
     }),
+  fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../src/repos/agent-review-result.js', () => ({

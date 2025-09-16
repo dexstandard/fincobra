@@ -61,6 +61,10 @@ export type Kline = [
 
 export type OpenOrder = { orderId: number };
 
+export type OrderStatusResponse = {
+  status?: string;
+};
+
 interface FearGreedResponse {
   data?: { value: string; value_classification: string }[];
   value?: string;
@@ -380,6 +384,28 @@ export async function cancelOrder(
       throw new Error(`failed to cancel order: ${res.status} ${body}`);
     }
     return res.json();
+  });
+}
+
+export async function fetchOrder(
+  id: string,
+  opts: { symbol: string; orderId: number },
+): Promise<OrderStatusResponse | null> {
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams({
+      symbol: opts.symbol.toUpperCase(),
+      orderId: String(opts.orderId),
+    });
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      `https://api.binance.com/api/v3/order?${params.toString()}`,
+      { headers: { 'X-MBX-APIKEY': creds.key } },
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to fetch order: ${res.status} ${body}`);
+    }
+    return (await res.json()) as OrderStatusResponse;
   });
 }
 
