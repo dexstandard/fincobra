@@ -59,7 +59,7 @@ vi.mock('../src/services/indicators.js', () => ({
   fetchTokenIndicators: vi.fn().mockResolvedValue(sampleIndicators),
 }));
 
-vi.mock('../src/services/rebalance.js', () => ({
+vi.mock('../src/services/orders.js', () => ({
   createRebalanceLimitOrder: vi.fn().mockResolvedValue(undefined),
 }));
 

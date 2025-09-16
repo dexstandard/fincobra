@@ -35,12 +35,12 @@ import {
 import {
   createRebalanceLimitOrder,
   MIN_LIMIT_ORDER_USD,
-} from '../services/rebalance.js';
+  cancelLimitOrder,
+} from '../services/orders.js';
 import { parseBinanceError } from '../services/binance.js';
 import { getRebalanceInfo } from '../repos/agent-review-result.js';
 import { getPromptForReviewResult } from '../repos/agent-review-raw-log.js';
 import { parseParams } from '../util/validation.js';
-import { cancelLimitOrder } from '../services/limit-order.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });

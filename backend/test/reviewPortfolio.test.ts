@@ -116,7 +116,7 @@ vi.mock('../src/services/indicators.js', () => ({
 const createDecisionLimitOrders = vi.hoisted(() =>
   vi.fn().mockResolvedValue(undefined),
 );
-vi.mock('../src/services/rebalance.js', () => ({
+vi.mock('../src/services/orders.js', () => ({
   createDecisionLimitOrders,
 }));
 

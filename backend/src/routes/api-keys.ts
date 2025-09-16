@@ -20,7 +20,7 @@ import {
   draftAgentsByUser,
 } from '../repos/portfolio-workflow.js';
 import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
-import { cancelLimitOrder } from '../services/limit-order.js';
+import { cancelLimitOrder } from '../services/orders.js';
 import {
   getOpenLimitOrdersForAgent,
   updateLimitOrderStatus,

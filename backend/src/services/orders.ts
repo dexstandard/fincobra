@@ -1,14 +1,20 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { insertLimitOrder, type LimitOrderStatus } from '../repos/limit-orders.js';
+import {
+  insertLimitOrder,
+  updateLimitOrderStatus,
+  type LimitOrderStatus,
+} from '../repos/limit-orders.js';
 import {
   fetchPairData,
   fetchPairInfo,
   createLimitOrder,
+  cancelOrder,
   parseBinanceError,
 } from './binance.js';
 import { TOKEN_SYMBOLS } from '../util/tokens.js';
 
 export const MIN_LIMIT_ORDER_USD = 0.02;
+const EXECUTION_SPREAD = 0.001;
 
 export async function calcRebalanceOrder(opts: {
   tokens: string[];
@@ -64,7 +70,8 @@ export async function createRebalanceLimitOrder(opts: {
     ? (wantMoreToken1 ? 'BUY' : 'SELL')
     : (wantMoreToken1 ? 'SELL' : 'BUY');
   const qty = quantity ?? order.quantity;
-  const prc = price ?? order.currentPrice * (side === 'BUY' ? 0.999 : 1.001);
+  const adjustment = side === 'BUY' ? 1 - EXECUTION_SPREAD : 1 + EXECUTION_SPREAD;
+  const prc = price ?? order.currentPrice * adjustment;
   const roundedQty = Number(qty.toFixed(info.quantityPrecision));
   const roundedPrice = Number(prc.toFixed(info.pricePrecision));
   const params = {
@@ -141,47 +148,79 @@ export async function createDecisionLimitOrders(opts: {
     token: string;
     side: string;
     quantity: number;
-    delta: number | null;
     limitPrice: number | null;
-    basePrice: number | null;
     maxPriceDivergence: number | null;
   }[];
   reviewResultId: string;
   log: FastifyBaseLogger;
 }) {
   for (const o of opts.orders) {
-    const [a, b] = splitPair(o.pair);
-    if (!a || !b) continue;
-    const info = await fetchPairInfo(a, b);
-    const { currentPrice } = await fetchPairData(a, b);
-    const side = o.side as 'BUY' | 'SELL';
-    const basePrice = o.basePrice ?? currentPrice;
-    const rawPrice =
-      o.limitPrice !== null
-        ? o.limitPrice
-        : basePrice * (o.delta !== null ? 1 + o.delta : side === 'BUY' ? 0.999 : 1.001);
+    const [base, quote] = splitPair(o.pair);
+    if (!base || !quote) continue;
+    const info = await fetchPairInfo(base, quote);
+    const { currentPrice } = await fetchPairData(base, quote);
+    const side = (o.side === 'SELL' ? 'SELL' : 'BUY') as 'BUY' | 'SELL';
+    const requestedPrice = o.limitPrice ?? currentPrice;
+    const maxDivergence = o.maxPriceDivergence ?? null;
+    const favorablePrice =
+      side === 'BUY'
+        ? currentPrice * (1 - EXECUTION_SPREAD)
+        : currentPrice * (1 + EXECUTION_SPREAD);
+
+    let executionPrice = requestedPrice;
+    if (o.limitPrice === null) {
+      executionPrice = favorablePrice;
+    } else if (side === 'BUY') {
+      executionPrice = Math.min(executionPrice, favorablePrice);
+    } else {
+      executionPrice = Math.max(executionPrice, favorablePrice);
+    }
+
+    if (!Number.isFinite(executionPrice) || executionPrice <= 0) {
+      await insertLimitOrder({
+        userId: opts.userId,
+        planned: {
+          symbol: info.symbol,
+          side,
+          quantity: 0,
+          price: requestedPrice,
+          manuallyEdited: false,
+          ...(o.limitPrice != null ? { requestedLimitPrice: o.limitPrice } : {}),
+          ...(maxDivergence !== null
+            ? { maxPriceDivergence: maxDivergence }
+            : {}),
+        },
+        status: 'canceled' as LimitOrderStatus,
+        reviewResultId: opts.reviewResultId,
+        orderId: String(Date.now()),
+        cancellationReason: 'invalid limit price',
+      });
+      continue;
+    }
+
     let quantity: number;
     if (o.token === info.baseAsset) {
       quantity = o.quantity;
     } else if (o.token === info.quoteAsset) {
-      quantity = o.quantity / rawPrice;
+      quantity = o.quantity / executionPrice;
     } else {
       continue;
     }
+
     const qty = Number(quantity.toFixed(info.quantityPrecision));
-    const prc = Number(rawPrice.toFixed(info.pricePrecision));
+    const prc = Number(executionPrice.toFixed(info.pricePrecision));
     const params = { symbol: info.symbol, side, quantity: qty, price: prc } as const;
     const planned = {
       ...params,
       manuallyEdited: false,
-      ...(o.delta !== null ? { delta: o.delta } : {}),
-      ...(o.limitPrice !== null ? { limitPrice: o.limitPrice } : {}),
-      ...(o.basePrice !== null ? { basePrice: o.basePrice } : {}),
-      ...(o.maxPriceDivergence !== null ? { maxPriceDivergence: o.maxPriceDivergence } : {}),
+      ...(o.limitPrice != null ? { requestedLimitPrice: o.limitPrice } : {}),
+      ...(maxDivergence !== null ? { maxPriceDivergence: maxDivergence } : {}),
+      marketPrice: currentPrice,
     };
+
     if (
-      o.maxPriceDivergence !== null &&
-      Math.abs(currentPrice - basePrice) / basePrice > o.maxPriceDivergence
+      maxDivergence !== null &&
+      Math.abs(requestedPrice - currentPrice) / currentPrice > maxDivergence
     ) {
       await insertLimitOrder({
         userId: opts.userId,
@@ -193,6 +232,7 @@ export async function createDecisionLimitOrders(opts: {
       });
       continue;
     }
+
     if (qty * prc < info.minNotional) {
       await insertLimitOrder({
         userId: opts.userId,
@@ -238,5 +278,30 @@ export async function createDecisionLimitOrders(opts: {
       });
       opts.log.error({ err, step: 'createLimitOrder' }, 'step failed');
     }
+  }
+}
+
+export async function cancelLimitOrder(
+  userId: string,
+  opts: { symbol: string; orderId: string; reason: string },
+): Promise<'canceled' | 'filled'> {
+  try {
+    const res = await cancelOrder(userId, {
+      symbol: opts.symbol,
+      orderId: Number(opts.orderId),
+    });
+    if (res && res.status === 'FILLED') {
+      await updateLimitOrderStatus(userId, opts.orderId, 'filled');
+      return 'filled';
+    }
+    await updateLimitOrderStatus(userId, opts.orderId, 'canceled', opts.reason);
+    return 'canceled';
+  } catch (err) {
+    const { code } = parseBinanceError(err);
+    if (code === -2013) {
+      await updateLimitOrderStatus(userId, opts.orderId, 'filled');
+      return 'filled';
+    }
+    throw err;
   }
 }

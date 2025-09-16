@@ -4,7 +4,7 @@ import {
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
 import { fetchOpenOrders, type OpenOrder } from '../services/binance.js';
-import { cancelLimitOrder } from '../services/limit-order.js';
+import { cancelLimitOrder } from '../services/orders.js';
 
 interface Order {
   user_id: string;

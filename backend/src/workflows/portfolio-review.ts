@@ -21,8 +21,7 @@ import {
   type ReviewResultError,
 } from '../repos/agent-review-result.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
-import { cancelLimitOrder } from '../services/limit-order.js';
-import { createDecisionLimitOrders } from '../services/rebalance.js';
+import { cancelLimitOrder, createDecisionLimitOrders } from '../services/orders.js';
 import { type RebalancePrompt } from '../agents/types.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
