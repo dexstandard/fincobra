@@ -21,7 +21,10 @@ export const developerInstructions = [
   '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
   '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
   '- The prompt lists all supported trading pairs with their current prices for easy reference.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,delta:number|null,limitPrice:number|null,basePrice:number|null,maxPriceDivergence:number|null},...],shortReport}.',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,limitPrice:number|null,basePrice:number|null,maxPriceDivergence:number|null},...],shortReport}.',
+  '- IMPORTANT: Model only sets limitPrice and maxPriceDivergence.',
+  '- maxPriceDivergence defines how far the live price may drift from basePrice before cancelation;',
+  '- Keep limit targets realistic for the stated review interval so orders can fill within that window; avoid extreme prices unlikely to execute within interval.',
   '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
   '- shortReport ≤255 chars.',
   '- On error, return {error:"message"}.',
@@ -44,7 +47,6 @@ export const rebalanceResponseSchema = {
                   token: { type: 'string' },
                   side: { type: 'string', enum: ['BUY', 'SELL'] },
                   quantity: { type: 'number' },
-                  delta: { type: ['number', 'null'] },
                   limitPrice: { type: ['number', 'null'] },
                   basePrice: { type: ['number', 'null'] },
                   maxPriceDivergence: { type: ['number', 'null'] },
@@ -54,7 +56,6 @@ export const rebalanceResponseSchema = {
                   'token',
                   'side',
                   'quantity',
-                  'delta',
                   'limitPrice',
                   'basePrice',
                   'maxPriceDivergence',
@@ -204,7 +205,6 @@ export interface MainTraderOrder {
   token: string;
   side: string;
   quantity: number;
-  delta: number | null;
   limitPrice: number | null;
   basePrice: number | null;
   maxPriceDivergence: number | null;

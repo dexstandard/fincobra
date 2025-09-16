@@ -348,7 +348,6 @@ describe('createDecisionLimitOrders', () => {
           token: 'USDT',
           side: 'BUY',
           quantity: 100,
-          delta: null,
           limitPrice: null,
           basePrice: null,
           maxPriceDivergence: null,
@@ -410,8 +409,7 @@ describe('createDecisionLimitOrders', () => {
           token: 'USDT',
           side: 'BUY',
           quantity: 100,
-          delta: -0.05,
-          limitPrice: null,
+          limitPrice: 95,
           basePrice: 100,
           maxPriceDivergence: null,
         },
@@ -426,7 +424,7 @@ describe('createDecisionLimitOrders', () => {
       quantity: 1.05263158,
       price: 95,
       basePrice: 100,
-      delta: -0.05,
+      limitPrice: 95,
       manuallyEdited: false,
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
@@ -437,7 +435,7 @@ describe('createDecisionLimitOrders', () => {
     });
   });
 
-  it('applies price delta relative to base price', async () => {
+  it('uses limit price for base-denominated quantity', async () => {
     const log = mockLogger();
     const userId = await insertUser('11');
     const agent = await insertAgent({
@@ -474,8 +472,7 @@ describe('createDecisionLimitOrders', () => {
           token: 'BTC',
           side: 'BUY',
           quantity: 1,
-          delta: -0.05,
-          limitPrice: null,
+          limitPrice: 95,
           basePrice: 100,
           maxPriceDivergence: null,
         },
@@ -490,7 +487,7 @@ describe('createDecisionLimitOrders', () => {
       quantity: 1,
       price: 95,
       basePrice: 100,
-      delta: -0.05,
+      limitPrice: 95,
       manuallyEdited: false,
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
@@ -538,7 +535,6 @@ describe('createDecisionLimitOrders', () => {
           token: 'BTC',
           side: 'BUY',
           quantity: 1,
-          delta: null,
           limitPrice: null,
           basePrice: 100,
           maxPriceDivergence: 0.02,
@@ -588,7 +584,6 @@ describe('createDecisionLimitOrders', () => {
           token: 'BTC',
           side: 'BUY',
           quantity: 0.05,
-          delta: null,
           limitPrice: null,
           basePrice: null,
           maxPriceDivergence: null,

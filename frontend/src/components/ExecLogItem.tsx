@@ -34,7 +34,6 @@ export interface ExecLog {
       token: string;
       side: string;
       quantity: number;
-      delta: number | null;
       limitPrice: number | null;
       basePrice: number | null;
       maxPriceDivergence: number | null;

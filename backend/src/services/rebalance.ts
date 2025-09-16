@@ -141,7 +141,6 @@ export async function createDecisionLimitOrders(opts: {
     token: string;
     side: string;
     quantity: number;
-    delta: number | null;
     limitPrice: number | null;
     basePrice: number | null;
     maxPriceDivergence: number | null;
@@ -159,7 +158,7 @@ export async function createDecisionLimitOrders(opts: {
     const rawPrice =
       o.limitPrice !== null
         ? o.limitPrice
-        : basePrice * (o.delta !== null ? 1 + o.delta : side === 'BUY' ? 0.999 : 1.001);
+        : basePrice * (side === 'BUY' ? 0.999 : 1.001);
     let quantity: number;
     if (o.token === info.baseAsset) {
       quantity = o.quantity;
@@ -174,7 +173,6 @@ export async function createDecisionLimitOrders(opts: {
     const planned = {
       ...params,
       manuallyEdited: false,
-      ...(o.delta !== null ? { delta: o.delta } : {}),
       ...(o.limitPrice !== null ? { limitPrice: o.limitPrice } : {}),
       ...(o.basePrice !== null ? { basePrice: o.basePrice } : {}),
       ...(o.maxPriceDivergence !== null ? { maxPriceDivergence: o.maxPriceDivergence } : {}),
