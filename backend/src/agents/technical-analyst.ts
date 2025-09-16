@@ -17,13 +17,26 @@ const CACHE_MS = 3 * 60 * 1000;
 const cache = new Map<string, { promise: Promise<AnalysisLog>; expires: number }>();
 const indicatorCache = new Map<
   string,
-  { promise: Promise<TokenIndicators>; expires: number }
+  { promise: Promise<Indicators>; expires: number }
 >();
+
+interface TokenReport {
+  token: string;
+  news: Analysis | null;
+  tech: Analysis | null;
+}
+
+interface Indicators extends TokenIndicators {}
+
+interface OrderBook {
+  bid: [number, number];
+  ask: [number, number];
+}
 
 export function fetchTokenIndicatorsCached(
   token: string,
   log: FastifyBaseLogger,
-): Promise<TokenIndicators> {
+): Promise<Indicators> {
   const now = Date.now();
   const cached = indicatorCache.get(token);
   if (cached && cached.expires > now) {
@@ -31,7 +44,7 @@ export function fetchTokenIndicatorsCached(
     return cached.promise;
   }
   log.info({ token }, 'indicator cache miss');
-  const promise = fetchTokenIndicators(token);
+  const promise = fetchTokenIndicators(token) as Promise<Indicators>;
   indicatorCache.set(token, { promise, expires: now + CACHE_MS });
   promise.catch(() => indicatorCache.delete(token));
   return promise;
@@ -39,8 +52,8 @@ export function fetchTokenIndicatorsCached(
 
 export function getTechnicalOutlookCached(
   token: string,
-  indicators: TokenIndicators,
-  orderBook: { bid: [number, number]; ask: [number, number] },
+  indicators: Indicators,
+  orderBook: OrderBook,
   fearGreedIndex: FearGreedIndex | undefined,
   model: string,
   apiKey: string,
@@ -69,8 +82,8 @@ export function getTechnicalOutlookCached(
 
 export async function getTechnicalOutlook(
   token: string,
-  indicators: TokenIndicators,
-  orderBook: { bid: [number, number]; ask: [number, number] },
+  indicators: Indicators,
+  orderBook: OrderBook,
   fearGreedIndex: FearGreedIndex | undefined,
   model: string,
   apiKey: string,
@@ -99,7 +112,7 @@ export async function runTechnicalAnalyst(
 ): Promise<void> {
   if (!prompt.reports) return;
 
-  const tokenReports = new Map<string, any[]>();
+  const tokenReports = new Map<string, TokenReport[]>();
   for (const report of prompt.reports) {
     const { token } = report;
     if (isStablecoin(token)) continue;
@@ -111,6 +124,11 @@ export async function runTechnicalAnalyst(
   if (tokenReports.size === 0) return;
   if (!prompt.marketData.indicators) prompt.marketData.indicators = {};
   if (!prompt.marketData.orderBooks) prompt.marketData.orderBooks = {};
+
+  const indicatorsMap =
+    prompt.marketData.indicators as unknown as Record<string, Indicators>;
+  const orderBooksMap =
+    prompt.marketData.orderBooks as unknown as Record<string, OrderBook>;
 
   const fearGreedIndex = await fetchFearGreedIndex().catch((err) => {
     log.error({ err }, 'failed to fetch fear & greed index');
@@ -135,8 +153,8 @@ export async function runTechnicalAnalyst(
       );
       if (p && response)
         await insertReviewRawLog({ portfolioId, prompt: p, response });
-      (prompt.marketData.indicators as Record<string, any>)[token] = indicators;
-      (prompt.marketData.orderBooks as Record<string, any>)[token] = orderBook;
+      indicatorsMap[token] = indicators;
+      orderBooksMap[token] = orderBook;
       for (const r of reports) r.tech = analysis;
     }),
   );
