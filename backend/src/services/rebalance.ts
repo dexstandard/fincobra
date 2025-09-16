@@ -167,12 +167,12 @@ export async function createDecisionLimitOrders(opts: {
     if (!a || !b) continue;
     const info = await fetchPairInfo(a, b);
     const { currentPrice } = await fetchPairData(a, b);
-    const side: 'BUY' | 'SELL' = o.side === 'SELL' ? 'SELL' : 'BUY';
+    const requestedSide = o.side;
     const plannedBase: Record<string, unknown> = {
       symbol: info.symbol,
       pair: o.pair,
       token: o.token,
-      side,
+      side: requestedSide,
       manuallyEdited: false,
       basePrice: o.basePrice,
       limitPrice: o.limitPrice,
@@ -180,6 +180,20 @@ export async function createDecisionLimitOrders(opts: {
       requestedQuantity: o.quantity,
       observedPrice: currentPrice,
     };
+
+    if (requestedSide !== 'BUY' && requestedSide !== 'SELL') {
+      await insertLimitOrder({
+        userId: opts.userId,
+        planned: plannedBase,
+        status: 'canceled' as LimitOrderStatus,
+        reviewResultId: opts.reviewResultId,
+        orderId: String(Date.now()),
+        cancellationReason: `Invalid order side: ${requestedSide}`,
+      });
+      continue;
+    }
+
+    const side: 'BUY' | 'SELL' = requestedSide;
 
     if (!Number.isFinite(o.basePrice) || o.basePrice <= 0) {
       await insertLimitOrder({
