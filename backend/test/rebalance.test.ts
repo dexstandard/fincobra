@@ -17,6 +17,7 @@ vi.mock('../src/services/binance.js', () => ({
     minNotional: 0,
   }),
   createLimitOrder: vi.fn().mockResolvedValue({ orderId: 1 }),
+  fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { createRebalanceLimitOrder, createDecisionLimitOrders } from '../src/services/rebalance.js';
