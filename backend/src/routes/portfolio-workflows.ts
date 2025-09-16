@@ -9,6 +9,7 @@ import {
   deleteAgent as repoDeleteAgent,
   startAgent as repoStartAgent,
   stopAgent as repoStopAgent,
+  type PortfolioWorkflowRow,
 } from '../repos/portfolio-workflow.js';
 import { getAgentReviewResults } from '../repos/agent-review-result.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
@@ -46,35 +47,40 @@ const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
 
 
+type WorkflowRequestContext = {
+  userId: string;
+  id: string;
+  log: FastifyBaseLogger;
+  workflow: PortfolioWorkflowRow;
+};
+
 async function getWorkflowForRequest(
   req: FastifyRequest,
   reply: FastifyReply,
-): Promise<
-  { userId: string; id: string; log: FastifyBaseLogger; agent: any } | undefined
-> {
+): Promise<WorkflowRequestContext | undefined> {
   const userId = requireUserId(req, reply);
   if (!userId) return;
   const params = parseParams(idParams, req.params, reply);
   if (!params) return;
   const { id } = params;
   const log = req.log.child({ userId, workflowId: id });
-  const agent = await getAgent(id);
-  if (!agent || agent.status === AgentStatus.Retired) {
+  const workflow = await getAgent(id);
+  if (!workflow || workflow.status === AgentStatus.Retired) {
     log.error('workflow not found');
     reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
     return;
   }
-  if (agent.user_id !== userId) {
+  if (workflow.user_id !== userId) {
     log.error('forbidden');
     reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
     return;
   }
-  return { userId, id, log, agent };
+  return { userId, id, log, workflow };
 }
 
 async function prepareManualRebalanceData(
   log: FastifyBaseLogger,
-  agent: any,
+  workflow: PortfolioWorkflowRow,
   userId: string,
   workflowId: string,
   logId: string,
@@ -103,8 +109,8 @@ async function prepareManualRebalanceData(
     log.error({ execLogId: logId }, 'no rebalance info');
     return { code: 400, body: errorResponse('no rebalance info') };
   }
-  const token1 = agent.tokens[0].token;
-  const token2 = agent.tokens[1].token;
+  const token1 = workflow.tokens[0].token;
+  const token2 = workflow.tokens[1].token;
   const account = await binance.fetchAccount(userId);
   if (!account) {
     log.error('missing api keys');
@@ -336,8 +342,8 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { id, userId, log, agent } = ctx;
-      if (!agent.manual_rebalance) {
+      const { id, userId, log, workflow } = ctx;
+      if (!workflow.manual_rebalance) {
         log.error('workflow not in manual mode');
         return reply
           .code(400)
@@ -346,7 +352,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const lp = parseParams(logIdParams, req.params, reply);
       if (!lp) return;
       const { logId } = lp;
-      const prep = await prepareManualRebalanceData(log, agent, userId, id, logId);
+      const prep = await prepareManualRebalanceData(log, workflow, userId, id, logId);
       if ('code' in prep) return reply.code(prep.code).send(prep.body);
       const {
         token1,
@@ -461,8 +467,8 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { id, userId, log, agent } = ctx;
-      if (!agent.manual_rebalance) {
+      const { id, userId, log, workflow } = ctx;
+      if (!workflow.manual_rebalance) {
         log.error('workflow not in manual mode');
         return reply
           .code(400)
@@ -471,7 +477,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const lp = parseParams(logIdParams, req.params, reply);
       if (!lp) return;
       const { logId } = lp;
-      const prep = await prepareManualRebalanceData(log, agent, userId, id, logId);
+      const prep = await prepareManualRebalanceData(log, workflow, userId, id, logId);
       if ('code' in prep) return reply.code(prep.code).send(prep.body);
       const { token1, token2, order } = prep;
       const info = await binance.fetchPairInfo(token1, token2);
@@ -491,7 +497,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { log, agent: row } = ctx;
+      const { log, workflow: row } = ctx;
       log.info('fetched workflow');
       return toApi(row);
     }
@@ -579,7 +585,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { userId, id, log, agent: existing } = ctx;
+      const { userId, id, log, workflow: existing } = ctx;
       if (!existing.model) {
         log.error('missing model');
         return reply.code(400).send(errorResponse('model required'));
@@ -626,8 +632,8 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { id, log, agent } = ctx;
-      if (agent.status !== AgentStatus.Active) {
+      const { id, log, workflow } = ctx;
+      if (workflow.status !== AgentStatus.Active) {
         log.error('workflow not active');
         return reply
           .code(400)
