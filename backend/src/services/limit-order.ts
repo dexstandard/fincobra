@@ -1,4 +1,9 @@
-import { cancelOrder, fetchOrder, parseBinanceError } from './binance.js';
+import {
+  cancelOrder,
+  fetchOrder,
+  BinanceApiError,
+  BINANCE_ORDER_NOT_FOUND_CODE,
+} from './binance.js';
 import { updateLimitOrderStatus } from '../repos/limit-orders.js';
 
 export async function cancelLimitOrder(
@@ -22,8 +27,10 @@ export async function cancelLimitOrder(
     );
     return 'canceled';
   } catch (err) {
-    const { code } = parseBinanceError(err);
-    if (code === -2013) {
+    if (
+      err instanceof BinanceApiError &&
+      err.code === BINANCE_ORDER_NOT_FOUND_CODE
+    ) {
       try {
         const order = await fetchOrder(userId, {
           symbol: opts.symbol,

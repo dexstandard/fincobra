@@ -30,11 +30,36 @@ vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
 }));
 
-const { cancelOrder, parseBinanceError, fetchOrder } = vi.hoisted(() => ({
-  cancelOrder: vi.fn().mockResolvedValue(undefined),
-  parseBinanceError: vi.fn().mockReturnValue({}),
-  fetchOrder: vi.fn().mockResolvedValue(undefined),
-}));
+const { cancelOrder, fetchOrder, BinanceApiError } = vi.hoisted(() => {
+  class MockBinanceApiError extends Error {
+    status: number;
+    code?: number;
+    binanceMsg?: string;
+    body?: string;
+    context: string;
+
+    constructor(
+      context: string,
+      status: number,
+      details: { code?: number; msg?: string; body?: string } = {},
+    ) {
+      const msg = details.msg ?? `${context}: ${status}`;
+      super(msg);
+      this.name = 'BinanceApiError';
+      this.status = status;
+      this.code = details.code;
+      this.binanceMsg = details.msg ?? undefined;
+      this.body = details.body;
+      this.context = context;
+    }
+  }
+
+  return {
+    cancelOrder: vi.fn().mockResolvedValue(undefined),
+    fetchOrder: vi.fn().mockResolvedValue(undefined),
+    BinanceApiError: MockBinanceApiError,
+  } as const;
+});
 vi.mock('../src/services/binance.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
@@ -53,8 +78,9 @@ vi.mock('../src/services/binance.js', () => ({
     minNotional: 0,
   }),
   cancelOrder,
-  parseBinanceError,
   fetchOrder,
+  BinanceApiError,
+  BINANCE_ORDER_NOT_FOUND_CODE: -2013,
 }));
 
 vi.mock('../src/services/indicators.js', () => ({
@@ -69,8 +95,6 @@ describe('cleanup open orders', () => {
   beforeEach(() => {
     cancelOrder.mockReset();
     cancelOrder.mockResolvedValue(undefined);
-    parseBinanceError.mockReset();
-    parseBinanceError.mockReturnValue({});
     fetchOrder.mockReset();
     fetchOrder.mockResolvedValue(undefined);
   });
@@ -177,8 +201,12 @@ describe('cleanup open orders', () => {
   });
 
   it('marks order filled when Binance reports unknown order with filled status', async () => {
-    cancelOrder.mockRejectedValueOnce(new Error('err'));
-    parseBinanceError.mockReturnValueOnce({ code: -2013 });
+    cancelOrder.mockRejectedValueOnce(
+      new BinanceApiError('failed to cancel order', 400, {
+        code: -2013,
+        msg: 'Order does not exist.',
+      }),
+    );
     fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
     const userId = await insertUser('1');
     await setAiKey(userId, 'enc');
@@ -220,8 +248,12 @@ describe('cleanup open orders', () => {
   });
 
   it('marks order canceled when Binance reports unknown order with canceled status', async () => {
-    cancelOrder.mockRejectedValueOnce(new Error('err'));
-    parseBinanceError.mockReturnValueOnce({ code: -2013 });
+    cancelOrder.mockRejectedValueOnce(
+      new BinanceApiError('failed to cancel order', 400, {
+        code: -2013,
+        msg: 'Order does not exist.',
+      }),
+    );
     fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
     const userId = await insertUser('1');
     await setAiKey(userId, 'enc');

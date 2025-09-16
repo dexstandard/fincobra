@@ -667,11 +667,14 @@ describe('agent exec log routes', () => {
       pricePrecision: 8,
       minNotional: 0,
     } as any);
-    vi.spyOn(binance, 'createLimitOrder').mockRejectedValue(
-      new Error(
-        'failed to create order: 401 {"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}',
-      ),
-    );
+    vi
+      .spyOn(binance, 'createLimitOrder')
+      .mockRejectedValue(
+        new binance.BinanceApiError('failed to create order', 401, {
+          code: -2015,
+          msg: 'Invalid API-key, IP, or permissions for action.',
+        }),
+      );
     const res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,

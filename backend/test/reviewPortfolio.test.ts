@@ -85,30 +85,36 @@ vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
 }));
 
-vi.mock('../src/services/binance.js', () => ({
-  fetchAccount: vi.fn().mockResolvedValue({
-    balances: [
-      { asset: 'BTC', free: '1', locked: '0.5' },
-      { asset: 'ETH', free: '2', locked: '0' },
-    ],
-  }),
-  fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
-  fetchMarketTimeseries: vi.fn().mockResolvedValue(sampleTimeseries),
-  fetchPairInfo: vi.fn().mockResolvedValue({
-    symbol: 'BTCETH',
-    baseAsset: 'BTC',
-    quoteAsset: 'ETH',
-    quantityPrecision: 8,
-    pricePrecision: 8,
-    minNotional: 0,
-  }),
-  cancelOrder: vi.fn().mockResolvedValue(undefined),
-  parseBinanceError: vi.fn().mockReturnValue({}),
-  fetchFearGreedIndex: vi
-    .fn()
-    .mockResolvedValue({ value: 50, classification: 'Neutral' }),
-  fetchOrder: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock('../src/services/binance.js', async () => {
+  const actual = await vi.importActual<
+    typeof import('../src/services/binance.js')
+  >('../src/services/binance.js');
+  return {
+    fetchAccount: vi.fn().mockResolvedValue({
+      balances: [
+        { asset: 'BTC', free: '1', locked: '0.5' },
+        { asset: 'ETH', free: '2', locked: '0' },
+      ],
+    }),
+    fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
+    fetchMarketTimeseries: vi.fn().mockResolvedValue(sampleTimeseries),
+    fetchPairInfo: vi.fn().mockResolvedValue({
+      symbol: 'BTCETH',
+      baseAsset: 'BTC',
+      quoteAsset: 'ETH',
+      quantityPrecision: 8,
+      pricePrecision: 8,
+      minNotional: 0,
+    }),
+    cancelOrder: vi.fn().mockResolvedValue(undefined),
+    fetchFearGreedIndex: vi
+      .fn()
+      .mockResolvedValue({ value: 50, classification: 'Neutral' }),
+    fetchOrder: vi.fn().mockResolvedValue(undefined),
+    BinanceApiError: actual.BinanceApiError,
+    BINANCE_ORDER_NOT_FOUND_CODE: actual.BINANCE_ORDER_NOT_FOUND_CODE,
+  };
+});
 
 vi.mock('../src/services/indicators.js', () => ({
   fetchTokenIndicators: vi.fn().mockResolvedValue(sampleIndicators),

@@ -4,6 +4,32 @@ import { getBinanceKeyRow } from '../repos/api-keys.js';
 import { decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
 
+const BINANCE_INVALID_SYMBOL_CODE = -1121;
+export const BINANCE_ORDER_NOT_FOUND_CODE = -2013;
+
+export class BinanceApiError extends Error {
+  status: number;
+  code?: number;
+  binanceMsg?: string;
+  body?: string;
+  context: string;
+
+  constructor(
+    context: string,
+    status: number,
+    details: { code?: number; msg?: string; body?: string },
+  ) {
+    const msg = details.msg?.trim();
+    super(msg || `${context}: ${status}`);
+    this.name = 'BinanceApiError';
+    this.status = status;
+    this.code = details.code;
+    this.binanceMsg = msg;
+    this.body = details.body;
+    this.context = context;
+  }
+}
+
 type UserCreds = { key: string; secret: string };
 
 interface LotSizeFilter {
@@ -95,11 +121,13 @@ export async function fetchPairInfo(
       `https://api.binance.com/api/v3/exchangeInfo?symbol=${symbol}`,
     );
     if (!res.ok) {
-      const body = await res.text();
-      lastErr = new Error(
-        `failed to fetch exchange info: ${res.status} ${body}`,
+      const error = await parseBinanceError(res);
+      lastErr = new BinanceApiError(
+        'failed to fetch exchange info',
+        res.status,
+        error,
       );
-      if (/Invalid symbol/i.test(body)) continue;
+      if (error.code === BINANCE_INVALID_SYMBOL_CODE) continue;
       throw lastErr;
     }
     const json = (await res.json()) as ExchangeInfoResponse;
@@ -174,22 +202,28 @@ function appendSignature(secret: string, params: URLSearchParams) {
   return signature;
 }
 
-export function parseBinanceError(
-  err: unknown,
-): { code?: number; msg?: string } {
-  if (err instanceof Error) {
-    const match = err.message.match(/\{.+\}$/);
-    if (match) {
-      try {
-        const body = JSON.parse(match[0]);
-        const res: { code?: number; msg?: string } = {};
-        if (typeof body.code === 'number') res.code = body.code;
-        if (typeof body.msg === 'string') res.msg = body.msg;
-        return res;
-      } catch {}
+export async function parseBinanceError(
+  res: Response,
+): Promise<{ code?: number; msg?: string; body?: string }> {
+  const bodyText = await res.text();
+  let code: number | undefined;
+  let msg: string | undefined;
+  if (bodyText) {
+    try {
+      const parsed = JSON.parse(bodyText) as Record<string, unknown>;
+      if (typeof parsed.code === 'number') code = parsed.code;
+      if (typeof parsed.msg === 'string') msg = parsed.msg;
+      else if (typeof parsed.message === 'string') msg = parsed.message;
+    } catch {
+      msg = bodyText.trim();
     }
   }
-  return {};
+  const trimmed = msg?.trim();
+  return {
+    code,
+    msg: trimmed,
+    body: bodyText || undefined,
+  };
 }
 
 export async function fetchAccount(id: string) {
@@ -200,7 +234,10 @@ export async function fetchAccount(id: string) {
       `https://api.binance.com/api/v3/account?${params.toString()}`,
       { headers: { 'X-MBX-APIKEY': creds.key } },
     );
-    if (!accountRes.ok) throw new Error('failed to fetch account');
+    if (!accountRes.ok) {
+      const error = await parseBinanceError(accountRes);
+      throw new BinanceApiError('failed to fetch account', accountRes.status, error);
+    }
     return (await accountRes.json()) as {
       balances: { asset: string; free: string; locked: string }[];
     };
@@ -217,7 +254,10 @@ export async function fetchEarnFlexibleBalance(id: string, asset: string) {
       `https://api.binance.com/sapi/v1/simple-earn/flexible/position?${params.toString()}`,
       { headers: { 'X-MBX-APIKEY': creds.key } },
     );
-    if (!res.ok) throw new Error('failed to fetch earn balance');
+    if (!res.ok) {
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to fetch earn balance', res.status, error);
+    }
     const json = (await res.json()) as {
       rows?: { totalAmount: string }[];
     };
@@ -247,8 +287,8 @@ export async function subscribeEarnFlexible(
       },
     );
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to subscribe earn: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to subscribe earn', res.status, error);
     }
     return res.json();
   });
@@ -276,8 +316,8 @@ export async function redeemEarnFlexible(
       },
     );
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to redeem earn: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to redeem earn', res.status, error);
     }
     return res.json();
   });
@@ -355,8 +395,8 @@ export async function createLimitOrder(
       body: params.toString(),
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to create order: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to create order', res.status, error);
     }
     return res.json();
   });
@@ -380,8 +420,8 @@ export async function cancelOrder(
       },
     );
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to cancel order: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to cancel order', res.status, error);
     }
     return res.json();
   });
@@ -402,8 +442,8 @@ export async function fetchOrder(
       { headers: { 'X-MBX-APIKEY': creds.key } },
     );
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to fetch order: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to fetch order', res.status, error);
     }
     return (await res.json()) as OrderStatusResponse;
   });
@@ -423,8 +463,8 @@ export async function cancelOpenOrders(id: string, opts: { symbol: string }) {
       },
     );
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to cancel open orders: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to cancel open orders', res.status, error);
     }
     return res.json();
   });
@@ -440,8 +480,8 @@ export async function fetchOpenOrders(id: string, opts: { symbol?: string }) {
       { headers: { 'X-MBX-APIKEY': creds.key } },
     );
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to fetch open orders: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError('failed to fetch open orders', res.status, error);
     }
     return res.json() as Promise<OpenOrder[]>;
   });
@@ -464,8 +504,12 @@ async function fetchSymbolData(symbol: string) {
   } as const;
   for (const [name, res] of Object.entries(responses)) {
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to fetch ${name} data: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError(
+        `failed to fetch ${name} data`,
+        res.status,
+        error,
+      );
     }
   }
   const priceJson = (await priceRes.json()) as { price: string };
@@ -497,7 +541,10 @@ export async function fetchPairData(token1: string, token2: string) {
       return await fetchSymbolData(symbol);
     } catch (err) {
       lastErr = err;
-      if (err instanceof Error && /Invalid symbol/i.test(err.message)) {
+      if (
+        err instanceof BinanceApiError &&
+        err.code === BINANCE_INVALID_SYMBOL_CODE
+      ) {
         continue;
       }
       throw err;
@@ -526,8 +573,12 @@ export async function fetchMarketTimeseries(symbol: string) {
   } as const;
   for (const [name, res] of Object.entries(responses)) {
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to fetch ${name} data: ${res.status} ${body}`);
+      const error = await parseBinanceError(res);
+      throw new BinanceApiError(
+        `failed to fetch ${name} data`,
+        res.status,
+        error,
+      );
     }
   }
 

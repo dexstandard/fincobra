@@ -36,7 +36,7 @@ import {
   createRebalanceLimitOrder,
   MIN_LIMIT_ORDER_USD,
 } from '../services/rebalance.js';
-import { parseBinanceError } from '../services/binance.js';
+import { BinanceApiError } from '../services/binance.js';
 import { getRebalanceInfo } from '../repos/agent-review-result.js';
 import { getPromptForReviewResult } from '../repos/agent-review-raw-log.js';
 import { parseParams } from '../util/validation.js';
@@ -406,7 +406,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           manuallyEdited: body?.manuallyEdited,
         });
       } catch (err) {
-        const { msg } = parseBinanceError(err);
+        const msg =
+          err instanceof BinanceApiError
+            ? err.binanceMsg ?? err.message
+            : err instanceof Error
+              ? err.message
+              : undefined;
         return reply
           .code(400)
           .send(errorResponse(msg || 'failed to create limit order'));
@@ -449,8 +454,15 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return { ok: true } as const;
       } catch (err) {
         log.error({ err, execLogId: logId, orderId }, 'failed to cancel order');
-        const { msg } = parseBinanceError(err);
-        return reply.code(500).send(errorResponse(msg || 'failed to cancel order'));
+        const msg =
+          err instanceof BinanceApiError
+            ? err.binanceMsg ?? err.message
+            : err instanceof Error
+              ? err.message
+              : undefined;
+        return reply
+          .code(500)
+          .send(errorResponse(msg || 'failed to cancel order'));
       }
     },
   );
