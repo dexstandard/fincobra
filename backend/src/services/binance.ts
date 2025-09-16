@@ -383,6 +383,33 @@ export async function cancelOrder(
   return res.json();
 }
 
+export async function fetchOrder(
+  id: string,
+  opts: { symbol: string; orderId: number },
+) {
+  const creds = await getUserCreds(id);
+  if (!creds) return null;
+  const timestamp = Date.now();
+  const params = new URLSearchParams({
+    symbol: opts.symbol.toUpperCase(),
+    orderId: String(opts.orderId),
+    timestamp: String(timestamp),
+  });
+  const signature = createHmac('sha256', creds.secret)
+    .update(params.toString())
+    .digest('hex');
+  params.append('signature', signature);
+  const res = await fetch(
+    `https://api.binance.com/api/v3/order?${params.toString()}`,
+    { headers: { 'X-MBX-APIKEY': creds.key } },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`failed to fetch order: ${res.status} ${body}`);
+  }
+  return res.json() as Promise<{ status?: string } | null>;
+}
+
 export async function cancelOpenOrders(id: string, opts: { symbol: string }) {
   const creds = await getUserCreds(id);
   if (!creds) return null;

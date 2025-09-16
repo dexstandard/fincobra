@@ -5,6 +5,7 @@ import { fetchPairData } from '../src/services/binance.js';
 vi.mock('../src/services/binance.js', () => ({
   fetchPairData: vi.fn(),
   fetchPairInfo: vi.fn().mockResolvedValue({ minNotional: 0 }),
+  fetchOrder: vi.fn(),
 }));
 
 describe('fetchTokenIndicators', () => {

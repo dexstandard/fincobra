@@ -17,6 +17,7 @@ vi.mock('../src/services/binance.js', () => ({
     .mockImplementation((t1: string, t2: string) =>
       Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 }),
     ),
+  fetchOrder: vi.fn(),
 }));
 
 vi.mock('../src/repos/agent-review-result.js', () => ({

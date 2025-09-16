@@ -104,7 +104,7 @@ export async function updateLimitOrderStatus(
   cancellationReason?: string,
 ) {
   await db.query(
-    `UPDATE limit_order SET status = $3, cancellation_reason = COALESCE($4, cancellation_reason) WHERE user_id = $1 AND order_id = $2`,
+    `UPDATE limit_order SET status = $3, cancellation_reason = $4 WHERE user_id = $1 AND order_id = $2`,
     [userId, orderId, status, cancellationReason ?? null],
   );
 }

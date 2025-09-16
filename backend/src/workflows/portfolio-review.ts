@@ -12,10 +12,7 @@ import {
 import { runNewsAnalyst } from '../agents/news-analyst.js';
 import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
 import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
-import {
-  getOpenLimitOrdersForAgent,
-  updateLimitOrderStatus,
-} from '../repos/limit-orders.js';
+import { getOpenLimitOrdersForAgent } from '../repos/limit-orders.js';
 import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
 import {
@@ -24,10 +21,7 @@ import {
   type ReviewResultError,
 } from '../repos/agent-review-result.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
-import {
-  cancelOrder,
-  parseBinanceError,
-} from '../services/binance.js';
+import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { type RebalancePrompt } from '../agents/types.js';
 import pLimit from 'p-limit';
@@ -102,24 +96,17 @@ async function cleanupOpenOrders(
       limit(async () => {
         const planned = JSON.parse(o.planned_json);
         try {
-          await cancelOrder(o.user_id, {
+          const res = await cancelLimitOrder(o.user_id, {
             symbol: planned.symbol,
-            orderId: Number(o.order_id),
+            orderId: o.order_id,
+            reason: 'Could not fill within interval',
           });
-          await updateLimitOrderStatus(
-            o.user_id,
-            o.order_id,
-            'canceled',
-            'Could not fill within interval',
+          log.info(
+            { orderId: o.order_id },
+            res === 'canceled' ? 'canceled stale order' : 'order already filled',
           );
-          log.info({ orderId: o.order_id }, 'canceled stale order');
         } catch (err) {
-          const { code } = parseBinanceError(err);
-          if (code === -2013) {
-            await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
-          } else {
-            log.error({ err }, 'failed to cancel order');
-          }
+          log.error({ err }, 'failed to cancel order');
         }
       }),
     ),

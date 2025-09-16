@@ -107,6 +107,7 @@ vi.mock('../src/services/binance.js', () => ({
   fetchFearGreedIndex: vi
     .fn()
     .mockResolvedValue({ value: 50, classification: 'Neutral' }),
+  fetchOrder: vi.fn(),
 }));
 
 vi.mock('../src/services/indicators.js', () => ({
