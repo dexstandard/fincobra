@@ -36,7 +36,7 @@ export interface ExecLog {
       quantity: number;
       limitPrice: number;
       basePrice: number;
-      maxPriceDivergence: number;
+      maxPriceDivergencePct: number;
     }[];
   };
   error?: Record<string, unknown>;

@@ -21,9 +21,9 @@ export const developerInstructions = [
   '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
   '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
   '- The prompt lists all supported trading pairs with their current prices for easy reference.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,limitPrice:number,basePrice:number,maxPriceDivergence:number},...],shortReport}.',
-  '- Set limitPrice near the stated basePrice and cap drift via maxPriceDivergence (use 0 when no cap).',
-  '- maxPriceDivergence defines how far the live price may drift from basePrice before cancelation;',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,limitPrice:number,basePrice:number,maxPriceDivergencePct:number},...],shortReport}.',
+  '- maxPriceDivergencePct is expressed as a percentage drift allowance (e.g. 0.01 = 1%) between basePrice and the live market price before cancelation;',
+  '- maxPriceDivergencePct must be at least 0.0001 (0.01%) to avoid premature cancelations;',
   '- Keep limit targets realistic for the stated review interval so orders can fill within that window; avoid extreme prices unlikely to execute within interval.',
   '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
   '- shortReport ≤255 chars.',
@@ -49,7 +49,7 @@ export const rebalanceResponseSchema = {
                   quantity: { type: 'number' },
                   limitPrice: { type: 'number' },
                   basePrice: { type: 'number' },
-                  maxPriceDivergence: { type: 'number' },
+                  maxPriceDivergencePct: { type: 'number' },
                 },
                 required: [
                   'pair',
@@ -58,7 +58,7 @@ export const rebalanceResponseSchema = {
                   'quantity',
                   'limitPrice',
                   'basePrice',
-                  'maxPriceDivergence',
+                  'maxPriceDivergencePct',
                 ],
                 additionalProperties: false,
               },
@@ -207,7 +207,7 @@ export interface MainTraderOrder {
   quantity: number;
   limitPrice: number;
   basePrice: number;
-  maxPriceDivergence: number;
+  maxPriceDivergencePct: number;
 }
 
 export interface MainTraderDecision {

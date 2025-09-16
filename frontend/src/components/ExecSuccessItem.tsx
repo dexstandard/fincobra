@@ -20,7 +20,7 @@ interface Props {
       quantity: number;
       limitPrice: number;
       basePrice: number;
-      maxPriceDivergence: number;
+      maxPriceDivergencePct: number;
     }[];
   };
   promptIcon?: ReactNode;

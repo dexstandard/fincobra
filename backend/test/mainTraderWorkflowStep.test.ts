@@ -20,7 +20,7 @@ const callAiMock = vi.hoisted(() =>
                         quantity: 1,
                         limitPrice: 25000,
                         basePrice: 25100,
-                        maxPriceDivergence: 0.01,
+                        maxPriceDivergencePct: 0.01,
                       },
                     ],
                     shortReport: 'ok',
@@ -72,7 +72,7 @@ describe('main trader step', () => {
         quantity: 1,
         limitPrice: 25000,
         basePrice: 25100,
-        maxPriceDivergence: 0.01,
+        maxPriceDivergencePct: 0.01,
       },
     ]);
     expect(callAiMock).toHaveBeenCalled();
