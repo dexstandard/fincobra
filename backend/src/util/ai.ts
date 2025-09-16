@@ -44,15 +44,67 @@ export function compactJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+export interface OpenAIResponse {
+  output: OpenAIResponseOutput[];
+}
+
+interface OpenAIResponseOutput {
+  id?: string;
+  type: string;
+  role?: string;
+  content?: OpenAIResponseContent[];
+}
+
+interface OpenAIResponseContent {
+  type: string;
+  text?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isOpenAIResponse(value: unknown): value is OpenAIResponse {
+  if (!isRecord(value)) return false;
+  const output = value.output;
+  if (!Array.isArray(output)) return false;
+  return output.every((item) => {
+    if (!isRecord(item)) return false;
+    const { id, type, content } = item;
+    if (typeof type !== 'string') return false;
+    if (id !== undefined && typeof id !== 'string') return false;
+    if (content === undefined) return true;
+    if (!Array.isArray(content)) return false;
+    return content.every((entry) => {
+      if (!isRecord(entry)) return false;
+      const { type: contentType, text } = entry;
+      if (typeof contentType !== 'string') return false;
+      if (text !== undefined && typeof text !== 'string') return false;
+      return true;
+    });
+  });
+}
+
 export function extractJson<T>(res: string): T | null {
   try {
     const json = JSON.parse(res);
-    const outputs = Array.isArray((json as any).output) ? (json as any).output : [];
-    const msg = outputs.find((o: any) => o.type === 'message' || o.id?.startsWith('msg_'));
-    const text = msg?.content?.[0]?.text;
-    if (typeof text !== 'string') return null;
+    if (!isOpenAIResponse(json)) {
+      console.error('Invalid OpenAI response payload', json);
+      return null;
+    }
+    const msg = json.output.find((item) => item.type === 'message' || item.id?.startsWith('msg_'));
+    if (!msg) {
+      console.error('OpenAI response missing assistant message', json);
+      return null;
+    }
+    const text = msg.content?.[0]?.text;
+    if (typeof text !== 'string') {
+      console.error('OpenAI response missing assistant text content', json);
+      return null;
+    }
     return JSON.parse(text) as T;
-  } catch {
+  } catch (error) {
+    console.error('Failed to parse OpenAI response JSON', { error, res });
     return null;
   }
 }
