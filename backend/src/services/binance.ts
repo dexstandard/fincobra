@@ -143,6 +143,33 @@ async function getUserCreds(id: string): Promise<UserCreds | null> {
   return { key, secret };
 }
 
+async function withUserCreds<T>(
+  id: string,
+  fn: (creds: UserCreds) => Promise<T>,
+): Promise<T | null> {
+  const creds = await getUserCreds(id);
+  if (!creds) return null;
+  return fn(creds);
+}
+
+function createTimestampedParams(values: Record<string, string> = {}) {
+  const timestamp = Date.now();
+  return new URLSearchParams({
+    ...values,
+    timestamp: String(timestamp),
+  });
+}
+
+function signParams(secret: string, params: URLSearchParams): string {
+  return createHmac('sha256', secret).update(params.toString()).digest('hex');
+}
+
+function appendSignature(secret: string, params: URLSearchParams) {
+  const signature = signParams(secret, params);
+  params.append('signature', signature);
+  return signature;
+}
+
 export function parseBinanceError(
   err: unknown,
 ): { code?: number; msg?: string } {
@@ -162,111 +189,94 @@ export function parseBinanceError(
 }
 
 export async function fetchAccount(id: string) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const query = `timestamp=${timestamp}`;
-  const signature = createHmac('sha256', creds.secret)
-    .update(query)
-    .digest('hex');
-  const accountRes = await fetch(
-    `https://api.binance.com/api/v3/account?${query}&signature=${signature}`,
-    { headers: { 'X-MBX-APIKEY': creds.key } },
-  );
-  if (!accountRes.ok) throw new Error('failed to fetch account');
-  return (await accountRes.json()) as {
-    balances: { asset: string; free: string; locked: string }[];
-  };
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams();
+    appendSignature(creds.secret, params);
+    const accountRes = await fetch(
+      `https://api.binance.com/api/v3/account?${params.toString()}`,
+      { headers: { 'X-MBX-APIKEY': creds.key } },
+    );
+    if (!accountRes.ok) throw new Error('failed to fetch account');
+    return (await accountRes.json()) as {
+      balances: { asset: string; free: string; locked: string }[];
+    };
+  });
 }
 
 export async function fetchEarnFlexibleBalance(id: string, asset: string) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const params = new URLSearchParams({
-    asset: asset.toUpperCase(),
-    timestamp: String(timestamp),
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams({
+      asset: asset.toUpperCase(),
+    });
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      `https://api.binance.com/sapi/v1/simple-earn/flexible/position?${params.toString()}`,
+      { headers: { 'X-MBX-APIKEY': creds.key } },
+    );
+    if (!res.ok) throw new Error('failed to fetch earn balance');
+    const json = (await res.json()) as {
+      rows?: { totalAmount: string }[];
+    };
+    return json.rows?.reduce((sum, r) => sum + Number(r.totalAmount), 0) ?? 0;
   });
-  const signature = createHmac('sha256', creds.secret)
-    .update(params.toString())
-    .digest('hex');
-  const res = await fetch(
-    `https://api.binance.com/sapi/v1/simple-earn/flexible/position?${params.toString()}&signature=${signature}`,
-    { headers: { 'X-MBX-APIKEY': creds.key } },
-  );
-  if (!res.ok) throw new Error('failed to fetch earn balance');
-  const json = (await res.json()) as {
-    rows?: { totalAmount: string }[];
-  };
-  return json.rows?.reduce((sum, r) => sum + Number(r.totalAmount), 0) ?? 0;
 }
 
 export async function subscribeEarnFlexible(
   id: string,
   opts: { productId: string; amount: number },
 ) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const params = new URLSearchParams({
-    productId: opts.productId,
-    amount: String(opts.amount),
-    timestamp: String(timestamp),
-  });
-  const signature = createHmac('sha256', creds.secret)
-    .update(params.toString())
-    .digest('hex');
-  params.append('signature', signature);
-  const res = await fetch(
-    'https://api.binance.com/sapi/v1/simple-earn/flexible/subscribe',
-    {
-      method: 'POST',
-      headers: {
-        'X-MBX-APIKEY': creds.key,
-        'Content-Type': 'application/x-www-form-urlencoded',
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams({
+      productId: opts.productId,
+      amount: String(opts.amount),
+    });
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      'https://api.binance.com/sapi/v1/simple-earn/flexible/subscribe',
+      {
+        method: 'POST',
+        headers: {
+          'X-MBX-APIKEY': creds.key,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
       },
-      body: params.toString(),
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`failed to subscribe earn: ${res.status} ${body}`);
-  }
-  return res.json();
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to subscribe earn: ${res.status} ${body}`);
+    }
+    return res.json();
+  });
 }
 
 export async function redeemEarnFlexible(
   id: string,
   opts: { productId: string; amount: number },
 ) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const params = new URLSearchParams({
-    productId: opts.productId,
-    amount: String(opts.amount),
-    timestamp: String(timestamp),
-  });
-  const signature = createHmac('sha256', creds.secret)
-    .update(params.toString())
-    .digest('hex');
-  params.append('signature', signature);
-  const res = await fetch(
-    'https://api.binance.com/sapi/v1/simple-earn/flexible/redeem',
-    {
-      method: 'POST',
-      headers: {
-        'X-MBX-APIKEY': creds.key,
-        'Content-Type': 'application/x-www-form-urlencoded',
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams({
+      productId: opts.productId,
+      amount: String(opts.amount),
+    });
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      'https://api.binance.com/sapi/v1/simple-earn/flexible/redeem',
+      {
+        method: 'POST',
+        headers: {
+          'X-MBX-APIKEY': creds.key,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
       },
-      body: params.toString(),
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`failed to redeem earn: ${res.status} ${body}`);
-  }
-  return res.json();
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to redeem earn: ${res.status} ${body}`);
+    }
+    return res.json();
+  });
 }
 
 export async function fetchTotalBalanceUsd(id: string) {
@@ -322,112 +332,93 @@ export async function createLimitOrder(
     price: number;
   },
 ) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const params = new URLSearchParams({
-    symbol: opts.symbol.toUpperCase(),
-    side: opts.side,
-    type: 'LIMIT',
-    timeInForce: 'GTC',
-    quantity: String(opts.quantity),
-    price: String(opts.price),
-    timestamp: String(timestamp),
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams({
+      symbol: opts.symbol.toUpperCase(),
+      side: opts.side,
+      type: 'LIMIT',
+      timeInForce: 'GTC',
+      quantity: String(opts.quantity),
+      price: String(opts.price),
+    });
+    appendSignature(creds.secret, params);
+    const res = await fetch(`https://api.binance.com/api/v3/order`, {
+      method: 'POST',
+      headers: {
+        'X-MBX-APIKEY': creds.key,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to create order: ${res.status} ${body}`);
+    }
+    return res.json();
   });
-  const signature = createHmac('sha256', creds.secret)
-    .update(params.toString())
-    .digest('hex');
-  params.append('signature', signature);
-  const res = await fetch(`https://api.binance.com/api/v3/order`, {
-    method: 'POST',
-    headers: {
-      'X-MBX-APIKEY': creds.key,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: params.toString(),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`failed to create order: ${res.status} ${body}`);
-  }
-  return res.json();
 }
 
 export async function cancelOrder(
   id: string,
   opts: { symbol: string; orderId: number },
 ) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const params = new URLSearchParams({
-    symbol: opts.symbol.toUpperCase(),
-    orderId: String(opts.orderId),
-    timestamp: String(timestamp),
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams({
+      symbol: opts.symbol.toUpperCase(),
+      orderId: String(opts.orderId),
+    });
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      `https://api.binance.com/api/v3/order?${params.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'X-MBX-APIKEY': creds.key },
+      },
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to cancel order: ${res.status} ${body}`);
+    }
+    return res.json();
   });
-  const signature = createHmac('sha256', creds.secret)
-    .update(params.toString())
-    .digest('hex');
-  params.append('signature', signature);
-  const res = await fetch(
-    `https://api.binance.com/api/v3/order?${params.toString()}`,
-    {
-      method: 'DELETE',
-      headers: { 'X-MBX-APIKEY': creds.key },
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`failed to cancel order: ${res.status} ${body}`);
-  }
-  return res.json();
 }
 
 export async function cancelOpenOrders(id: string, opts: { symbol: string }) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const params = new URLSearchParams({
-    symbol: opts.symbol.toUpperCase(),
-    timestamp: String(timestamp),
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams({
+      symbol: opts.symbol.toUpperCase(),
+    });
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      `https://api.binance.com/api/v3/openOrders?${params.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'X-MBX-APIKEY': creds.key },
+      },
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to cancel open orders: ${res.status} ${body}`);
+    }
+    return res.json();
   });
-  const signature = createHmac('sha256', creds.secret)
-    .update(params.toString())
-    .digest('hex');
-  params.append('signature', signature);
-  const res = await fetch(
-    `https://api.binance.com/api/v3/openOrders?${params.toString()}`,
-    {
-      method: 'DELETE',
-      headers: { 'X-MBX-APIKEY': creds.key },
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`failed to cancel open orders: ${res.status} ${body}`);
-  }
-  return res.json();
 }
 
 export async function fetchOpenOrders(id: string, opts: { symbol?: string }) {
-  const creds = await getUserCreds(id);
-  if (!creds) return null;
-  const timestamp = Date.now();
-  const params = new URLSearchParams({ timestamp: String(timestamp) });
-  if (opts.symbol) params.append('symbol', opts.symbol.toUpperCase());
-  const signature = createHmac('sha256', creds.secret)
-    .update(params.toString())
-    .digest('hex');
-  params.append('signature', signature);
-  const res = await fetch(
-    `https://api.binance.com/api/v3/openOrders?${params.toString()}`,
-    { headers: { 'X-MBX-APIKEY': creds.key } },
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`failed to fetch open orders: ${res.status} ${body}`);
-  }
-  return res.json() as Promise<OpenOrder[]>;
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams();
+    if (opts.symbol) params.append('symbol', opts.symbol.toUpperCase());
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      `https://api.binance.com/api/v3/openOrders?${params.toString()}`,
+      { headers: { 'X-MBX-APIKEY': creds.key } },
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to fetch open orders: ${res.status} ${body}`);
+    }
+    return res.json() as Promise<OpenOrder[]>;
+  });
 }
 
 async function fetchSymbolData(symbol: string) {
