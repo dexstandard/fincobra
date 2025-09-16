@@ -77,7 +77,10 @@ export default function AgentView() {
         </div>
         {isActive ? (
           <div className="mt-4 flex gap-2">
-            <Button onClick={() => setShowUpdate(true)}>{t('update_agent')}</Button>
+            <Button onClick={() => setShowUpdate(true)}>
+              <span className="hidden md:inline">{t('update_agent')}</span>
+              <span className="md:hidden">{t('edit')}</span>
+            </Button>
             <Button
               disabled={stopMut.isPending}
               loading={stopMut.isPending}
@@ -95,7 +98,10 @@ export default function AgentView() {
           </div>
         ) : (
           <div className="mt-4 flex gap-2">
-            <Button onClick={() => setShowUpdate(true)}>{t('update_agent')}</Button>
+            <Button onClick={() => setShowUpdate(true)}>
+              <span className="hidden md:inline">{t('update_agent')}</span>
+              <span className="md:hidden">{t('edit')}</span>
+            </Button>
             {hasOpenAIKey && hasBinanceKey && (
               <Button
                 disabled={startMut.isPending}
