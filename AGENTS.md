@@ -5,6 +5,10 @@ relevant directory to save time.
 
 ### General
 - Pin all `package.json` dependencies to exact versions. Do not use `^` or `~` ranges.
+- Typing rules:
+  - Keep shared types for a directory in a `types.ts` file within that folder.
+  - When a type is used only inside a single file, define the interface at the top of that file.
+  - Use `interface` declarations for object shapes instead of `type` aliases.
 
 ## Backend
 
