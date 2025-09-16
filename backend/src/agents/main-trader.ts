@@ -21,8 +21,8 @@ export const developerInstructions = [
   '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
   '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
   '- The prompt lists all supported trading pairs with their current prices for easy reference.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,limitPrice:number|null,basePrice:number|null,maxPriceDivergence:number|null},...],shortReport}.',
-  '- IMPORTANT: Model only sets limitPrice and maxPriceDivergence.',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,limitPrice:number,basePrice:number,maxPriceDivergence:number},...],shortReport}.',
+  '- Set limitPrice near the stated basePrice and cap drift via maxPriceDivergence (use 0 when no cap).',
   '- maxPriceDivergence defines how far the live price may drift from basePrice before cancelation;',
   '- Keep limit targets realistic for the stated review interval so orders can fill within that window; avoid extreme prices unlikely to execute within interval.',
   '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
@@ -47,9 +47,9 @@ export const rebalanceResponseSchema = {
                   token: { type: 'string' },
                   side: { type: 'string', enum: ['BUY', 'SELL'] },
                   quantity: { type: 'number' },
-                  limitPrice: { type: ['number', 'null'] },
-                  basePrice: { type: ['number', 'null'] },
-                  maxPriceDivergence: { type: ['number', 'null'] },
+                  limitPrice: { type: 'number' },
+                  basePrice: { type: 'number' },
+                  maxPriceDivergence: { type: 'number' },
                 },
                 required: [
                   'pair',
@@ -205,9 +205,9 @@ export interface MainTraderOrder {
   token: string;
   side: string;
   quantity: number;
-  limitPrice: number | null;
-  basePrice: number | null;
-  maxPriceDivergence: number | null;
+  limitPrice: number;
+  basePrice: number;
+  maxPriceDivergence: number;
 }
 
 export interface MainTraderDecision {

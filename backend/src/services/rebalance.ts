@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { insertLimitOrder, type LimitOrderStatus } from '../repos/limit-orders.js';
+import type { MainTraderOrder } from '../agents/main-trader.js';
 import {
   fetchPairData,
   fetchPairInfo,
@@ -136,15 +137,7 @@ function splitPair(pair: string): [string, string] {
 
 export async function createDecisionLimitOrders(opts: {
   userId: string;
-  orders: {
-    pair: string;
-    token: string;
-    side: string;
-    quantity: number;
-    limitPrice: number | null;
-    basePrice: number | null;
-    maxPriceDivergence: number | null;
-  }[];
+  orders: MainTraderOrder[];
   reviewResultId: string;
   log: FastifyBaseLogger;
 }) {
@@ -154,32 +147,37 @@ export async function createDecisionLimitOrders(opts: {
     const info = await fetchPairInfo(a, b);
     const { currentPrice } = await fetchPairData(a, b);
     const side = o.side as 'BUY' | 'SELL';
-    const basePrice = o.basePrice ?? currentPrice;
-    const rawPrice =
-      o.limitPrice !== null
+    const basePrice =
+      Number.isFinite(o.basePrice) && o.basePrice > 0 ? o.basePrice : currentPrice;
+    const limitPrice =
+      Number.isFinite(o.limitPrice) && o.limitPrice > 0
         ? o.limitPrice
         : basePrice * (side === 'BUY' ? 0.999 : 1.001);
+    const divergenceLimit =
+      Number.isFinite(o.maxPriceDivergence) && o.maxPriceDivergence > 0
+        ? o.maxPriceDivergence
+        : 0;
     let quantity: number;
     if (o.token === info.baseAsset) {
       quantity = o.quantity;
     } else if (o.token === info.quoteAsset) {
-      quantity = o.quantity / rawPrice;
+      quantity = o.quantity / limitPrice;
     } else {
       continue;
     }
     const qty = Number(quantity.toFixed(info.quantityPrecision));
-    const prc = Number(rawPrice.toFixed(info.pricePrecision));
+    const prc = Number(limitPrice.toFixed(info.pricePrecision));
     const params = { symbol: info.symbol, side, quantity: qty, price: prc } as const;
     const planned = {
       ...params,
       manuallyEdited: false,
-      ...(o.limitPrice !== null ? { limitPrice: o.limitPrice } : {}),
-      ...(o.basePrice !== null ? { basePrice: o.basePrice } : {}),
-      ...(o.maxPriceDivergence !== null ? { maxPriceDivergence: o.maxPriceDivergence } : {}),
+      limitPrice: prc,
+      basePrice,
+      maxPriceDivergence: divergenceLimit,
     };
     if (
-      o.maxPriceDivergence !== null &&
-      Math.abs(currentPrice - basePrice) / basePrice > o.maxPriceDivergence
+      divergenceLimit > 0 &&
+      Math.abs(currentPrice - basePrice) / basePrice > divergenceLimit
     ) {
       await insertLimitOrder({
         userId: opts.userId,

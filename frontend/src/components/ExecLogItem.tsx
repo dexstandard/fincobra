@@ -34,9 +34,9 @@ export interface ExecLog {
       token: string;
       side: string;
       quantity: number;
-      limitPrice: number | null;
-      basePrice: number | null;
-      maxPriceDivergence: number | null;
+      limitPrice: number;
+      basePrice: number;
+      maxPriceDivergence: number;
     }[];
   };
   error?: Record<string, unknown>;

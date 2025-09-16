@@ -18,6 +18,9 @@ const callAiMock = vi.hoisted(() =>
                         token: 'BTC',
                         side: 'SELL',
                         quantity: 1,
+                        limitPrice: 25000,
+                        basePrice: 25100,
+                        maxPriceDivergence: 0.01,
                       },
                     ],
                     shortReport: 'ok',
@@ -62,7 +65,15 @@ describe('main trader step', () => {
       prompt,
     );
     expect(decision?.orders).toEqual([
-      { pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 },
+      {
+        pair: 'BTCUSDT',
+        token: 'BTC',
+        side: 'SELL',
+        quantity: 1,
+        limitPrice: 25000,
+        basePrice: 25100,
+        maxPriceDivergence: 0.01,
+      },
     ]);
     expect(callAiMock).toHaveBeenCalled();
   });

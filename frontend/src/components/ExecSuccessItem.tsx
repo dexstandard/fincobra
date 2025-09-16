@@ -18,9 +18,9 @@ interface Props {
       token: string;
       side: string;
       quantity: number;
-      limitPrice: number | null;
-      basePrice: number | null;
-      maxPriceDivergence: number | null;
+      limitPrice: number;
+      basePrice: number;
+      maxPriceDivergence: number;
     }[];
   };
   promptIcon?: ReactNode;
