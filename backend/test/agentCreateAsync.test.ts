@@ -114,5 +114,136 @@ describe('agent creation', () => {
     ]);
     await app.close();
   });
+
+  it('rejects duplicate cash tokens for active workflows', async () => {
+    const app = await buildServer();
+    const userId = await insertUserWithKeys('3');
+
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          balances: [
+            { asset: 'BTC', free: '1', locked: '0' },
+            { asset: 'ETH', free: '1', locked: '0' },
+          ],
+        }),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '60' }) } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '40' }) } as any);
+
+    const originalFetch = globalThis.fetch;
+    (globalThis as any).fetch = fetchMock;
+
+    const firstPayload = {
+      model: 'm',
+      name: 'First',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'prompt',
+      cash: 'USDT',
+      status: 'active',
+    };
+
+    try {
+      const firstRes = await app.inject({
+        method: 'POST',
+        url: '/api/portfolio-workflows',
+        cookies: authCookies(userId),
+        payload: firstPayload,
+      });
+      expect(firstRes.statusCode).toBe(200);
+      const firstId = firstRes.json().id as string;
+
+      fetchMock.mockClear();
+
+      const secondRes = await app.inject({
+        method: 'POST',
+        url: '/api/portfolio-workflows',
+        cookies: authCookies(userId),
+        payload: {
+          ...firstPayload,
+          name: 'Second',
+          tokens: [{ token: 'BNB', minAllocation: 30 }],
+        },
+      });
+      expect(secondRes.statusCode).toBe(400);
+      expect(secondRes.json()).toEqual({
+        error: `token USDT used by ${firstPayload.name} (${firstId}) already used`,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as any).fetch = originalFetch;
+      await app.close();
+    }
+  });
+
+  it('rejects cash token conflicts against other workflow positions', async () => {
+    const app = await buildServer();
+    const userId = await insertUserWithKeys('4');
+
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        balances: [
+          { asset: 'USDC', free: '100', locked: '0' },
+          { asset: 'USDT', free: '50', locked: '0' },
+        ],
+      }),
+    } as any);
+
+    const originalFetch = globalThis.fetch;
+    (globalThis as any).fetch = fetchMock;
+
+    const firstPayload = {
+      model: 'm',
+      name: 'First',
+      tokens: [{ token: 'USDT', minAllocation: 10 }],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'prompt',
+      cash: 'USDC',
+      status: 'active',
+    };
+
+    try {
+      const firstRes = await app.inject({
+        method: 'POST',
+        url: '/api/portfolio-workflows',
+        cookies: authCookies(userId),
+        payload: firstPayload,
+      });
+      expect(firstRes.statusCode).toBe(200);
+      const firstId = firstRes.json().id as string;
+
+      fetchMock.mockClear();
+
+      const secondRes = await app.inject({
+        method: 'POST',
+        url: '/api/portfolio-workflows',
+        cookies: authCookies(userId),
+        payload: {
+          ...firstPayload,
+          name: 'Second',
+          cash: 'USDT',
+          tokens: [{ token: 'BTC', minAllocation: 20 }],
+        },
+      });
+      expect(secondRes.statusCode).toBe(400);
+      expect(secondRes.json()).toEqual({
+        error: `token USDT used by ${firstPayload.name} (${firstId}) already used`,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as any).fetch = originalFetch;
+      await app.close();
+    }
+  });
 });
 

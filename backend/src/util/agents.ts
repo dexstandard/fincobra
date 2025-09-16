@@ -121,7 +121,7 @@ async function validateAgentInput(
     const conflict = await validateTokenConflicts(
       log,
       userId,
-      body.tokens.map((t) => t.token),
+      [body.cash, ...body.tokens.map((t) => t.token)],
       id,
     );
     if (conflict) return conflict;

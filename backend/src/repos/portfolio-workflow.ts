@@ -151,10 +151,23 @@ export async function findActiveTokenConflicts(
   tokens: string[],
   excludeId?: string,
 ) {
-  const query = `SELECT a.id, a.name, t.token FROM portfolio_workflow a
-      JOIN portfolio_workflow_tokens t ON t.portfolio_workflow_id = a.id
-     WHERE a.user_id = $1 AND a.status = 'active' AND ($2::bigint IS NULL OR a.id != $2)
-       AND t.token = ANY($3::text[])`;
+  const query = `SELECT id, name, token
+      FROM (
+            SELECT a.id, a.name, a.cash_token AS token
+              FROM portfolio_workflow a
+             WHERE a.user_id = $1
+               AND a.status = 'active'
+               AND ($2::bigint IS NULL OR a.id != $2)
+               AND a.cash_token = ANY($3::text[])
+            UNION
+            SELECT a.id, a.name, t.token
+              FROM portfolio_workflow a
+              JOIN portfolio_workflow_tokens t ON t.portfolio_workflow_id = a.id
+             WHERE a.user_id = $1
+               AND a.status = 'active'
+               AND ($2::bigint IS NULL OR a.id != $2)
+               AND t.token = ANY($3::text[])
+           ) conflicts`;
   const params: unknown[] = [userId, excludeId ?? null, tokens];
   const { rows } = await db.query(query, params as any[]);
   return rows as { id: string; name: string; token: string }[];
