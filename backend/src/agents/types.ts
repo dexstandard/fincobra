@@ -84,6 +84,7 @@ export interface PreviousReport {
 export interface RoutePrice {
   pair: string;
   price: number;
+  [token: string]: { minNotional: number } | string | number;
 }
 
 export interface RebalancePrompt {

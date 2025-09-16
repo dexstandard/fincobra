@@ -14,9 +14,43 @@ vi.mock('../src/services/binance.js', () => ({
   }),
   fetchPairData: vi
     .fn()
-    .mockImplementation((t1: string, t2: string) =>
-      Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 }),
-    ),
+    .mockImplementation((t1: string, t2: string) => {
+      if (t1 === 'USDT') return Promise.resolve({ symbol: `${t2}USDT`, currentPrice: 20000 });
+      if (t2 === 'USDT') return Promise.resolve({ symbol: `${t1}USDT`, currentPrice: 20000 });
+      return Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 });
+    }),
+  fetchPairInfo: vi
+    .fn()
+    .mockImplementation((t1: string, t2: string) => {
+      if (t1 === 'USDT') {
+        return Promise.resolve({
+          symbol: `${t2}USDT`,
+          baseAsset: t2,
+          quoteAsset: 'USDT',
+          quantityPrecision: 8,
+          pricePrecision: 2,
+          minNotional: 10,
+        });
+      }
+      if (t2 === 'USDT') {
+        return Promise.resolve({
+          symbol: `${t1}USDT`,
+          baseAsset: t1,
+          quoteAsset: 'USDT',
+          quantityPrecision: 8,
+          pricePrecision: 2,
+          minNotional: 10,
+        });
+      }
+      return Promise.resolve({
+        symbol: `${t1}${t2}`,
+        baseAsset: t1,
+        quoteAsset: t2,
+        quantityPrecision: 8,
+        pricePrecision: 2,
+        minNotional: 10,
+      });
+    }),
 }));
 
 vi.mock('../src/repos/agent-review-result.js', () => ({
@@ -129,6 +163,14 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.positions).toHaveLength(3);
     expect(prompt?.cash).toBe('USDT');
     expect(prompt?.routes).toHaveLength(3);
+    const route = prompt!.routes[0];
+    expect(route).toMatchObject({
+      pair: 'BTCUSDT',
+      price: 20000,
+      USDT: { minNotional: 10 },
+      BTC: { minNotional: 10 / 20000 },
+    });
+    expect(prompt?.policy.floor.USDT).toBe(0);
   });
 
   it('excludes locked balances for current positions', async () => {
