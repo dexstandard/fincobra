@@ -20,10 +20,7 @@ import {
   draftAgentsByUser,
 } from '../repos/portfolio-workflow.js';
 import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
-import {
-  cancelOrder,
-  parseBinanceError,
-} from '../services/binance.js';
+import { cancelLimitOrder } from '../services/limit-order.js';
 import {
   getOpenLimitOrdersForAgent,
   updateLimitOrderStatus,
@@ -64,18 +61,13 @@ async function cancelOrdersForAgent(agentId: string, log: FastifyBaseLogger) {
       continue;
     }
     try {
-      await cancelOrder(o.user_id, { symbol, orderId: Number(o.order_id) });
-      await updateLimitOrderStatus(
-        o.user_id,
-        o.order_id,
-        'canceled',
-        'API key removed',
-      );
+      await cancelLimitOrder(o.user_id, {
+        symbol,
+        orderId: o.order_id,
+        reason: 'API key removed',
+      });
     } catch (err) {
-      const { code } = parseBinanceError(err);
-      if (code === -2013)
-        await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
-      else log.error({ err, orderId: o.order_id }, 'failed to cancel order');
+      log.error({ err, orderId: o.order_id }, 'failed to cancel order');
     }
   }
 }

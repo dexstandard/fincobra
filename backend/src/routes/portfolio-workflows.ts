@@ -40,6 +40,7 @@ import { parseBinanceError } from '../services/binance.js';
 import { getRebalanceInfo } from '../repos/agent-review-result.js';
 import { getPromptForReviewResult } from '../repos/agent-review-raw-log.js';
 import { parseParams } from '../util/validation.js';
+import { cancelLimitOrder } from '../services/limit-order.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
@@ -439,16 +440,11 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       }
       const planned = JSON.parse(row.planned_json);
       try {
-        await binance.cancelOrder(userId, {
+        await cancelLimitOrder(userId, {
           symbol: planned.symbol,
-          orderId: Number(orderId),
-        });
-        await updateLimitOrderStatus(
-          userId,
           orderId,
-          'canceled',
-          'Canceled by user',
-        );
+          reason: 'Canceled by user',
+        });
         log.info({ execLogId: logId, orderId }, 'canceled order');
         return { ok: true } as const;
       } catch (err) {
@@ -563,22 +559,13 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           continue;
         }
         try {
-          await binance.cancelOrder(userId, {
+          await cancelLimitOrder(o.user_id, {
             symbol,
-            orderId: Number(o.order_id),
+            orderId: o.order_id,
+            reason: 'Workflow deleted',
           });
-          await updateLimitOrderStatus(
-            o.user_id,
-            o.order_id,
-            'canceled',
-            'Workflow deleted',
-          );
         } catch (err) {
-          const { code } = parseBinanceError(err);
-          if (code === -2013)
-            await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
-          else
-            log.error({ err, symbol, orderId: o.order_id }, 'failed to cancel order');
+          log.error({ err, symbol, orderId: o.order_id }, 'failed to cancel order');
         }
       }
       log.info('deleted workflow');

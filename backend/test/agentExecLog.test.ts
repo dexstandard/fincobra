@@ -122,6 +122,47 @@ describe('agent exec log routes', () => {
     await app.close();
   });
 
+  it('marks order filled when cancel returns FILLED', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('40');
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId,
+      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      status: 'open',
+      reviewResultId,
+      orderId: '3',
+    });
+    const spy = vi.spyOn(binance, 'cancelOrder').mockResolvedValue({ status: 'FILLED' } as any);
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/3/cancel`,
+      cookies: authCookies(userId),
+    });
+    expect(res.statusCode).toBe(200);
+    const row = await getLimitOrder('3');
+    expect(row?.status).toBe('filled');
+    expect(row?.cancellation_reason).toBeNull();
+    spy.mockRestore();
+    await app.close();
+  });
+
   it('returns prompt for log and enforces ownership', async () => {
     const app = await buildServer();
     const user1Id = await insertUser('20');
