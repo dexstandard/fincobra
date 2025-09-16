@@ -15,11 +15,11 @@ import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
 import { getOpenLimitOrdersForAgent } from '../repos/limit-orders.js';
 import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
-import {
-  insertReviewResult,
-  type ReviewResultInsert,
-  type ReviewResultError,
-} from '../repos/agent-review-result.js';
+import { insertReviewResult } from '../repos/agent-review-result.js';
+import type {
+  ReviewResultInsert,
+  ReviewResultError,
+} from '../repos/types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';

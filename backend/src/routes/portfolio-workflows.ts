@@ -264,10 +264,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
               ? undefined
               : {
                   rebalance: !!r.rebalance,
-                  ...(r.new_allocation !== null
-                    ? { newAllocation: r.new_allocation }
+                  ...(r.newAllocation !== null
+                    ? { newAllocation: r.newAllocation }
                     : {}),
-                  shortReport: r.short_report ?? '',
+                  shortReport: r.shortReport ?? '',
                   ...(orders ? { orders } : {}),
                 };
           return {
@@ -275,7 +275,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
             log: r.log,
             ...(resp ? { response: resp } : {}),
             ...(r.error ? { error: JSON.parse(r.error) } : {}),
-            createdAt: r.created_at,
+            createdAt: r.createdAt,
           };
         }),
         total,

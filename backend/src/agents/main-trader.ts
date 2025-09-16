@@ -174,7 +174,7 @@ export async function collectPromptData(
       } as const;
     });
     const report: PreviousReport = {
-      datetime: r.created_at.toISOString(),
+      datetime: r.createdAt.toISOString(),
       ...(r.shortReport !== undefined ? { shortReport: r.shortReport } : {}),
       ...(r.error !== undefined ? { error: r.error } : {}),
       ...(orders.length ? { orders } : {}),

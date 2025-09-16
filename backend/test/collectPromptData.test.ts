@@ -58,7 +58,7 @@ vi.mock('../src/repos/agent-review-result.js', () => ({
   getRecentReviewResults: vi.fn().mockResolvedValue(
     Array.from({ length: 5 }, (_, i) => ({
       id: `r${i + 1}`,
-      created_at: new Date(`2025-01-0${i + 1}T00:00:00.000Z`),
+      createdAt: new Date(`2025-01-0${i + 1}T00:00:00.000Z`),
       shortReport: `p${i + 1}`,
       error: null,
     })),
