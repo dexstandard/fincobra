@@ -14,6 +14,16 @@ export interface ReviewResultInsert {
   rawLogId?: string;
 }
 
+export interface ReviewResultRow {
+  id: string;
+  log: string;
+  rebalance: boolean | null;
+  new_allocation: number | null;
+  short_report: string | null;
+  error: string | null;
+  created_at: Date;
+}
+
 export async function insertReviewResult(entry: ReviewResultInsert): Promise<string> {
   const { rows } = await db.query(
     'INSERT INTO agent_review_result (agent_id, log, rebalance, new_allocation, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
@@ -65,11 +75,11 @@ export async function getAgentReviewResults(
     `SELECT COUNT(*) as count FROM agent_review_result WHERE agent_id = $1${filter}`,
     [portfolioId],
   );
-  const { rows } = await db.query(
+  const { rows } = await db.query<ReviewResultRow>(
     `SELECT id, log, rebalance, new_allocation, short_report, error, created_at FROM agent_review_result WHERE agent_id = $1${filter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
     [portfolioId, limit, offset],
   );
-  return { rows: rows as any[], total: Number(totalRes.rows[0].count) };
+  return { rows, total: Number(totalRes.rows[0].count) };
 }
 
 export async function getRebalanceInfo(portfolioId: string, id: string) {
