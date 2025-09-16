@@ -44,18 +44,18 @@ export function compactJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export interface OpenAIResponse {
-  output: OpenAIResponseOutput[];
+export interface AIResponse {
+  output: AIResponseOutput[];
 }
 
-interface OpenAIResponseOutput {
+interface AIResponseOutput {
   id?: string;
-  type: string;
+  type?: string;
   role?: string;
-  content?: OpenAIResponseContent[];
+  content?: AIResponseContent[];
 }
 
-interface OpenAIResponseContent {
+interface AIResponseContent {
   type: string;
   text?: string;
 }
@@ -64,18 +64,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isOpenAIResponse(value: unknown): value is OpenAIResponse {
+function isAIResponse(value: unknown): value is AIResponse {
   if (!isRecord(value)) return false;
   const output = value.output;
   if (!Array.isArray(output)) return false;
-  return output.every((item) => {
+  return output.every((item): item is AIResponseOutput => {
     if (!isRecord(item)) return false;
-    const { id, type, content } = item;
-    if (typeof type !== 'string') return false;
+    const { id, type, role, content } = item;
     if (id !== undefined && typeof id !== 'string') return false;
+    if (type !== undefined && typeof type !== 'string') return false;
+    if (role !== undefined && typeof role !== 'string') return false;
     if (content === undefined) return true;
     if (!Array.isArray(content)) return false;
-    return content.every((entry) => {
+    return content.every((entry): entry is AIResponseContent => {
       if (!isRecord(entry)) return false;
       const { type: contentType, text } = entry;
       if (typeof contentType !== 'string') return false;
@@ -88,7 +89,7 @@ function isOpenAIResponse(value: unknown): value is OpenAIResponse {
 export function extractJson<T>(res: string): T | null {
   try {
     const json = JSON.parse(res);
-    if (!isOpenAIResponse(json)) {
+    if (!isAIResponse(json)) {
       console.error('Invalid OpenAI response payload', json);
       return null;
     }
@@ -97,7 +98,7 @@ export function extractJson<T>(res: string): T | null {
       console.error('OpenAI response missing assistant message', json);
       return null;
     }
-    const text = msg.content?.[0]?.text;
+    const text = msg.content?.find((entry) => typeof entry.text === 'string')?.text;
     if (typeof text !== 'string') {
       console.error('OpenAI response missing assistant text content', json);
       return null;
