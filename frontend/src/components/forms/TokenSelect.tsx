@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TokenDisplay from '../TokenDisplay';
 
 interface Option {
@@ -20,13 +20,31 @@ export default function TokenSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((o) => o.value === value);
   const filtered = options.filter((o) =>
     o.value.toLowerCase().includes(query.toLowerCase()),
   );
 
+  useEffect(() => {
+    if (!open) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         id={id}
@@ -47,14 +65,16 @@ export default function TokenSelect({
       </button>
       {open && !disabled && (
         <div className="absolute z-10 w-full bg-white border rounded mt-1">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search..."
-            className="w-full px-2 py-1 border-b"
-            autoFocus
-          />
+          {options.length >= 5 && (
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search..."
+              className="w-full px-2 py-1 border-b"
+              autoFocus
+            />
+          )}
           <ul className="max-h-40 overflow-auto">
             {filtered.map((opt) => (
               <li key={opt.value}>
@@ -64,6 +84,7 @@ export default function TokenSelect({
                   onClick={() => {
                     onChange(opt.value);
                     setOpen(false);
+                    setQuery('');
                   }}
                 >
                   <TokenDisplay token={opt.value} />
