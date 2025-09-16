@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { callAi } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
-import { fetchAccount, fetchPairData } from '../services/binance.js';
+import { fetchAccount, fetchPairData, fetchPairInfo } from '../services/binance.js';
 import { getRecentReviewResults } from '../repos/agent-review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import type { ActivePortfolioWorkflowRow } from '../repos/portfolio-workflow.js';
@@ -96,7 +96,7 @@ export async function collectPromptData(
   });
   if (!account) return undefined;
 
-  const floor: Record<string, number> = {};
+  const floor: Record<string, number> = { [cash]: 0 };
   const positions: RebalancePosition[] = [];
   const routes: RebalancePrompt['routes'] = [];
 
@@ -124,8 +124,19 @@ export async function collectPromptData(
   for (let i = 0; i < allTokens.length; i++) {
     for (let j = i + 1; j < allTokens.length; j++) {
       try {
-        const { symbol, currentPrice } = await fetchPairData(allTokens[i], allTokens[j]);
-        routes.push({ pair: symbol, price: currentPrice });
+        const [info, data] = await Promise.all([
+          fetchPairInfo(allTokens[i], allTokens[j]),
+          fetchPairData(allTokens[i], allTokens[j]),
+        ]);
+        const baseMin = data.currentPrice
+          ? info.minNotional / data.currentPrice
+          : 0;
+        routes.push({
+          pair: data.symbol,
+          price: data.currentPrice,
+          [info.quoteAsset]: { minNotional: info.minNotional },
+          [info.baseAsset]: { minNotional: baseMin },
+        });
       } catch (err) {
         log.error({ err }, 'failed to fetch pair data');
       }
