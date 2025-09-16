@@ -1,12 +1,45 @@
 import { TOKEN_SYMBOLS } from './tokens.js';
 
+export interface ExecOrder {
+  pair: string;
+  token: string;
+  side: string;
+  quantity: number;
+  limitPrice?: number;
+  basePrice?: number;
+  maxPriceDivergencePct?: number;
+}
+
 export interface ParsedExecLog {
   text: string;
   response?: {
-    orders: any[];
+    orders: ExecOrder[];
     shortReport: string;
   };
   error?: Record<string, unknown>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isExecOrder(value: unknown): value is ExecOrder {
+  if (!isRecord(value)) return false;
+  if (
+    typeof value.pair !== 'string' ||
+    typeof value.token !== 'string' ||
+    typeof value.side !== 'string' ||
+    typeof value.quantity !== 'number'
+  )
+    return false;
+  if ('limitPrice' in value && typeof value.limitPrice !== 'number') return false;
+  if ('basePrice' in value && typeof value.basePrice !== 'number') return false;
+  if (
+    'maxPriceDivergencePct' in value &&
+    typeof value.maxPriceDivergencePct !== 'number'
+  )
+    return false;
+  return true;
 }
 
 export function parseExecLog(log: unknown): ParsedExecLog {
@@ -20,46 +53,55 @@ export function parseExecLog(log: unknown): ParsedExecLog {
   let response: ParsedExecLog['response'];
   let error: Record<string, unknown> | undefined;
 
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = typeof log === 'string' ? JSON.parse(log) : log;
   } catch {
     return { text, response, error };
   }
 
-  if (parsed && typeof parsed === 'object') {
+  if (isRecord(parsed)) {
     if ('prompt' in parsed) {
-      if ('response' in parsed)
-        return parseExecLog((parsed as any).response);
+      if ('response' in parsed) return parseExecLog(parsed.response);
       if ('error' in parsed)
         return {
           text: '',
           response: undefined,
-          error: { message: String((parsed as any).error) },
+          error: { message: String(parsed.error) },
         };
     }
     // *** FIX: only treat as error if value is truthy, not when it's null ***
     if ('error' in parsed && parsed.error) {
-      error = parsed.error as Record<string, unknown>;
-      const { error: _err, ...rest } = parsed as any;
+      const parsedError = parsed.error;
+      error = isRecord(parsedError)
+          ? parsedError
+          : { message: String(parsedError) };
+      const { error: _err, ...rest } = parsed;
       text = Object.keys(rest).length > 0 ? JSON.stringify(rest) : '';
       return { text, response, error };
     }
 
-    if ((parsed as any).object === 'response') {
-      const outputs = Array.isArray((parsed as any).output)
-          ? (parsed as any).output
-          : [];
+    if (parsed.object === 'response') {
+      const outputs = Array.isArray(parsed.output) ? parsed.output : [];
 
       const msg = outputs.find(
-          (o: any) =>
-              typeof o?.id === 'string' &&
-              (o.id.startsWith('msg_') || o.type === 'message')
+          (o): o is Record<string, unknown> => {
+            if (!isRecord(o)) return false;
+            const id = o.id;
+            const type = o.type;
+            return (
+              (typeof id === 'string' && id.startsWith('msg_')) || type === 'message'
+            );
+          },
       );
 
-      const textField = Array.isArray(msg?.content)
-          ? msg.content[0]?.text
-          : undefined;
+      let textField: string | undefined;
+      if (msg && Array.isArray(msg.content)) {
+        const first = msg.content[0];
+        if (isRecord(first) && typeof first.text === 'string') {
+          textField = first.text;
+        }
+      }
 
       if (typeof textField === 'string') {
         text = textField;
@@ -68,22 +110,26 @@ export function parseExecLog(log: unknown): ParsedExecLog {
           const sanitized = textField.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
           const out = JSON.parse(sanitized);
 
-          if (out && typeof out === 'object' && 'result' in out) {
-            const result = (out as any).result;
+          if (isRecord(out) && 'result' in out) {
+            const result = out.result;
 
-            if (result && typeof result === 'object') {
+            if (isRecord(result)) {
               if ('error' in result && result.error) {
-                error = {
-                  message:
-                      typeof result.error === 'string'
-                          ? result.error
-                          : JSON.stringify(result.error),
-                };
+                const resultError = result.error;
+                const message =
+                    typeof resultError === 'string'
+                        ? resultError
+                        : JSON.stringify(resultError);
+                error = { message };
               } else if ('orders' in result) {
-                const r = result as { orders: any[]; shortReport?: string };
+                const ordersValue = result.orders;
+                const orders = Array.isArray(ordersValue)
+                    ? ordersValue.filter(isExecOrder)
+                    : [];
                 response = {
-                  orders: Array.isArray(r.orders) ? r.orders : [],
-                  shortReport: typeof r.shortReport === 'string' ? r.shortReport : '',
+                  orders,
+                  shortReport:
+                      typeof result.shortReport === 'string' ? result.shortReport : '',
                 };
               }
             }
