@@ -21,19 +21,12 @@ relevant directory to save time.
 - `/backend/src/db` keeps `schema.sql`, migrations, and DB helpers.
 - `/backend/test` contains backend tests.
 
-### Scheduler Flow
-cron → load users → plan action → simulate → execute → record result.
-
-### Security Model
-Trades execute on Binance using encrypted user API keys.
-Only allowlisted token pairs are traded.
-
 ### Data Model
 Tables:
 - `users` — accounts and encrypted API keys.
 - `limit_order` — records of performed trades.
-- `agents` — user-configured trading bots.
-- `agent_review_raw_log` — prompt/response history per agent.
+- `portfolio_workflow` — user-configured trading workflows.
+- `agent_review_raw_log` — prompt/response history per workflow.
 - `agent_review_result` — outcomes and rebalances.
 
 ### Config
@@ -52,7 +45,7 @@ Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
 - The server automatically applies pending migrations on startup.
 - Cover backend code, especially API endpoints, with sufficient tests.
 - New API endpoints should use the `RATE_LIMITS` presets for rate limiting.
-- Use structured logging and include `userId`, `agentId`, and `execLogId` when available.
+- Use structured logging and include `userId`, `workflowId`, and `execLogId` when available.
 - Break down complex functions into reusable utilities and check for existing helpers before adding new ones.
 - Reuse existing repository functions or test helpers before writing raw SQL. Add new
   helpers under `backend/test/repos` when necessary.
@@ -67,12 +60,6 @@ Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
 - `/frontend/src/routes` defines route components.
 - `/frontend/src/lib` holds shared utilities.
 - `/frontend/public` serves static assets.
-
-### Config
-Environment variables:
-- `VITE_API_BASE` — override API base URL.
-- `VITE_USE_MOCKS` — toggle mock API responses.
-- `VITE_GOOGLE_CLIENT_ID` — OAuth client ID.
 
 ### Testing
 - `npm --prefix frontend run lint`
