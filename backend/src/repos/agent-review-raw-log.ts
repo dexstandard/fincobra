@@ -1,10 +1,6 @@
 import { db } from '../db/index.js';
-
-export interface ReviewRawLogInsert {
-  portfolioId: string;
-  prompt: unknown;
-  response: unknown;
-}
+import { convertKeysToCamelCase } from '../util/objectCase.js';
+import type { ReviewRawLogInsert, ReviewRawLogEntity } from './raw-log.types.js';
 
 export async function insertReviewRawLog(entry: ReviewRawLogInsert): Promise<string> {
   const { rows } = await db.query(
@@ -24,5 +20,8 @@ export async function getPromptForReviewResult(
      WHERE rr.id = $1 AND rr.agent_id = $2`,
     [resultId, portfolioId],
   );
-  return rows[0]?.prompt ?? null;
+  const entity = rows[0]
+    ? (convertKeysToCamelCase(rows[0]) as Pick<ReviewRawLogEntity, 'prompt'>)
+    : undefined;
+  return entity?.prompt ?? null;
 }

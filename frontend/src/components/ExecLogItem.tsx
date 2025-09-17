@@ -27,7 +27,6 @@ export interface ExecLog {
   log: string;
   response?: {
     rebalance: boolean;
-    newAllocation?: number;
     shortReport: string;
     orders?: {
       pair: string;

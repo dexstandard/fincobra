@@ -236,11 +236,10 @@ describe('agent exec log routes', () => {
       const parsed = parseExecLog(`log-${i}`);
       await insertReviewResult({
         portfolioId: agentId,
-        log: parsed.text,
+        log: parsed.response ? JSON.stringify(parsed.response) : parsed.text,
         ...(parsed.response
           ? {
-              rebalance: parsed.response.rebalance,
-              newAllocation: parsed.response.newAllocation,
+              rebalance: parsed.response.orders.length > 0,
               shortReport: parsed.response.shortReport,
             }
           : {}),
@@ -366,11 +365,10 @@ describe('agent exec log routes', () => {
     const parsedP = parseExecLog(entry);
     await insertReviewResult({
       portfolioId: agentId,
-      log: parsedP.text,
+      log: parsedP.response ? JSON.stringify(parsedP.response) : parsedP.text,
       ...(parsedP.response
         ? {
-            rebalance: parsedP.response.rebalance,
-            newAllocation: parsedP.response.newAllocation,
+            rebalance: parsedP.response.orders.length > 0,
             shortReport: parsedP.response.shortReport,
           }
         : {}),
@@ -406,18 +404,26 @@ describe('agent exec log routes', () => {
       manualRebalance: true,
       useEarn: true,
     });
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCETH',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.5,
+          limitPrice: 99.9,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
+      ],
+      shortReport: 's',
+    } as const;
     const reviewResultId = await insertReviewResult({
       portfolioId: agent.id,
-      log: '',
+      log: JSON.stringify(decision),
       rebalance: true,
-      newAllocation: 60,
+      shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '1', locked: '0' },
-      ],
-    } as any);
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
       symbol: 'BTCETH',
       currentPrice: 100,
@@ -439,7 +445,10 @@ describe('agent exec log routes', () => {
     expect(res.statusCode).toBe(201);
     const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(1);
-    expect(JSON.parse(rows[0].planned_json)).toMatchObject({ price: 99.9 });
+    expect(JSON.parse(rows[0].planned_json)).toMatchObject({
+      price: 99.9,
+      manuallyEdited: false,
+    });
     res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
@@ -469,78 +478,30 @@ describe('agent exec log routes', () => {
       manualRebalance: true,
       useEarn: true,
     });
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.0001,
+          limitPrice: 100,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
+      ],
+      shortReport: 's',
+    } as const;
     const reviewResultId = await insertReviewResult({
       portfolioId: agent.id,
-      log: '',
+      log: JSON.stringify(decision),
       rebalance: true,
-      newAllocation: 50,
+      shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '0.9999', locked: '0' },
-      ],
-    } as any);
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
-      symbol: 'BTCETH',
+      symbol: 'BTCUSDT',
       currentPrice: 100,
     } as any);
-    vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
-      symbol: 'BTCETH',
-      baseAsset: 'BTC',
-      quoteAsset: 'ETH',
-      quantityPrecision: 8,
-      pricePrecision: 8,
-      minNotional: 0,
-    } as any);
-    const spy = vi
-      .spyOn(binance, 'createLimitOrder')
-      .mockResolvedValue({ orderId: 1 } as any);
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
-      cookies: authCookies(userId),
-    });
-    expect(res.statusCode).toBe(400);
-    const rows = await getLimitOrdersByReviewResult(reviewResultId);
-    expect(rows).toHaveLength(0);
-    expect(spy).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
-    await app.close();
-  });
-
-  it('rejects manual rebalance order below exchange minimum', async () => {
-    const app = await buildServer();
-    const userId = await insertUser('61');
-    const agent = await insertAgent({
-      userId,
-      model: 'gpt',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'BTC', minAllocation: 10 },
-        { token: 'USDT', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: true,
-      useEarn: true,
-    });
-    const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
-      log: '',
-      rebalance: true,
-      newAllocation: 50,
-    });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '0.95', locked: '0' },
-        { asset: 'USDT', free: '105', locked: '0' },
-      ],
-    } as any);
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -549,18 +510,17 @@ describe('agent exec log routes', () => {
       pricePrecision: 8,
       minNotional: 10,
     } as any);
-    const spy = vi
-      .spyOn(binance, 'createLimitOrder')
-      .mockResolvedValue({ orderId: 1 } as any);
     const res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'order below min notional' });
     const rows = await getLimitOrdersByReviewResult(reviewResultId);
-    expect(rows).toHaveLength(0);
-    expect(spy).not.toHaveBeenCalled();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].cancellation_reason).toBe('order below min notional');
     vi.restoreAllMocks();
     await app.close();
   });
@@ -584,30 +544,26 @@ describe('agent exec log routes', () => {
       manualRebalance: true,
       useEarn: true,
     });
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCETH',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.2,
+          limitPrice: 99.9,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
+      ],
+      shortReport: 's',
+    } as const;
     const reviewResultId = await insertReviewResult({
       portfolioId: agent.id,
-      log: '',
+      log: JSON.stringify(decision),
       rebalance: true,
-      newAllocation: 60,
+      shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '1', locked: '0' },
-      ],
-    } as any);
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
-      symbol: 'BTCETH',
-      currentPrice: 100,
-    } as any);
-    vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
-      symbol: 'BTCETH',
-      baseAsset: 'BTC',
-      quoteAsset: 'ETH',
-      quantityPrecision: 8,
-      pricePrecision: 8,
-      minNotional: 0,
-    } as any);
     const res = await app.inject({
       method: 'GET',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance/preview`,
@@ -620,7 +576,6 @@ describe('agent exec log routes', () => {
       quantity: 0.2,
       price: 99.9,
     });
-    vi.restoreAllMocks();
     await app.close();
   });
 
@@ -643,18 +598,26 @@ describe('agent exec log routes', () => {
       manualRebalance: true,
       useEarn: true,
     });
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCETH',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.5,
+          limitPrice: 99.9,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
+      ],
+      shortReport: 's',
+    } as const;
     const reviewResultId = await insertReviewResult({
       portfolioId: agent.id,
-      log: '',
+      log: JSON.stringify(decision),
       rebalance: true,
-      newAllocation: 60,
+      shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '1', locked: '0' },
-      ],
-    } as any);
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
       symbol: 'BTCETH',
       currentPrice: 100,
