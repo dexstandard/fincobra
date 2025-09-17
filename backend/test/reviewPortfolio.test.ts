@@ -5,7 +5,7 @@ import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { setAiKey } from '../src/repos/api-keys.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/agent-review-raw-log.js';
-import { getRecentReviewResults } from '../src/repos/review-result';
+import { getRecentReviewResults } from '../src/repos/agent-review-result.js';
 import * as mainTrader from '../src/agents/main-trader.js';
 import * as newsAnalyst from '../src/agents/news-analyst.js';
 import * as techAnalyst from '../src/agents/technical-analyst.js';

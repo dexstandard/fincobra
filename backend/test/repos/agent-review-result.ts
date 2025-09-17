@@ -1,4 +1,4 @@
-import { insertReviewResult as insertReviewResultProd } from '../../src/repos/review-result';
+import { insertReviewResult as insertReviewResultProd } from '../../src/repos/agent-review-result.js';
 
 export function insertReviewResult(entry: any) {
   return insertReviewResultProd({

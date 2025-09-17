@@ -1,5 +1,5 @@
 import { db } from '../../src/db/index.js';
-import { insertReviewRawLog as insertReviewRawLogProd } from '../../src/repos/review-raw-log';
+import { insertReviewRawLog as insertReviewRawLogProd } from '../../src/repos/agent-review-raw-log.js';
 
 export function insertReviewRawLog(entry: any) {
   return insertReviewRawLogProd({

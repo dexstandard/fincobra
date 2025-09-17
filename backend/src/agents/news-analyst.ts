@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { getNewsByToken } from '../repos/news.js';
-import { insertReviewRawLog } from '../repos/review-raw-log.js';
+import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
 import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import {

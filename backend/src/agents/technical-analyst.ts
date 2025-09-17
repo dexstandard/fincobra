@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { fetchTokenIndicators, type TokenIndicators } from '../services/indicators.js';
 import { fetchOrderBook } from '../services/derivatives.js';
 import { fetchFearGreedIndex, type FearGreedIndex } from '../services/binance.js';
-import { insertReviewRawLog } from '../repos/review-raw-log.js';
+import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
 import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
