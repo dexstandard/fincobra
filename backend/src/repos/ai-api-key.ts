@@ -1,21 +1,43 @@
 import { db } from '../db/index.js';
 import type {
-  AiApiKeys,
+  AiApiKeyDetails,
   AiApiKeyUpsert,
   AiApiKeyShareUpsert,
   AiApiKeyShareDelete,
   AiApiKeyShareLookup,
+  SharedAiApiKeyDetails,
 } from './ai-api-key.types.js';
 
-export async function getAiKeyRow(id: string): Promise<AiApiKeys | undefined> {
+export async function getAiKey(
+  id: string,
+): Promise<AiApiKeyDetails | null | undefined> {
   const { rows } = await db.query(
-    `SELECT ak.id AS "ownId",
-            ak.api_key_enc AS "ownApiKeyEnc",
-            oak.id AS "sharedId",
-            oak.api_key_enc AS "sharedApiKeyEnc",
-            s.model AS "sharedModel"
+    `SELECT ak.id AS "aiApiKeyId",
+            ak.api_key_enc AS "aiApiKeyEnc"
        FROM users u
        LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai'
+      WHERE u.id = $1`,
+    [id],
+  );
+  const row = rows[0] as
+    | {
+        aiApiKeyId: string | null;
+        aiApiKeyEnc: string | null;
+      }
+    | undefined;
+  if (!row) return undefined;
+  if (!row.aiApiKeyId) return null;
+  return { id: row.aiApiKeyId, aiApiKeyEnc: row.aiApiKeyEnc ?? '' };
+}
+
+export async function getSharedAiKey(
+  id: string,
+): Promise<SharedAiApiKeyDetails | null | undefined> {
+  const { rows } = await db.query(
+    `SELECT oak.id AS "sharedAiApiKeyId",
+            oak.api_key_enc AS "sharedAiApiKeyEnc",
+            s.model AS "sharedModel"
+       FROM users u
        LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id
        LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
       WHERE u.id = $1`,
@@ -23,25 +45,18 @@ export async function getAiKeyRow(id: string): Promise<AiApiKeys | undefined> {
   );
   const row = rows[0] as
     | {
-        ownId: string | null;
-        ownApiKeyEnc: string | null;
-        sharedId: string | null;
-        sharedApiKeyEnc: string | null;
+        sharedAiApiKeyId: string | null;
+        sharedAiApiKeyEnc: string | null;
         sharedModel: string | null;
       }
     | undefined;
   if (!row) return undefined;
+  if (!row.sharedAiApiKeyId)
+    return null;
   return {
-    own: row.ownId
-      ? { id: row.ownId, aiApiKeyEnc: row.ownApiKeyEnc ?? '' }
-      : null,
-    shared: row.sharedId
-      ? {
-          id: row.sharedId,
-          aiApiKeyEnc: row.sharedApiKeyEnc ?? '',
-          model: row.sharedModel ?? null,
-        }
-      : null,
+    id: row.sharedAiApiKeyId,
+    aiApiKeyEnc: row.sharedAiApiKeyEnc ?? '',
+    model: row.sharedModel ?? null,
   };
 }
 

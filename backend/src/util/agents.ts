@@ -4,7 +4,7 @@ import {
   findIdenticalDraftAgent,
   findActiveTokenConflicts,
 } from '../repos/portfolio-workflow.js';
-import { getAiKeyRow } from '../repos/ai-api-key.js';
+import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
 import {
   errorResponse,
   lengthMessage,
@@ -86,8 +86,11 @@ async function validateAgentInput(
     log.error('model too long');
     return { code: 400, body: errorResponse(lengthMessage('model', 50)) };
   } else {
-    const keyRow = await getAiKeyRow(userId);
-    if (!keyRow?.own && keyRow?.shared?.model && body.model !== keyRow.shared.model) {
+    const [ownKey, sharedKey] = await Promise.all([
+      getAiKey(userId),
+      getSharedAiKey(userId),
+    ]);
+    if (!ownKey && sharedKey?.model && body.model !== sharedKey.model) {
       log.error('model not allowed');
       return { code: 400, body: errorResponse('model not allowed') };
     }
