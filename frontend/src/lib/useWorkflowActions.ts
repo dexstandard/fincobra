@@ -4,7 +4,7 @@ import api from './axios';
 import { useUser } from './useUser';
 import { useToast } from './useToast';
 
-export function useAgentActions(id?: string) {
+export function useWorkflowActions(id?: string) {
   const queryClient = useQueryClient();
   const { user } = useUser();
   const toast = useToast();
@@ -14,12 +14,12 @@ export function useAgentActions(id?: string) {
       await api.post(`/portfolio-workflows/${id}/start`);
     },
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['agent', id, user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['workflow', id, user?.id] }),
     onError: (err) => {
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         toast.show(err.response.data.error);
       } else {
-        toast.show('Failed to start agent');
+        toast.show('Failed to start workflow');
       }
     },
   });
@@ -29,12 +29,12 @@ export function useAgentActions(id?: string) {
       await api.post(`/portfolio-workflows/${id}/stop`);
     },
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['agent', id, user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['workflow', id, user?.id] }),
     onError: (err) => {
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         toast.show(err.response.data.error);
       } else {
-        toast.show('Failed to stop agent');
+        toast.show('Failed to stop workflow');
       }
     },
   });

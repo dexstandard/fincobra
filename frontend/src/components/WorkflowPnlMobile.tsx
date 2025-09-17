@@ -1,4 +1,4 @@
-import { useAgentBalanceUsd } from '../lib/useAgentBalanceUsd';
+import { useWorkflowBalanceUsd } from '../lib/useWorkflowBalanceUsd';
 import { useTranslation } from '../lib/i18n';
 
 interface Props {
@@ -6,9 +6,9 @@ interface Props {
   startBalanceUsd: number | null;
 }
 
-export default function AgentPnl({ tokens, startBalanceUsd }: Props) {
+export default function WorkflowPnlMobile({ tokens, startBalanceUsd }: Props) {
   const t = useTranslation();
-  const { balance, isLoading } = useAgentBalanceUsd(tokens);
+  const { balance, isLoading } = useWorkflowBalanceUsd(tokens);
   const balanceText =
     balance === null ? '-' : isLoading ? t('loading') : `$${balance.toFixed(2)}`;
   const pnl =
@@ -51,9 +51,9 @@ export default function AgentPnl({ tokens, startBalanceUsd }: Props) {
         }`;
   return (
     <p className="mt-2">
-      <strong>{t('balance_usd')}:</strong> {balanceText}
+      <strong>{t('balance')}:</strong> {balanceText}
       <span className="ml-4">
-        <strong>{t('pnl_usd')}:</strong>{' '}
+        <strong>{t('pnl')}:</strong>{' '}
         <span className={pnlClass} title={pnlTooltip}>
           {pnlText}
         </span>
@@ -61,4 +61,3 @@ export default function AgentPnl({ tokens, startBalanceUsd }: Props) {
     </p>
   );
 }
-

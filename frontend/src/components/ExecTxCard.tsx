@@ -7,13 +7,13 @@ import Modal from './ui/Modal';
 import { useTranslation } from '../lib/i18n';
 
 interface Props {
-  agentId: string;
+  workflowId: string;
   logId: string;
   orders: LimitOrder[];
   onCancel?: () => Promise<unknown> | void;
 }
 
-export default function ExecTxCard({ agentId, logId, orders, onCancel }: Props) {
+export default function ExecTxCard({ workflowId, logId, orders, onCancel }: Props) {
   const [canceling, setCanceling] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const t = useTranslation();
@@ -22,7 +22,7 @@ export default function ExecTxCard({ agentId, logId, orders, onCancel }: Props) 
     setCanceling(id);
     try {
       await api.post(
-        `/portfolio-workflows/${agentId}/exec-log/${logId}/orders/${id}/cancel`,
+        `/portfolio-workflows/${workflowId}/exec-log/${logId}/orders/${id}/cancel`,
       );
       await onCancel?.();
     } finally {

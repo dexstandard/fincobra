@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from '../lib/i18n';
-import AgentName from '../components/AgentName';
+import WorkflowName from '../components/WorkflowName';
 import AgentInstructions from '../components/AgentInstructions';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -10,7 +10,7 @@ import ApiKeyProviderSelector from '../components/forms/ApiKeyProviderSelector';
 import { useToast } from '../lib/useToast';
 import Button from '../components/ui/Button';
 import { usePrerequisites } from '../lib/usePrerequisites';
-import AgentStartButton from '../components/AgentStartButton';
+import WorkflowStartButton from '../components/WorkflowStartButton';
 import SelectInput from '../components/forms/SelectInput';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,10 +21,10 @@ import {
   type PortfolioReviewFormValues,
 } from '../lib/constants';
 import PortfolioWorkflowFields from '../components/forms/PortfolioWorkflowFields';
-import type { Agent } from '../lib/useAgentData';
+import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 
 interface Props {
-  draft?: Agent;
+  draft?: PortfolioWorkflow;
 }
 
 export default function PortfolioWorkflowDraft({ draft }: Props) {
@@ -67,7 +67,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
   const [name, setName] = useState(
     draft?.name || tokenSymbols.map((t) => t.toUpperCase()).join(' / '),
   );
-  const [agentInstructions, setAgentInstructions] = useState(
+  const [instructions, setInstructions] = useState(
     draft?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS,
   );
   const [manualRebalance, setManualRebalance] = useState(
@@ -105,8 +105,8 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-        <span>{t('agent_draft')}:</span>
-        <AgentName
+        <span>{t('workflow_draft')}:</span>
+        <WorkflowName
           name={name}
           onChange={setName}
           className="text-2xl font-bold"
@@ -125,7 +125,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
           />
         </div>
       </FormProvider>
-      <AgentInstructions value={agentInstructions} onChange={setAgentInstructions} />
+      <AgentInstructions value={instructions} onChange={setInstructions} />
       {user && (
         <div className="mt-4 max-w-xl">
           <div className="grid grid-cols-2 gap-2 max-w-md">
@@ -199,7 +199,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
                   })),
                   risk: values.risk,
                   reviewInterval: values.reviewInterval,
-                  agentInstructions,
+                  agentInstructions: instructions,
                   manualRebalance,
                   useEarn,
                   status: 'draft',
@@ -224,14 +224,14 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
           >
             {draft ? t('update_draft') : t('save_draft')}
           </Button>
-          <AgentStartButton
+          <WorkflowStartButton
             draft={draft}
-            agentData={{
+            workflowData={{
               name,
               tokens: values.tokens.map((t) => ({ token: t.token, minAllocation: t.minAllocation })),
               risk: values.risk,
               reviewInterval: values.reviewInterval,
-              agentInstructions,
+              agentInstructions: instructions,
               manualRebalance,
               useEarn,
             }}

@@ -12,7 +12,7 @@ import {
 import { usePrerequisites } from '../lib/usePrerequisites';
 import { useToast } from '../lib/useToast';
 import { useTranslation } from '../lib/i18n';
-import type { Agent } from '../lib/useAgentData';
+import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 
 import AgentInstructions from './AgentInstructions';
 import ApiKeyProviderSelector from './forms/ApiKeyProviderSelector';
@@ -24,14 +24,14 @@ import ConfirmDialog from './ui/ConfirmDialog';
 import Modal from './ui/Modal';
 
 interface Props {
-  agent: Agent;
+  workflow: PortfolioWorkflow;
   open: boolean;
   onClose: () => void;
   onUpdated: () => void;
 }
 
-export default function AgentUpdateModal({
-  agent,
+export default function WorkflowUpdateModal({
+  workflow,
   open,
   onClose,
   onUpdated,
@@ -42,24 +42,24 @@ export default function AgentUpdateModal({
     resolver: zodResolver(portfolioReviewSchema),
     defaultValues: {
       tokens: [
-        { token: agent.cashToken, minAllocation: 0 },
-        ...agent.tokens.map((t) => ({
+        { token: workflow.cashToken, minAllocation: 0 },
+        ...workflow.tokens.map((t) => ({
           token: t.token,
           minAllocation: t.minAllocation,
         })),
       ],
-      risk: agent.risk,
-      reviewInterval: agent.reviewInterval,
+      risk: workflow.risk,
+      reviewInterval: workflow.reviewInterval,
     },
   });
   const { reset, handleSubmit } = methods;
-  const [agentInstructions, setAgentInstructions] = useState(
-    agent.agentInstructions,
+  const [instructions, setInstructions] = useState(
+    workflow.agentInstructions,
   );
-  const [useEarn, setUseEarn] = useState(agent.useEarn);
+  const [useEarn, setUseEarn] = useState(workflow.useEarn);
   const [tokenSymbols, setTokenSymbols] = useState<string[]>([
-    agent.cashToken,
-    ...agent.tokens.map((t) => t.token),
+    workflow.cashToken,
+    ...workflow.tokens.map((t) => t.token),
   ]);
 
   const {
@@ -70,7 +70,7 @@ export default function AgentUpdateModal({
     accountBalances,
     isAccountLoading,
   } = usePrerequisites(tokenSymbols);
-  const [model, setModel] = useState(agent.model || '');
+  const [model, setModel] = useState(workflow.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
   const [exchangeProvider, setExchangeProvider] = useState('binance');
 
@@ -78,40 +78,40 @@ export default function AgentUpdateModal({
     if (open) {
       reset({
         tokens: [
-          { token: agent.cashToken, minAllocation: 0 },
-          ...agent.tokens.map((t) => ({
+          { token: workflow.cashToken, minAllocation: 0 },
+          ...workflow.tokens.map((t) => ({
             token: t.token,
             minAllocation: t.minAllocation,
           })),
         ],
-        risk: agent.risk,
-        reviewInterval: agent.reviewInterval,
+        risk: workflow.risk,
+        reviewInterval: workflow.reviewInterval,
       });
-      setAgentInstructions(agent.agentInstructions);
-      setUseEarn(agent.useEarn);
-      setModel(agent.model || '');
+      setInstructions(workflow.agentInstructions);
+      setUseEarn(workflow.useEarn);
+      setModel(workflow.model || '');
       setTokenSymbols([
-        agent.cashToken,
-        ...agent.tokens.map((t) => t.token),
+        workflow.cashToken,
+        ...workflow.tokens.map((t) => t.token),
       ]);
     }
-  }, [open, agent, reset]);
+  }, [open, workflow, reset]);
 
   useEffect(() => {
     if (!hasOpenAIKey) {
       setModel('');
     } else if (!model) {
-      setModel(agent.model || models[0] || '');
+      setModel(workflow.model || models[0] || '');
     }
-  }, [hasOpenAIKey, models, agent.model, model]);
+  }, [hasOpenAIKey, models, workflow.model, model]);
 
   const updateMut = useMutation<void, unknown, PortfolioReviewFormValues>({
     mutationFn: async (values: PortfolioReviewFormValues) => {
       const [cashToken, ...positions] = values.tokens;
-      await api.put(`/portfolio-workflows/${agent.id}`, {
+      await api.put(`/portfolio-workflows/${workflow.id}`, {
         model,
-        status: agent.status,
-        name: agent.name,
+        status: workflow.status,
+        name: workflow.name,
         cash: cashToken.token.toUpperCase(),
         tokens: positions.map((t) => ({
           token: t.token.toUpperCase(),
@@ -119,8 +119,8 @@ export default function AgentUpdateModal({
         })),
         risk: values.risk,
         reviewInterval: values.reviewInterval,
-        agentInstructions,
-        manualRebalance: agent.manualRebalance,
+        agentInstructions: instructions,
+        manualRebalance: workflow.manualRebalance,
         useEarn,
       });
     },
@@ -132,7 +132,7 @@ export default function AgentUpdateModal({
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         toast.show(err.response.data.error);
       } else {
-        toast.show(t('failed_update_agent'));
+        toast.show(t('failed_update_workflow'));
       }
     },
   });
@@ -145,7 +145,7 @@ export default function AgentUpdateModal({
 
   return (
     <Modal open={open} onClose={onClose}>
-      <h2 className="text-xl font-bold mb-2">{t('update_agent')}</h2>
+      <h2 className="text-xl font-bold mb-2">{t('update_workflow')}</h2>
       <FormProvider {...methods}>
         <div className="max-w-2xl">
           <PortfolioWorkflowFields
@@ -159,8 +159,8 @@ export default function AgentUpdateModal({
         </div>
       </FormProvider>
       <AgentInstructions
-        value={agentInstructions}
-        onChange={setAgentInstructions}
+        value={instructions}
+        onChange={setInstructions}
       />
       <div className="mt-4 max-w-2xl">
         <div className="grid grid-cols-2 gap-4">
@@ -171,7 +171,7 @@ export default function AgentUpdateModal({
               value={aiProvider}
               onChange={setAiProvider}
             />
-            {hasOpenAIKey && (models.length || agent.model) && (
+            {hasOpenAIKey && (models.length || workflow.model) && (
               <div className="mt-2">
                 <h2 className="text-md font-bold">{t('model')}</h2>
                 <SelectInput
@@ -179,8 +179,8 @@ export default function AgentUpdateModal({
                   value={model}
                   onChange={setModel}
                   options={
-                    agent.model && !models.length
-                      ? [{ value: agent.model, label: agent.model }]
+                    workflow.model && !models.length
+                      ? [{ value: workflow.model, label: workflow.model }]
                       : models.map((m) => ({ value: m, label: m }))
                   }
                 />
@@ -219,9 +219,9 @@ export default function AgentUpdateModal({
       <ConfirmDialog
         open={confirmOpen}
         message={
-          agent.status === 'active'
-            ? t('update_running_agent_prompt')
-            : t('update_agent_prompt')
+          workflow.status === 'active'
+            ? t('update_running_workflow_prompt')
+            : t('update_workflow_prompt')
         }
         onConfirm={() => {
           if (!formValues) return;

@@ -2,7 +2,7 @@ interface Props {
   status: 'active' | 'inactive' | 'draft';
 }
 
-export default function AgentStatusLabel({ status }: Props) {
+export default function WorkflowStatusLabel({ status }: Props) {
   const base = 'px-2 py-1 rounded text-xs font-medium';
   if (status === 'active') {
     return <span className={`${base} bg-green-100 text-green-800`}>Active</span>;
