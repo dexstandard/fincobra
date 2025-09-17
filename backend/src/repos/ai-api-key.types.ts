@@ -7,7 +7,7 @@ export interface SharedAiApiKeyDetails extends AiApiKeyDetails {
   model: string | null;
 }
 
-export interface AiApiKeyRow {
+export interface AiApiKeys {
   own: AiApiKeyDetails | null;
   shared: SharedAiApiKeyDetails | null;
 }
@@ -23,7 +23,12 @@ export interface AiApiKeyShareUpsert {
   model: string;
 }
 
-export interface AiApiKeyShareQuery {
+export interface AiApiKeyShareDelete {
+  ownerUserId: string;
+  targetUserId: string;
+}
+
+export interface AiApiKeyShareLookup {
   ownerUserId: string;
   targetUserId: string;
 }

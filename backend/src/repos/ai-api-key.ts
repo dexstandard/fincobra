@@ -1,52 +1,48 @@
 import { db } from '../db/index.js';
-import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
-  AiApiKeyRow,
+  AiApiKeys,
   AiApiKeyUpsert,
   AiApiKeyShareUpsert,
-  AiApiKeyShareQuery,
+  AiApiKeyShareDelete,
+  AiApiKeyShareLookup,
 } from './ai-api-key.types.js';
 
-interface AiApiKeyQueryRow {
-  own_id?: string | null;
-  own_ai_api_key_enc?: string | null;
-  shared_id?: string | null;
-  shared_ai_api_key_enc?: string | null;
-  shared_model?: string | null;
-}
-
-interface AiApiKeyQueryEntity {
-  ownId?: string | null;
-  ownAiApiKeyEnc?: string | null;
-  sharedId?: string | null;
-  sharedAiApiKeyEnc?: string | null;
-  sharedModel?: string | null;
-}
-
-function mapAiApiKeyRow(row: AiApiKeyQueryRow): AiApiKeyRow {
-  const entity = convertKeysToCamelCase(row) as AiApiKeyQueryEntity;
+export async function getAiKeyRow(id: string): Promise<AiApiKeys | undefined> {
+  const { rows } = await db.query(
+    `SELECT ak.id AS "ownId",
+            ak.api_key_enc AS "ownApiKeyEnc",
+            oak.id AS "sharedId",
+            oak.api_key_enc AS "sharedApiKeyEnc",
+            s.model AS "sharedModel"
+       FROM users u
+       LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai'
+       LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id
+       LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+      WHERE u.id = $1`,
+    [id],
+  );
+  const row = rows[0] as
+    | {
+        ownId: string | null;
+        ownApiKeyEnc: string | null;
+        sharedId: string | null;
+        sharedApiKeyEnc: string | null;
+        sharedModel: string | null;
+      }
+    | undefined;
+  if (!row) return undefined;
   return {
-    own: entity.ownId
-      ? { id: entity.ownId, aiApiKeyEnc: entity.ownAiApiKeyEnc ?? '' }
+    own: row.ownId
+      ? { id: row.ownId, aiApiKeyEnc: row.ownApiKeyEnc ?? '' }
       : null,
-    shared: entity.sharedId
+    shared: row.sharedId
       ? {
-          id: entity.sharedId,
-          aiApiKeyEnc: entity.sharedAiApiKeyEnc ?? '',
-          model: entity.sharedModel ?? null,
+          id: row.sharedId,
+          aiApiKeyEnc: row.sharedApiKeyEnc ?? '',
+          model: row.sharedModel ?? null,
         }
       : null,
   };
-}
-
-export async function getAiKeyRow(id: string): Promise<AiApiKeyRow | undefined> {
-  const { rows } = await db.query(
-    "SELECT ak.id AS own_id, ak.api_key_enc AS own_ai_api_key_enc, oak.id AS shared_id, oak.api_key_enc AS shared_ai_api_key_enc, s.model AS shared_model FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' WHERE u.id = $1",
-    [id],
-  );
-  const row = rows[0] as AiApiKeyQueryRow | undefined;
-  if (!row) return undefined;
-  return mapAiApiKeyRow(row);
 }
 
 export async function setAiKey(entry: AiApiKeyUpsert): Promise<void> {
@@ -70,14 +66,14 @@ export async function shareAiKey(entry: AiApiKeyShareUpsert): Promise<void> {
   );
 }
 
-export async function revokeAiKeyShare(entry: AiApiKeyShareQuery): Promise<void> {
+export async function revokeAiKeyShare(entry: AiApiKeyShareDelete): Promise<void> {
   await db.query(
     'DELETE FROM ai_api_key_shares WHERE owner_user_id = $1 AND target_user_id = $2',
     [entry.ownerUserId, entry.targetUserId],
   );
 }
 
-export async function hasAiKeyShare(entry: AiApiKeyShareQuery): Promise<boolean> {
+export async function hasAiKeyShare(entry: AiApiKeyShareLookup): Promise<boolean> {
   const { rowCount } = await db.query(
     'SELECT 1 FROM ai_api_key_shares WHERE owner_user_id = $1 AND target_user_id = $2',
     [entry.ownerUserId, entry.targetUserId],

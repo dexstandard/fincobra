@@ -1,41 +1,34 @@
 import { db } from '../db/index.js';
-import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
   BinanceApiKey,
   BinanceApiKeyUpsert,
 } from './exchange-api-keys.types.js';
 
-interface BinanceKeyQueryRow {
-  id?: string | null;
-  binance_api_key_enc?: string | null;
-  binance_api_secret_enc?: string | null;
-}
-
-interface BinanceKeyQueryEntity {
-  id?: string | null;
-  binanceApiKeyEnc?: string | null;
-  binanceApiSecretEnc?: string | null;
-}
-
-function mapBinanceKeyRow(row: BinanceKeyQueryRow): BinanceApiKey {
-  const entity = convertKeysToCamelCase(row) as BinanceKeyQueryEntity;
-  return {
-    id: entity.id ?? null,
-    binanceApiKeyEnc: entity.binanceApiKeyEnc ?? null,
-    binanceApiSecretEnc: entity.binanceApiSecretEnc ?? null,
-  };
-}
-
 export async function getBinanceKeyRow(
   id: string,
 ): Promise<BinanceApiKey | undefined> {
   const { rows } = await db.query(
-    "SELECT ek.id, ek.api_key_enc AS binance_api_key_enc, ek.api_secret_enc AS binance_api_secret_enc FROM users u LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance' WHERE u.id = $1",
+    `SELECT ek.id AS "id",
+            ek.api_key_enc AS "binanceApiKeyEnc",
+            ek.api_secret_enc AS "binanceApiSecretEnc"
+       FROM users u
+       LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance'
+      WHERE u.id = $1`,
     [id],
   );
-  const row = rows[0] as BinanceKeyQueryRow | undefined;
+  const row = rows[0] as
+    | {
+        id: string | null;
+        binanceApiKeyEnc: string | null;
+        binanceApiSecretEnc: string | null;
+      }
+    | undefined;
   if (!row) return undefined;
-  return mapBinanceKeyRow(row);
+  return {
+    id: row.id ?? null,
+    binanceApiKeyEnc: row.binanceApiKeyEnc ?? null,
+    binanceApiSecretEnc: row.binanceApiSecretEnc ?? null,
+  };
 }
 
 export async function setBinanceKey(entry: BinanceApiKeyUpsert): Promise<void> {
