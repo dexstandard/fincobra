@@ -7,11 +7,6 @@ export interface SharedAiApiKeyDetails extends AiApiKeyDetails {
   model: string | null;
 }
 
-export interface AiApiKeys {
-  own: AiApiKeyDetails | null;
-  shared: SharedAiApiKeyDetails | null;
-}
-
 export interface AiApiKeyUpsert {
   userId: string;
   apiKeyEnc: string;

@@ -13,12 +13,7 @@ vi.mock('../src/services/binance.js', async () => {
 
 import buildServer from '../src/server.js';
 import { insertUser, insertAdminUser } from './repos/users.js';
-import {
-  getAiKeyRow,
-  setAiKey,
-  shareAiKey,
-  hasAiKeyShare,
-} from '../src/repos/ai-api-key.js';
+import { getAiKey, setAiKey, shareAiKey, hasAiKeyShare } from '../src/repos/ai-api-key.js';
 import {
   getBinanceKeyRow,
   setBinanceKey,
@@ -53,8 +48,8 @@ describe('AI API key routes', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({ error: 'verification failed' });
-    let row = await getAiKeyRow(userId);
-    expect(row?.own?.aiApiKeyEnc).toBeUndefined();
+    let row = await getAiKey(userId);
+    expect(row?.aiApiKeyEnc).toBeUndefined();
 
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     res = await app.inject({
@@ -65,8 +60,8 @@ describe('AI API key routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ key: '<REDACTED>' });
-    row = await getAiKeyRow(userId);
-    expect(row?.own?.aiApiKeyEnc).not.toBe(key1);
+    row = await getAiKey(userId);
+    expect(row?.aiApiKeyEnc).not.toBe(key1);
 
     res = await app.inject({
       method: 'GET',
