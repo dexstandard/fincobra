@@ -1,31 +1,32 @@
 import { useState } from 'react';
 import { useTranslation } from '../lib/i18n';
 import { Eye, EyeOff } from 'lucide-react';
-import AgentStatusLabel from './AgentStatusLabel';
+import WorkflowStatusLabel from './WorkflowStatusLabel';
 import TokenDisplay from './TokenDisplay';
-import AgentPnl from './AgentPnl';
+import WorkflowPnl from './WorkflowPnl';
 import FormattedDate from './ui/FormattedDate';
-import type { Agent } from '../lib/useAgentData';
+import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 
 interface Props {
-  agent: Agent;
+  workflow: PortfolioWorkflow;
 }
 
-export default function AgentDetailsDesktop({ agent }: Props) {
+export default function WorkflowDetailsDesktop({ workflow }: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
   const t = useTranslation();
 
-  const tokens = [agent.cashToken, ...agent.tokens.map((t) => t.token)];
+  const tokens = [workflow.cashToken, ...workflow.tokens.map((t) => t.token)];
   return (
     <div>
       <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-        <span>{t('agent')}:</span> <span>{agent.name}</span>
+        <span>{t('workflow')}:</span> <span>{workflow.name}</span>
       </h1>
       <p className="mt-2">
-        <strong>{t('created')}:</strong> <FormattedDate date={agent.createdAt} />
+        <strong>{t('created')}:</strong> <FormattedDate date={workflow.createdAt} />
       </p>
       <p className="mt-2">
-        <strong>{t('status')}:</strong> <AgentStatusLabel status={agent.status} />
+        <strong>{t('status')}:</strong>{' '}
+        <WorkflowStatusLabel status={workflow.status} />
       </p>
       <p className="flex items-center gap-1 mt-2">
         <strong>{t('tokens')}:</strong>
@@ -53,11 +54,11 @@ export default function AgentDetailsDesktop({ agent }: Props) {
         </div>
         {showPrompt && (
           <pre className="whitespace-pre-wrap mt-2">
-            {agent.agentInstructions}
+            {workflow.agentInstructions}
           </pre>
         )}
       </div>
-      <AgentPnl tokens={tokens} startBalanceUsd={agent.startBalanceUsd} />
+      <WorkflowPnl tokens={tokens} startBalanceUsd={workflow.startBalanceUsd} />
     </div>
   );
 }

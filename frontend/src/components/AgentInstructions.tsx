@@ -8,7 +8,11 @@ interface Props {
   maxLength?: number;
 }
 
-export default function AgentInstructions({ value, onChange, maxLength = 1000 }: Props) {
+export default function AgentInstructions({
+  value,
+  onChange,
+  maxLength = 1000,
+}: Props) {
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(value);
   useEffect(() => setLocal(value), [value]);

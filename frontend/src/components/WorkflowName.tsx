@@ -6,7 +6,7 @@ interface Props {
   className?: string;
 }
 
-export default function AgentName({
+export default function WorkflowName({
   name,
   onChange,
   className = 'text-xl font-bold mb-2',

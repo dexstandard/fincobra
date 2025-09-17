@@ -5,9 +5,9 @@ import { Eye, Trash, Clock, Plus } from 'lucide-react';
 import axios from 'axios';
 import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
-import AgentStatusLabel from '../components/AgentStatusLabel';
+import WorkflowStatusLabel from '../components/WorkflowStatusLabel';
 import TokenDisplay from '../components/TokenDisplay';
-import { useAgentBalanceUsd } from '../lib/useAgentBalanceUsd';
+import { useWorkflowBalanceUsd } from '../lib/useWorkflowBalanceUsd';
 import Button from '../components/ui/Button';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import ExchangeApiKeySection from '../components/forms/ExchangeApiKeySection';
@@ -17,7 +17,7 @@ import Toggle from '../components/ui/Toggle';
 import { useTranslation } from '../lib/i18n';
 import { usePrerequisites } from '../lib/usePrerequisites';
 
-interface Agent {
+interface WorkflowSummary {
   id: string;
   userId: string;
   model: string;
@@ -28,28 +28,28 @@ interface Agent {
   reviewInterval: string;
 }
 
-function AgentRow({
-  agent,
+function WorkflowRow({
+  workflow,
   onDelete,
 }: {
-  agent: Agent;
+  workflow: WorkflowSummary;
   onDelete: (id: string) => void;
 }) {
   const t = useTranslation();
   const tokenList = [
-    agent.cashToken,
-    ...(agent.tokens ? agent.tokens.map((t) => t.token) : []),
+    workflow.cashToken,
+    ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
   ];
-  const { balance, isLoading } = useAgentBalanceUsd(tokenList);
+  const { balance, isLoading } = useWorkflowBalanceUsd(tokenList);
   const balanceText =
     balance === null ? '-' : isLoading ? t('loading') : `$${balance.toFixed(2)}`;
   const pnl =
-    balance !== null && agent.startBalanceUsd != null
-      ? balance - agent.startBalanceUsd
+    balance !== null && workflow.startBalanceUsd != null
+      ? balance - workflow.startBalanceUsd
       : null;
   const pnlPercent =
-    pnl !== null && agent.startBalanceUsd
-      ? (pnl / agent.startBalanceUsd) * 100
+    pnl !== null && workflow.startBalanceUsd
+      ? (pnl / workflow.startBalanceUsd) * 100
       : null;
   const pnlText =
     pnl === null
@@ -78,7 +78,7 @@ function AgentRow({
   const pnlTooltip =
     pnl === null || isLoading
       ? undefined
-      : `${t('pnl')} = $${balance!.toFixed(2)} - $${agent.startBalanceUsd!.toFixed(2)} = ${
+      : `${t('pnl')} = $${balance!.toFixed(2)} - $${workflow.startBalanceUsd!.toFixed(2)} = ${
           pnl > 0 ? '+' : pnl < 0 ? '-' : ''
         }$${Math.abs(pnl).toFixed(2)}${
           pnlPercent !== null
@@ -86,7 +86,7 @@ function AgentRow({
             : ''
         }`;
   return (
-    <tr key={agent.id}>
+    <tr key={workflow.id}>
       <td>
         {tokenList.length ? (
           <span className="inline-flex items-center gap-1">
@@ -105,29 +105,29 @@ function AgentRow({
       <td className={pnlClass} title={pnlTooltip}>
         {pnlText}
       </td>
-      <td>{agent.model || '-'}</td>
+      <td>{workflow.model || '-'}</td>
       <td>
         <span className="inline-flex items-center gap-1">
           <Clock className="w-4 h-4" />
-          {agent.reviewInterval}
+          {workflow.reviewInterval}
         </span>
       </td>
       <td>
-        <AgentStatusLabel status={agent.status} />
+        <WorkflowStatusLabel status={workflow.status} />
       </td>
       <td>
         <div className="flex items-center gap-2">
           <Link
             className="text-blue-600 underline inline-flex"
-            to={`/portfolio-workflows/${agent.id}`}
-            aria-label={t('view_agent')}
+            to={`/portfolio-workflows/${workflow.id}`}
+            aria-label={t('view_workflow')}
           >
             <Eye className="w-4 h-4" />
           </Link>
           <button
             className="text-red-600"
-            onClick={() => onDelete(agent.id)}
-            aria-label={t('delete_agent')}
+            onClick={() => onDelete(workflow.id)}
+            aria-label={t('delete_workflow')}
           >
             <Trash className="w-4 h-4" />
           </button>
@@ -137,28 +137,28 @@ function AgentRow({
   );
 }
 
-function AgentBlock({
-  agent,
+function WorkflowBlock({
+  workflow,
   onDelete,
 }: {
-  agent: Agent;
+  workflow: WorkflowSummary;
   onDelete: (id: string) => void;
 }) {
   const t = useTranslation();
   const tokenList = [
-    agent.cashToken,
-    ...(agent.tokens ? agent.tokens.map((t) => t.token) : []),
+    workflow.cashToken,
+    ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
   ];
-  const { balance, isLoading } = useAgentBalanceUsd(tokenList);
+  const { balance, isLoading } = useWorkflowBalanceUsd(tokenList);
   const balanceText =
     balance === null ? '-' : isLoading ? t('loading') : `$${balance.toFixed(2)}`;
   const pnl =
-    balance !== null && agent.startBalanceUsd != null
-      ? balance - agent.startBalanceUsd
+    balance !== null && workflow.startBalanceUsd != null
+      ? balance - workflow.startBalanceUsd
       : null;
   const pnlPercent =
-    pnl !== null && agent.startBalanceUsd
-      ? (pnl / agent.startBalanceUsd) * 100
+    pnl !== null && workflow.startBalanceUsd
+      ? (pnl / workflow.startBalanceUsd) * 100
       : null;
   const pnlText =
     pnl === null
@@ -187,7 +187,7 @@ function AgentBlock({
   const pnlTooltip =
     pnl === null || isLoading
       ? undefined
-      : `${t('pnl')} = $${balance!.toFixed(2)} - $${agent.startBalanceUsd!.toFixed(2)} = ${
+      : `${t('pnl')} = $${balance!.toFixed(2)} - $${workflow.startBalanceUsd!.toFixed(2)} = ${
           pnl > 0 ? '+' : pnl < 0 ? '-' : ''
         }$${Math.abs(pnl).toFixed(2)}${
           pnlPercent !== null
@@ -222,8 +222,8 @@ function AgentBlock({
         <div className="flex justify-end">
           <Link
             className="text-blue-600 underline inline-flex"
-            to={`/portfolio-workflows/${agent.id}`}
-            aria-label={t('view_agent')}
+            to={`/portfolio-workflows/${workflow.id}`}
+            aria-label={t('view_workflow')}
           >
             <Eye className="w-5 h-5" />
           </Link>
@@ -232,24 +232,24 @@ function AgentBlock({
       <div className="grid grid-cols-4 gap-2 items-center">
         <div>
           <div className="text-xs text-gray-500">{t('status')}</div>
-          <AgentStatusLabel status={agent.status} />
+          <WorkflowStatusLabel status={workflow.status} />
         </div>
         <div>
           <div className="text-xs text-gray-500">{t('model')}</div>
-          {agent.model || '-'}
+          {workflow.model || '-'}
         </div>
         <div>
           <div className="text-xs text-gray-500">{t('interval')}</div>
           <span className="inline-flex items-center gap-1">
             <Clock className="w-4 h-4" />
-            {agent.reviewInterval}
+            {workflow.reviewInterval}
           </span>
         </div>
         <div className="flex justify-end">
           <button
             className="text-red-600"
-            onClick={() => onDelete(agent.id)}
-            aria-label={t('delete_agent')}
+            onClick={() => onDelete(workflow.id)}
+            aria-label={t('delete_workflow')}
           >
             <Trash className="w-5 h-5" />
           </button>
@@ -271,7 +271,7 @@ export default function Dashboard() {
   });
 
   const { data } = useQuery({
-    queryKey: ['agents', page, user?.id, onlyActive],
+    queryKey: ['workflows', page, user?.id, onlyActive],
     queryFn: async () => {
       const res = await api.get('/portfolio-workflows/paginated', {
         params: {
@@ -281,7 +281,7 @@ export default function Dashboard() {
         },
       });
       return res.data as {
-        items: Agent[];
+        items: WorkflowSummary[];
         total: number;
         page: number;
         pageSize: number;
@@ -303,13 +303,13 @@ export default function Dashboard() {
     if (!deleteId) return;
     try {
       await api.delete(`/portfolio-workflows/${deleteId}`);
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      toast.show(t('agent_deleted'), 'success');
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      toast.show(t('workflow_deleted'), 'success');
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         toast.show(err.response.data.error);
       } else {
-        toast.show(t('failed_delete_agent'));
+        toast.show(t('failed_delete_workflow'));
       }
     } finally {
       setDeleteId(null);
@@ -322,10 +322,12 @@ export default function Dashboard() {
         <ErrorBoundary>
           <div className="bg-white shadow-md border border-gray-200 rounded p-6 w-full">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">{t('my_agents')}</h2>
+              <h2 className="text-xl font-bold">{t('my_workflows')}</h2>
             </div>
             <p>{
-              hasBinanceKey ? t('no_agents_yet_connected') : t('no_agents_yet')
+              hasBinanceKey
+                ? t('no_workflows_yet_connected')
+                : t('no_workflows_yet')
             }</p>
           </div>
         </ErrorBoundary>
@@ -350,12 +352,12 @@ export default function Dashboard() {
           <div className="bg-white shadow-md border border-gray-200 rounded p-6 w-full">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold">{t('my_agents')}</h2>
+                <h2 className="text-xl font-bold">{t('my_workflows')}</h2>
                 {hasBinanceKey && (
                   <Link
                     to="/portfolio-workflow-draft"
                     className="text-blue-600 inline-flex"
-                    aria-label={t('create_agent')}
+                    aria-label={t('create_workflow')}
                   >
                     <Plus className="w-6 h-6" strokeWidth={3} />
                   </Link>
@@ -371,8 +373,8 @@ export default function Dashboard() {
               <p>
                 {
                   hasBinanceKey
-                    ? t('no_agents_yet_connected')
-                    : t('no_agents_yet')
+                    ? t('no_workflows_yet_connected')
+                    : t('no_workflows_yet')
                 }
               </p>
             ) : (
@@ -390,20 +392,20 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((agent) => (
-                      <AgentRow
-                        key={agent.id}
-                        agent={agent}
+                    {items.map((workflow) => (
+                      <WorkflowRow
+                        key={workflow.id}
+                        workflow={workflow}
                         onDelete={handleDelete}
                       />
                     ))}
                   </tbody>
                 </table>
                 <div className="md:hidden flex flex-col gap-2 mb-4">
-                  {items.map((agent) => (
-                    <AgentBlock
-                      key={agent.id}
-                      agent={agent}
+                  {items.map((workflow) => (
+                    <WorkflowBlock
+                      key={workflow.id}
+                      workflow={workflow}
                       onDelete={handleDelete}
                     />
                   ))}
@@ -438,7 +440,7 @@ export default function Dashboard() {
       </div>
       <ConfirmDialog
         open={deleteId !== null}
-        message={t('delete_agent_prompt')}
+        message={t('delete_workflow_prompt')}
         confirmVariant="danger"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId(null)}

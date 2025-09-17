@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from '../lib/i18n';
-import AgentName from '../components/AgentName';
+import WorkflowName from '../components/WorkflowName';
 import AgentInstructions from '../components/AgentInstructions';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
@@ -19,7 +19,7 @@ import {
 import { useToast } from '../lib/useToast';
 import Button from '../components/ui/Button';
 import { usePrerequisites } from '../lib/usePrerequisites';
-import AgentStartButton from '../components/AgentStartButton';
+import WorkflowStartButton from '../components/WorkflowStartButton';
 import SelectInput from '../components/forms/SelectInput';
 
 interface WorkflowPreviewDetails {
@@ -114,8 +114,8 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-        <span>{isDraft ? t('agent_draft') : t('agent_preview')}:</span>
-        <AgentName
+        <span>{isDraft ? t('workflow_draft') : t('workflow_preview')}:</span>
+        <WorkflowName
           name={workflowData.name}
           onChange={(name) =>
             setWorkflowData((d) => (d ? { ...d, name } : d))
@@ -361,9 +361,9 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
           >
             {isDraft ? t('update_draft') : t('save_draft')}
           </Button>
-          <AgentStartButton
+          <WorkflowStartButton
             draft={draft}
-            agentData={workflowData}
+            workflowData={workflowData}
             model={model}
             disabled={!user || !hasOpenAIKey || !hasBinanceKey || !model}
           />

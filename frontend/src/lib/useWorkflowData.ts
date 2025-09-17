@@ -3,7 +3,7 @@ import api from './axios';
 import { useUser } from './useUser';
 import type { PortfolioReviewFormValues } from './constants';
 
-export interface Agent {
+export interface PortfolioWorkflow {
   id: string;
   userId: string;
   model: string;
@@ -22,13 +22,13 @@ export interface Agent {
   exchangeApiKeyId: string | null;
 }
 
-export function useAgentData(id?: string) {
+export function useWorkflowData(id?: string) {
   const { user } = useUser();
   return useQuery({
-    queryKey: ['agent', id, user?.id],
+    queryKey: ['workflow', id, user?.id],
     queryFn: async () => {
       const res = await api.get(`/portfolio-workflows/${id}`);
-      return res.data as Agent;
+      return res.data as PortfolioWorkflow;
     },
     enabled: !!id && !!user,
   });

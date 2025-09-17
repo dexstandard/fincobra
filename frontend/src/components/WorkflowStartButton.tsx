@@ -9,7 +9,7 @@ import { useTranslation } from '../lib/i18n';
 import Button from './ui/Button';
 import ConfirmDialog from './ui/ConfirmDialog';
 
-interface AgentPreviewDetails {
+interface WorkflowPreviewDetails {
   name: string;
   tokens: { token: string; minAllocation: number }[];
   risk: string;
@@ -19,22 +19,22 @@ interface AgentPreviewDetails {
   useEarn: boolean;
 }
 
-interface AgentDraft extends AgentPreviewDetails {
+interface WorkflowDraft extends WorkflowPreviewDetails {
   id: string;
   userId: string;
   model: string | null;
 }
 
 interface Props {
-  draft?: AgentDraft;
-  agentData: AgentPreviewDetails;
+  draft?: WorkflowDraft;
+  workflowData: WorkflowPreviewDetails;
   model: string;
   disabled: boolean;
 }
 
-export default function AgentStartButton({
+export default function WorkflowStartButton({
   draft,
-  agentData,
+  workflowData,
   model,
   disabled,
 }: Props) {
@@ -46,7 +46,7 @@ export default function AgentStartButton({
   const [isCreating, setIsCreating] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  async function startAgent() {
+  async function startWorkflow() {
     if (!user) return;
     if (!model) {
       toast.show(t('model_required'));
@@ -57,24 +57,24 @@ export default function AgentStartButton({
     try {
       if (draft) {
         await api.post(`/portfolio-workflows/${draft.id}/start`);
-        queryClient.invalidateQueries({ queryKey: ['agents'] });
-        toast.show(t('agent_started_success'), 'success');
+        queryClient.invalidateQueries({ queryKey: ['workflows'] });
+        toast.show(t('workflow_started_success'), 'success');
         navigate('/');
       } else {
-        const [cashToken, ...positions] = agentData.tokens;
+        const [cashToken, ...positions] = workflowData.tokens;
         const res = await api.post('/portfolio-workflows', {
           model,
-          name: agentData.name,
+          name: workflowData.name,
           cash: cashToken.token.toUpperCase(),
           tokens: positions.map((t) => ({
             token: t.token.toUpperCase(),
             minAllocation: t.minAllocation,
           })),
-          risk: agentData.risk,
-          reviewInterval: agentData.reviewInterval,
-          agentInstructions: agentData.agentInstructions,
-          manualRebalance: agentData.manualRebalance,
-          useEarn: agentData.useEarn,
+          risk: workflowData.risk,
+          reviewInterval: workflowData.reviewInterval,
+          agentInstructions: workflowData.agentInstructions,
+          manualRebalance: workflowData.manualRebalance,
+          useEarn: workflowData.useEarn,
           status: 'active',
         });
         navigate(`/portfolio-workflows/${res.data.id}`);
@@ -83,7 +83,7 @@ export default function AgentStartButton({
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         toast.show(err.response.data.error);
       } else {
-        toast.show(t('failed_start_agent'));
+        toast.show(t('failed_start_workflow'));
       }
     } finally {
       setIsCreating(false);
@@ -97,12 +97,12 @@ export default function AgentStartButton({
         loading={isCreating}
         onClick={() => setConfirmOpen(true)}
       >
-        {t('start_agent')}
+        {t('start_workflow')}
       </Button>
       <ConfirmDialog
         open={confirmOpen}
-        message={t('start_agent_confirm')}
-        onConfirm={startAgent}
+        message={t('start_workflow_confirm')}
+        onConfirm={startWorkflow}
         onCancel={() => setConfirmOpen(false)}
       />
     </>

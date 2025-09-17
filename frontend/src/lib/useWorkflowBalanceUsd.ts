@@ -3,7 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import api from './axios';
 import { useUser } from './useUser';
 
-export function useAgentBalanceUsd(tokens: string[]) {
+export function useWorkflowBalanceUsd(tokens: string[]) {
   const { user } = useUser();
   const uniqTokens = Array.from(
     new Set(tokens.map((t) => t.toUpperCase())),
