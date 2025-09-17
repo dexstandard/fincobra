@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 
-import { getBinanceKeyRow } from '../repos/api-keys.js';
+import { getBinanceKeyRow } from '../repos/exchange-api-keys.js';
 import { decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
 

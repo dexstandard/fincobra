@@ -3,7 +3,7 @@ import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
 import { getActivePortfolioWorkflowById, getAgent } from '../src/repos/portfolio-workflow.js';
 import { insertUser, insertUserWithKeys } from './repos/users.js';
-import { setAiKey, shareAiKey } from '../src/repos/api-keys.js';
+import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import {
   setAgentStatus,
   getPortfolioWorkflowStatus,
@@ -756,8 +756,12 @@ describe('agent routes', () => {
     const adminId = await insertUser('adm');
     const userId = await insertUser('usr');
     const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
-    await setAiKey(adminId, ai);
-    await shareAiKey(adminId, userId, 'gpt-5');
+    await setAiKey({ userId: adminId, apiKeyEnc: ai });
+    await shareAiKey({
+      ownerUserId: adminId,
+      targetUserId: userId,
+      model: 'gpt-5',
+    });
     const payload = {
       userId,
       model: 'gpt-4',

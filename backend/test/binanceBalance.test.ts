@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
 import { insertUser } from './repos/users.js';
-import { setBinanceKey } from '../src/repos/api-keys.js';
+import { setBinanceKey } from '../src/repos/exchange-api-keys.js';
 import { authCookies } from './helpers.js';
 
 describe('binance balance route', () => {
@@ -13,7 +13,11 @@ describe('binance balance route', () => {
     const encKey = encrypt(key, process.env.KEY_PASSWORD!);
     const encSecret = encrypt(secret, process.env.KEY_PASSWORD!);
     const userId = await insertUser('3');
-    await setBinanceKey(userId, encKey, encSecret);
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: encKey,
+      apiSecretEnc: encSecret,
+    });
 
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;
@@ -52,7 +56,11 @@ describe('binance balance route', () => {
     const encKey = encrypt(key, process.env.KEY_PASSWORD!);
     const encSecret = encrypt(secret, process.env.KEY_PASSWORD!);
     const userId = await insertUser('1');
-    await setBinanceKey(userId, encKey, encSecret);
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: encKey,
+      apiSecretEnc: encSecret,
+    });
 
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;
@@ -91,7 +99,11 @@ describe('binance balance route', () => {
     const encKey = encrypt(key, process.env.KEY_PASSWORD!);
     const encSecret = encrypt(secret, process.env.KEY_PASSWORD!);
     const userId = await insertUser('2');
-    await setBinanceKey(userId, encKey, encSecret);
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: encKey,
+      apiSecretEnc: encSecret,
+    });
 
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { encrypt } from '../src/util/crypto.js';
 import { insertUser } from './repos/users.js';
-import { setBinanceKey } from '../src/repos/api-keys.js';
+import { setBinanceKey } from '../src/repos/exchange-api-keys.js';
 import { createHmac } from 'node:crypto';
 import {
   createLimitOrder,
@@ -19,7 +19,11 @@ describe('binance order helpers', () => {
     const encKey = encrypt(key, process.env.KEY_PASSWORD!);
     const encSecret = encrypt(secret, process.env.KEY_PASSWORD!);
     const id1 = await insertUser('1');
-    await setBinanceKey(id1, encKey, encSecret);
+    await setBinanceKey({
+      userId: id1,
+      apiKeyEnc: encKey,
+      apiSecretEnc: encSecret,
+    });
 
     const fetchMock = vi
       .fn()
@@ -53,7 +57,11 @@ describe('binance order helpers', () => {
     const encKey = encrypt(key, process.env.KEY_PASSWORD!);
     const encSecret = encrypt(secret, process.env.KEY_PASSWORD!);
     const id2 = await insertUser('2');
-    await setBinanceKey(id2, encKey, encSecret);
+    await setBinanceKey({
+      userId: id2,
+      apiKeyEnc: encKey,
+      apiSecretEnc: encSecret,
+    });
 
     const fetchMock = vi
       .fn()

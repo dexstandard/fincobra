@@ -3,7 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { setAiKey } from '../src/repos/api-keys.js';
+import { setAiKey } from '../src/repos/ai-api-key.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/review-raw-log.js';
 import { getRecentReviewResults } from '../src/repos/review-result.js';
 import * as mainTrader from '../src/agents/main-trader.js';
@@ -130,7 +130,7 @@ beforeEach(() => {
 
 async function setupAgent(tokens: string[], manual = false) {
   const userId = await insertUser();
-  await setAiKey(userId, 'enc');
+  await setAiKey({ userId, apiKeyEnc: 'enc' });
   const agent = await insertAgent({
     userId,
     model: 'gpt',

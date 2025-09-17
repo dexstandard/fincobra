@@ -5,7 +5,7 @@ import { decrypt } from '../util/crypto.js';
 import { requireUserIdMatch } from '../util/auth.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { getAiKeyRow } from '../repos/api-keys.js';
+import { getAiKeyRow } from '../repos/ai-api-key.js';
 import { parseParams } from '../util/validation.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });

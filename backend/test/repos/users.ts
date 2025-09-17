@@ -5,7 +5,8 @@ import {
   setUserEnabled,
 } from '../../src/repos/users.js';
 import { insertUserIdentity } from '../../src/repos/user-identities.js';
-import { setAiKey, setBinanceKey } from '../../src/repos/api-keys.js';
+import { setAiKey } from '../../src/repos/ai-api-key.js';
+import { setBinanceKey } from '../../src/repos/exchange-api-keys.js';
 import { encrypt } from '../../src/util/crypto.js';
 
 export async function insertUser(sub?: string, emailEnc?: string | null) {
@@ -35,7 +36,7 @@ export async function insertUserWithKeys(sub?: string, emailEnc?: string | null)
   const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
   const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
   const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-  await setAiKey(userId, ai);
-  await setBinanceKey(userId, bk, bs);
+  await setAiKey({ userId, apiKeyEnc: ai });
+  await setBinanceKey({ userId, apiKeyEnc: bk, apiSecretEnc: bs });
   return userId;
 }

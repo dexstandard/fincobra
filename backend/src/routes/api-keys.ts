@@ -5,15 +5,16 @@ import {
   getAiKeyRow,
   setAiKey,
   clearAiKey,
-  getBinanceKeyRow,
-  setBinanceKey,
-  clearBinanceKey,
   shareAiKey,
   revokeAiKeyShare,
   hasAiKeyShare,
   getAiKeyShareTargets,
-
-} from '../repos/api-keys.js';
+} from '../repos/ai-api-key.js';
+import {
+  getBinanceKeyRow,
+  setBinanceKey,
+  clearBinanceKey,
+} from '../repos/exchange-api-keys.js';
 import {
   getActivePortfolioWorkflowsByUser,
   deactivateAgentsByUser,
@@ -90,7 +91,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       if (!(await verifyApiKey(ApiKeyType.Ai, key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
-      await setAiKey(id, enc);
+      await setAiKey({ userId: id, apiKeyEnc: enc });
       return { key: '<REDACTED>' };
     },
   );
@@ -146,7 +147,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       if (!(await verifyApiKey(ApiKeyType.Ai, key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
-      await setAiKey(id, enc);
+      await setAiKey({ userId: id, apiKeyEnc: enc });
       return { key: '<REDACTED>' };
     },
   );
@@ -190,7 +191,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
           }
           await draftAgentsByUser(targetId);
         }
-        await revokeAiKeyShare(id, targetId);
+        await revokeAiKeyShare({ ownerUserId: id, targetUserId: targetId });
       }
       await clearAiKey(id);
       return { ok: true };
@@ -214,7 +215,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       if (err) return reply.code(err.code).send(err.body);
       const target = await findUserByEmail(email);
       if (!target) return reply.code(404).send(errorResponse('user not found'));
-      await shareAiKey(id, target.id, model);
+      await shareAiKey({ ownerUserId: id, targetUserId: target.id, model });
       return { ok: true };
     },
   );
@@ -231,7 +232,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       const { email } = req.body as { email: string };
       const target = await findUserByEmail(email);
       if (!target) return reply.code(404).send(errorResponse('user not found'));
-      if (!(await hasAiKeyShare(id, target.id)))
+      if (!(await hasAiKeyShare({ ownerUserId: id, targetUserId: target.id })))
         return reply.code(404).send(errorResponse('share not found'));
       const keyRow = await getAiKeyRow(target.id);
       if (!keyRow?.own && keyRow?.shared) {
@@ -246,7 +247,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
         }
         await draftAgentsByUser(target.id);
       }
-      await revokeAiKeyShare(id, target.id);
+      await revokeAiKeyShare({ ownerUserId: id, targetUserId: target.id });
       return { ok: true };
     },
   );
@@ -278,7 +279,11 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
           );
       const encKey = encryptKey(key);
       const encSecret = encryptKey(secret);
-      await setBinanceKey(id, encKey, encSecret);
+      await setBinanceKey({
+        userId: id,
+        apiKeyEnc: encKey,
+        apiSecretEnc: encSecret,
+      });
       return { key: '<REDACTED>', secret: '<REDACTED>' };
     },
   );
@@ -331,7 +336,11 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
           );
       const encKey = encryptKey(key);
       const encSecret = encryptKey(secret);
-      await setBinanceKey(id, encKey, encSecret);
+      await setBinanceKey({
+        userId: id,
+        apiKeyEnc: encKey,
+        apiSecretEnc: encSecret,
+      });
       return { key: '<REDACTED>', secret: '<REDACTED>' };
     },
   );
