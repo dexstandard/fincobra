@@ -2,13 +2,13 @@ import { db } from '../db/index.js';
 import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
   ReviewRebalanceInfo,
-  ReviewResultEntity,
+  ReviewResult,
   ReviewResultError,
-  ReviewResultInsert,
-  ReviewResultSummary,
-} from './types.js';
+  CreateReviewResult,
+  ReviewResultShort,
+} from './review-result.types.js';
 
-export async function insertReviewResult(entry: ReviewResultInsert): Promise<string> {
+export async function insertReviewResult(entry: CreateReviewResult): Promise<string> {
   const { rows } = await db.query(
     'INSERT INTO agent_review_result (agent_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
     [
@@ -26,17 +26,17 @@ export async function insertReviewResult(entry: ReviewResultInsert): Promise<str
 export async function getRecentReviewResults(
   portfolioId: string,
   limit: number,
-): Promise<ReviewResultSummary[]> {
+): Promise<ReviewResultShort[]> {
   const { rows } = await db.query(
     'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM agent_review_result WHERE agent_id = $1 ORDER BY created_at DESC LIMIT $2',
     [portfolioId, limit],
   );
   return rows.map((row) => {
     const entity = convertKeysToCamelCase(row) as Pick<
-      ReviewResultEntity,
+      ReviewResult,
       'id' | 'createdAt' | 'rebalance' | 'shortReport' | 'error'
     >;
-    const summary: ReviewResultSummary = {
+    const summary: ReviewResultShort = {
       id: entity.id,
       createdAt: entity.createdAt,
       rebalance: entity.rebalance ?? false,
@@ -71,7 +71,7 @@ export async function getAgentReviewResults(
     [portfolioId, limit, offset],
   );
   const entities = rows.map(
-    (row) => convertKeysToCamelCase(row) as ReviewResultEntity,
+    (row) => convertKeysToCamelCase(row) as ReviewResult,
   );
   return { rows: entities, total: Number(totalRes.rows[0].count) };
 }

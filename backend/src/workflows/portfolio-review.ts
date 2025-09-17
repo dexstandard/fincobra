@@ -17,9 +17,8 @@ import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
 import { insertReviewResult } from '../repos/agent-review-result.js';
 import type {
-  ReviewResultInsert,
-  ReviewResultError,
-} from '../repos/types.js';
+  CreateReviewResult
+} from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
@@ -123,21 +122,16 @@ function buildReviewResultEntry({
   decision: MainTraderDecision | null;
   logId: string;
   validationError?: string;
-}): ReviewResultInsert {
-  const entry: ReviewResultInsert = {
-    portfolioId: workflowId,
-    log: decision ? JSON.stringify(decision) : '',
-    rawLogId: logId,
-  };
+}): CreateReviewResult {
+    const ok = !!decision && !validationError;
 
-  if (decision && !validationError) {
-    entry.rebalance = decision.orders.length > 0;
-    entry.shortReport = decision.shortReport;
-  } else {
-    entry.error = { message: validationError ?? 'decision unavailable' };
-  }
-
-  return entry;
+    return {
+        portfolioId: workflowId,
+        log: decision ? JSON.stringify(decision) : "",
+        rawLogId: logId,
+        rebalance: ok ? decision.orders.length > 0 : false,
+        ...(ok ? {shortReport: decision.shortReport} : {error: {message: validationError ?? "decision unavailable"}}),
+    };
 }
 
 export async function executeWorkflow(
@@ -168,8 +162,7 @@ export async function executeWorkflow(
 
     prompt = await runStep('collectPromptData', () => collectPromptData(wf, runLog));
     if (!prompt) {
-      await saveFailure(wf, 'failed to collect prompt data');
-      runLog.info('workflow run complete');
+      runLog.error('workflow run failed: could not collect prompt data');
       return;
     }
 
@@ -214,7 +207,7 @@ export async function executeWorkflow(
     }
     runLog.info('workflow run complete');
   } catch (err) {
-    await saveFailure(wf, String(err), prompt);
+    await saveFailure(wf, String(err), prompt!);
     runLog.error({ err }, 'workflow run failed');
   }
 }
@@ -222,35 +215,37 @@ export async function executeWorkflow(
 async function saveFailure(
   row: ActivePortfolioWorkflowRow,
   message: string,
-  prompt?: RebalancePrompt,
+  prompt: RebalancePrompt,
 ) {
-  let rawId: string | undefined;
-  if (prompt) {
-    rawId = await insertReviewRawLog({
-      portfolioId: row.id,
-      prompt,
-      response: { error: message },
+    const rawLogId = await insertReviewRawLog({
+        portfolioId: row.id,
+        prompt,
+        response: { error: message },
     });
-  }
-  const parsed = parseExecLog({ error: message });
-  const entry: ReviewResultInsert = {
-    portfolioId: row.id,
-    log: parsed.text,
-  };
-  if (rawId) entry.rawLogId = rawId;
-  if (parsed.response) {
-    entry.rebalance = (parsed.response.orders || []).length > 0;
-    entry.shortReport = parsed.response.shortReport;
-  }
-  if (
-    parsed.error &&
-    typeof (parsed.error as any).message === 'string'
-  ) {
-    entry.error = {
-      message: String((parsed.error as any).message),
-    } as ReviewResultError;
-  }
-  await insertReviewResult(entry);
+
+    const parsed = parseExecLog({ error: message });
+
+    const rebalance =
+        Array.isArray(parsed.response?.orders) &&
+        parsed.response!.orders.length > 0;
+
+    const entry: CreateReviewResult = {
+        portfolioId: row.id,
+        log: parsed.text,
+        rawLogId,
+        rebalance,
+        ...(parsed.response?.shortReport != null && {
+            shortReport: parsed.response.shortReport,
+        }),
+        error: {
+            message:
+                typeof (parsed.error as any)?.message === "string"
+                    ? String((parsed.error as any).message)
+                    : message,
+        },
+    };
+
+    await insertReviewResult(entry);
 }
 
 export { reviewPortfolio as reviewAgentPortfolio };

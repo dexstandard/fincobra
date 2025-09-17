@@ -1,22 +1,8 @@
-export interface ReviewRawLogInsert {
-  portfolioId: string;
-  prompt: unknown;
-  response: unknown;
-}
-
-export interface ReviewRawLogEntity {
-  id: string;
-  agentId: string;
-  prompt: string;
-  response: string | null;
-  createdAt: Date;
-}
-
 export interface ReviewResultError {
   message: string;
 }
 
-export interface ReviewResultInsert {
+export interface CreateReviewResult {
   portfolioId: string;
   log: string;
   rebalance: boolean;
@@ -25,7 +11,7 @@ export interface ReviewResultInsert {
   rawLogId: string;
 }
 
-export interface ReviewResultEntity {
+export interface ReviewResult {
   id: string;
   log: string;
   rebalance: boolean;
@@ -35,7 +21,7 @@ export interface ReviewResultEntity {
   createdAt: Date;
 }
 
-export interface ReviewResultSummary {
+export interface ReviewResultShort {
   id: string;
   createdAt: Date;
   rebalance: boolean;
