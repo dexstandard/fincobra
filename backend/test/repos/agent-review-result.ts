@@ -1,4 +1,3 @@
-import { db } from '../../src/db/index.js';
 import { insertReviewResult as insertReviewResultProd } from '../../src/repos/agent-review-result.js';
 
 export function insertReviewResult(entry: any) {

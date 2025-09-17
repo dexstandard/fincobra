@@ -19,32 +19,31 @@ export interface ReviewResultError {
 export interface ReviewResultInsert {
   portfolioId: string;
   log: string;
-  rebalance?: boolean;
+  rebalance: boolean;
   shortReport?: string;
   error?: ReviewResultError;
-  rawLogId?: string;
+  rawLogId: string;
 }
 
 export interface ReviewResultEntity {
   id: string;
   log: string;
-  rebalance: boolean | null;
+  rebalance: boolean;
   shortReport: string | null;
   error: string | null;
-  rawLogId: string | null;
+  rawLogId: string;
   createdAt: Date;
 }
 
 export interface ReviewResultSummary {
   id: string;
   createdAt: Date;
-  rebalance?: boolean;
+  rebalance: boolean;
   shortReport?: string;
   error?: ReviewResultError;
-  rawLogId?: string;
 }
 
 export interface ReviewRebalanceInfo {
-  rebalance: boolean | null;
+  rebalance: boolean;
   log: string;
 }

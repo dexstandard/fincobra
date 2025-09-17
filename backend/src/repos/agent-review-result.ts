@@ -34,13 +34,12 @@ export async function getRecentReviewResults(
   return rows.map((row) => {
     const entity = convertKeysToCamelCase(row) as Pick<
       ReviewResultEntity,
-      'id' | 'createdAt' | 'rebalance' | 'shortReport' | 'error' | 'rawLogId'
+      'id' | 'createdAt' | 'rebalance' | 'shortReport' | 'error'
     >;
     const summary: ReviewResultSummary = {
       id: entity.id,
       createdAt: entity.createdAt,
-      ...(entity.rawLogId !== null ? { rawLogId: entity.rawLogId } : {}),
-      ...(entity.rebalance !== null ? { rebalance: entity.rebalance } : {}),
+      rebalance: entity.rebalance ?? false,
       ...(entity.shortReport !== null
         ? { shortReport: entity.shortReport }
         : {}),
@@ -83,12 +82,5 @@ export async function getRebalanceInfo(portfolioId: string, id: string) {
     [id, portfolioId],
   );
   if (!rows[0]) return undefined;
-  const entity = convertKeysToCamelCase(rows[0]) as Pick<
-    ReviewResultEntity,
-    'rebalance' | 'log'
-  >;
-  return {
-    rebalance: entity.rebalance ?? null,
-    log: entity.log,
-  } satisfies ReviewRebalanceInfo;
+  return convertKeysToCamelCase(rows[0]) as ReviewRebalanceInfo;
 }
