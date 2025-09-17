@@ -11,7 +11,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.query(
-    'TRUNCATE TABLE news, agent_review_raw_log, agent_review_result, limit_order, portfolio_workflow_tokens, portfolio_workflow, ai_api_key_shares, ai_api_keys, exchange_keys, user_identities, users RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE news, review_raw_log, review_result, limit_order, portfolio_workflow_tokens, portfolio_workflow, ai_api_key_shares, ai_api_keys, exchange_keys, user_identities, users RESTART IDENTITY CASCADE',
   );
 });
 

@@ -10,7 +10,7 @@ import type {
 
 export async function insertReviewResult(entry: ReviewResultInsert): Promise<string> {
   const { rows } = await db.query(
-    'INSERT INTO agent_review_result (portfolio_workflow_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+    'INSERT INTO review_result (portfolio_workflow_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
     [
       entry.portfolioWorkflowId,
       entry.log,
@@ -28,7 +28,7 @@ export async function getRecentReviewResults(
   limit: number,
 ): Promise<ReviewResultSummary[]> {
   const { rows } = await db.query(
-    'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM agent_review_result WHERE portfolio_workflow_id = $1 ORDER BY created_at DESC LIMIT $2',
+    'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM review_result WHERE portfolio_workflow_id = $1 ORDER BY created_at DESC LIMIT $2',
     [portfolioWorkflowId, limit],
   );
   return rows.map((row) => {
@@ -63,11 +63,11 @@ export async function getPortfolioReviewResults(
 ) {
   const filter = rebalanceOnly ? ' AND rebalance IS TRUE' : '';
   const totalRes = await db.query(
-    `SELECT COUNT(*) as count FROM agent_review_result WHERE portfolio_workflow_id = $1${filter}`,
+    `SELECT COUNT(*) as count FROM review_result WHERE portfolio_workflow_id = $1${filter}`,
     [portfolioWorkflowId],
   );
   const { rows } = await db.query(
-    `SELECT id, log, rebalance, short_report, error, created_at, raw_log_id FROM agent_review_result WHERE portfolio_workflow_id = $1${filter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    `SELECT id, log, rebalance, short_report, error, created_at, raw_log_id FROM review_result WHERE portfolio_workflow_id = $1${filter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
     [portfolioWorkflowId, limit, offset],
   );
   const entities = rows.map(
@@ -78,7 +78,7 @@ export async function getPortfolioReviewResults(
 
 export async function getRebalanceInfo(portfolioWorkflowId: string, id: string) {
   const { rows } = await db.query(
-    'SELECT rebalance, log FROM agent_review_result WHERE id = $1 AND portfolio_workflow_id = $2',
+    'SELECT rebalance, log FROM review_result WHERE id = $1 AND portfolio_workflow_id = $2',
     [id, portfolioWorkflowId],
   );
   if (!rows[0]) return undefined;

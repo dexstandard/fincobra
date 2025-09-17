@@ -4,7 +4,7 @@ import type { ReviewRawLogInsert, ReviewRawLog } from './raw-log.types.js';
 
 export async function insertReviewRawLog(entry: ReviewRawLogInsert): Promise<string> {
   const { rows } = await db.query(
-    'INSERT INTO agent_review_raw_log (portfolio_workflow_id, prompt, response) VALUES ($1, $2, $3) RETURNING id',
+    'INSERT INTO review_raw_log (portfolio_workflow_id, prompt, response) VALUES ($1, $2, $3) RETURNING id',
     [
       entry.portfolioWorkflowId,
       JSON.stringify(entry.prompt),
@@ -19,8 +19,8 @@ export async function getPromptForReviewResult(
   resultId: string,
 ): Promise<string | null> {
   const { rows } = await db.query(
-    `SELECT rl.prompt FROM agent_review_result rr
-     JOIN agent_review_raw_log rl ON rr.raw_log_id = rl.id
+    `SELECT rl.prompt FROM review_result rr
+     JOIN review_raw_log rl ON rr.raw_log_id = rl.id
      WHERE rr.id = $1 AND rr.portfolio_workflow_id = $2`,
     [resultId, portfolioWorkflowId],
   );

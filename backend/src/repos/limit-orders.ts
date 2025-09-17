@@ -38,7 +38,7 @@ export async function getLimitOrdersByReviewResult(
   const { rows } = await db.query(
     `SELECT e.planned_json, e.status, e.created_at, e.order_id, e.cancellation_reason
        FROM limit_order e
-       JOIN agent_review_result r ON e.review_result_id = r.id
+       JOIN review_result r ON e.review_result_id = r.id
       WHERE r.portfolio_workflow_id = $1 AND e.review_result_id = $2`,
     [portfolioWorkflowId, reviewResultId],
   );
@@ -55,7 +55,7 @@ export async function getOpenLimitOrdersForWorkflow(portfolioWorkflowId: string)
   const { rows } = await db.query(
     `SELECT e.user_id, e.order_id, e.planned_json
        FROM limit_order e
-       JOIN agent_review_result r ON e.review_result_id = r.id
+       JOIN review_result r ON e.review_result_id = r.id
       WHERE r.portfolio_workflow_id = $1 AND e.status = 'open'`,
     [portfolioWorkflowId],
   );
@@ -66,7 +66,7 @@ export async function getAllOpenLimitOrders() {
   const { rows } = await db.query(
     `SELECT e.user_id, e.order_id, e.planned_json, r.portfolio_workflow_id, pw.status AS workflow_status
        FROM limit_order e
-       JOIN agent_review_result r ON e.review_result_id = r.id
+       JOIN review_result r ON e.review_result_id = r.id
        JOIN portfolio_workflow pw ON r.portfolio_workflow_id = pw.id
       WHERE e.status = 'open'`,
   );
