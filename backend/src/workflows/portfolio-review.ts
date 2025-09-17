@@ -11,11 +11,11 @@ import {
 } from '../agents/main-trader.js';
 import { runNewsAnalyst } from '../agents/news-analyst.js';
 import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
-import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
+import { insertReviewRawLog } from '../repos/review-raw-log.js';
 import { getOpenLimitOrdersForAgent } from '../repos/limit-orders.js';
 import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
-import { insertReviewResult } from '../repos/agent-review-result.js';
+import { insertReviewResult } from '../repos/review-result.js';
 import type {
   CreateReviewResult
 } from '../repos/review-result.types.js';

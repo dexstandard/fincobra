@@ -11,7 +11,7 @@ import {
   stopAgent as repoStopAgent,
   type PortfolioWorkflowRow,
 } from '../repos/portfolio-workflow.js';
-import { getAgentReviewResults } from '../repos/agent-review-result.js';
+import { getAgentReviewResults } from '../repos/review-result.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import {
   reviewAgentPortfolio,
@@ -33,8 +33,8 @@ import {
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
-import { getRebalanceInfo } from '../repos/agent-review-result.js';
-import { getPromptForReviewResult } from '../repos/agent-review-raw-log.js';
+import { getRebalanceInfo } from '../repos/review-result.js';
+import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import { parseParams } from '../util/validation.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { parseBinanceError } from '../services/binance.js';

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { parseExecLog } from '../src/util/parse-exec-log.js';
-import { insertReviewResult } from '../src/repos/agent-review-result.js';
+import { insertReviewResult } from '../src/repos/review-result';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewRawLog } from './repos/agent-review-raw-log.js';
