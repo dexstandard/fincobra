@@ -5,7 +5,7 @@ import { decrypt } from '../util/crypto.js';
 import { requireUserIdMatch } from '../util/auth.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { getAiKeyRow } from '../repos/api-keys.js';
+import { getAiKeyRow } from '../repos/ai-api-key.js';
 import { parseParams } from '../util/validation.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
@@ -40,7 +40,7 @@ export default async function modelsRoutes(app: FastifyInstance) {
       if (!row?.own && row?.shared?.model) {
         return { models: [row.shared.model] };
       }
-      const enc = row?.own?.ai_api_key_enc ?? row?.shared?.ai_api_key_enc;
+      const enc = row?.own?.aiApiKeyEnc ?? row?.shared?.aiApiKeyEnc;
       if (!enc)
         return reply
           .code(404)

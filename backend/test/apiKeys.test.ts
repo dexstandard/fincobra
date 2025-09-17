@@ -15,12 +15,14 @@ import buildServer from '../src/server.js';
 import { insertUser, insertAdminUser } from './repos/users.js';
 import {
   getAiKeyRow,
-  getBinanceKeyRow,
   setAiKey,
-  setBinanceKey,
   shareAiKey,
   hasAiKeyShare,
-} from '../src/repos/api-keys.js';
+} from '../src/repos/ai-api-key.js';
+import {
+  getBinanceKeyRow,
+  setBinanceKey,
+} from '../src/repos/exchange-api-keys.js';
 import { insertAgent, getPortfolioWorkflow } from './repos/portfolio-workflow.js';
 import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
@@ -52,7 +54,7 @@ describe('AI API key routes', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({ error: 'verification failed' });
     let row = await getAiKeyRow(userId);
-    expect(row?.own?.ai_api_key_enc).toBeUndefined();
+    expect(row?.own?.aiApiKeyEnc).toBeUndefined();
 
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     res = await app.inject({
@@ -64,7 +66,7 @@ describe('AI API key routes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ key: '<REDACTED>' });
     row = await getAiKeyRow(userId);
-    expect(row?.own?.ai_api_key_enc).not.toBe(key1);
+    expect(row?.own?.aiApiKeyEnc).not.toBe(key1);
 
     res = await app.inject({
       method: 'GET',
@@ -135,7 +137,7 @@ describe('AI API key routes', () => {
     const adminId = await insertAdminUser('admin1', encrypt('admin@example.com', process.env.KEY_PASSWORD!));
     const userId = await insertUser('u1', encrypt('user@example.com', process.env.KEY_PASSWORD!));
     const ai = encrypt('aikey1234567890', process.env.KEY_PASSWORD!);
-    await setAiKey(adminId, ai);
+    await setAiKey({ userId: adminId, apiKeyEnc: ai });
 
     let res = await app.inject({
       method: 'POST',
@@ -256,8 +258,8 @@ describe('Binance API key routes', () => {
       error: 'verification failed: Invalid API-key',
     });
     let row = await getBinanceKeyRow(userId);
-    expect(row!.binance_api_key_enc).toBeNull();
-    expect(row!.binance_api_secret_enc).toBeNull();
+    expect(row!.binanceApiKeyEnc).toBeNull();
+    expect(row!.binanceApiSecretEnc).toBeNull();
 
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
@@ -273,8 +275,8 @@ describe('Binance API key routes', () => {
       secret: '<REDACTED>',
     });
     row = await getBinanceKeyRow(userId);
-    expect(row!.binance_api_key_enc).not.toBe(key1);
-    expect(row!.binance_api_secret_enc).not.toBe(secret1);
+    expect(row!.binanceApiKeyEnc).not.toBe(key1);
+    expect(row!.binanceApiSecretEnc).not.toBe(secret1);
 
     res = await app.inject({
       method: 'GET',
@@ -369,8 +371,12 @@ describe('key deletion effects on agents', () => {
     const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
     const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
     const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-    await setAiKey(userId, ai);
-    await setBinanceKey(userId, bk, bs);
+    await setAiKey({ userId, apiKeyEnc: ai });
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: bk,
+      apiSecretEnc: bs,
+    });
     const agent = await insertAgent({
       userId,
       model: 'gpt-5',
@@ -419,8 +425,12 @@ describe('key deletion effects on agents', () => {
     const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
     const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
     const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-    await setAiKey(userId, ai);
-    await setBinanceKey(userId, bk, bs);
+    await setAiKey({ userId, apiKeyEnc: ai });
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: bk,
+      apiSecretEnc: bs,
+    });
     const agent = await insertAgent({
       userId,
       model: 'gpt-5',
@@ -476,9 +486,17 @@ describe('key deletion effects on agents', () => {
     const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
     const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
     const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-    await setAiKey(adminId, ai);
-    await setBinanceKey(userId, bk, bs);
-    await shareAiKey(adminId, userId, 'gpt-5');
+    await setAiKey({ userId: adminId, apiKeyEnc: ai });
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: bk,
+      apiSecretEnc: bs,
+    });
+    await shareAiKey({
+      ownerUserId: adminId,
+      targetUserId: userId,
+      model: 'gpt-5',
+    });
     const agent = await insertAgent({
       userId,
       model: 'gpt-5',
@@ -535,9 +553,17 @@ describe('key deletion effects on agents', () => {
     const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
     const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
     const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-    await setAiKey(adminId, ai);
-    await setBinanceKey(userId, bk, bs);
-    await shareAiKey(adminId, userId, 'gpt-5');
+    await setAiKey({ userId: adminId, apiKeyEnc: ai });
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: bk,
+      apiSecretEnc: bs,
+    });
+    await shareAiKey({
+      ownerUserId: adminId,
+      targetUserId: userId,
+      model: 'gpt-5',
+    });
     const agent = await insertAgent({
       userId,
       model: 'gpt-5',
@@ -579,7 +605,10 @@ describe('key deletion effects on agents', () => {
     });
     const keyRow = await getUserApiKeys(userId);
     expect(keyRow?.ai_api_key_enc).toBeNull();
-    const shareExists = await hasAiKeyShare(adminId, userId);
+    const shareExists = await hasAiKeyShare({
+      ownerUserId: adminId,
+      targetUserId: userId,
+    });
     expect(shareExists).toBe(false);
     await app.close();
   });
@@ -598,10 +627,18 @@ describe('key deletion effects on agents', () => {
     const aiUser = encrypt('userkey', process.env.KEY_PASSWORD!);
     const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
     const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-    await setAiKey(adminId, aiAdmin);
-    await setAiKey(userId, aiUser);
-    await setBinanceKey(userId, bk, bs);
-    await shareAiKey(adminId, userId, 'gpt-5');
+    await setAiKey({ userId: adminId, apiKeyEnc: aiAdmin });
+    await setAiKey({ userId, apiKeyEnc: aiUser });
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: bk,
+      apiSecretEnc: bs,
+    });
+    await shareAiKey({
+      ownerUserId: adminId,
+      targetUserId: userId,
+      model: 'gpt-5',
+    });
     const agent = await insertAgent({
       userId,
       model: 'gpt-5',
@@ -649,9 +686,13 @@ describe('key deletion effects on agents', () => {
     const aiUser = encrypt('userkey', process.env.KEY_PASSWORD!);
     const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
     const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-    await setAiKey(adminId, aiAdmin);
-    await setAiKey(userId, aiUser);
-    await setBinanceKey(userId, bk, bs);
+    await setAiKey({ userId: adminId, apiKeyEnc: aiAdmin });
+    await setAiKey({ userId, apiKeyEnc: aiUser });
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: bk,
+      apiSecretEnc: bs,
+    });
     const agent = await insertAgent({
       userId,
       model: 'gpt-5',

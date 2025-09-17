@@ -1,0 +1,46 @@
+import { db } from '../db/index.js';
+import type {
+  BinanceApiKey,
+  BinanceApiKeyUpsert,
+} from './exchange-api-keys.types.js';
+
+export async function getBinanceKeyRow(
+  id: string,
+): Promise<BinanceApiKey | undefined> {
+  const { rows } = await db.query(
+    `SELECT ek.id AS "id",
+            ek.api_key_enc AS "binanceApiKeyEnc",
+            ek.api_secret_enc AS "binanceApiSecretEnc"
+       FROM users u
+       LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance'
+      WHERE u.id = $1`,
+    [id],
+  );
+  const row = rows[0] as
+    | {
+        id: string | null;
+        binanceApiKeyEnc: string | null;
+        binanceApiSecretEnc: string | null;
+      }
+    | undefined;
+  if (!row) return undefined;
+  return {
+    id: row.id ?? null,
+    binanceApiKeyEnc: row.binanceApiKeyEnc ?? null,
+    binanceApiSecretEnc: row.binanceApiSecretEnc ?? null,
+  };
+}
+
+export async function setBinanceKey(entry: BinanceApiKeyUpsert): Promise<void> {
+  await db.query(
+    "INSERT INTO exchange_keys (user_id, provider, api_key_enc, api_secret_enc) VALUES ($3, 'binance', $1, $2) ON CONFLICT (user_id, provider) DO UPDATE SET api_key_enc = EXCLUDED.api_key_enc, api_secret_enc = EXCLUDED.api_secret_enc",
+    [entry.apiKeyEnc, entry.apiSecretEnc, entry.userId],
+  );
+}
+
+export async function clearBinanceKey(id: string): Promise<void> {
+  await db.query(
+    "DELETE FROM exchange_keys WHERE user_id = $1 AND provider = 'binance'",
+    [id],
+  );
+}

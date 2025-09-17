@@ -4,7 +4,7 @@ import {
   findIdenticalDraftAgent,
   findActiveTokenConflicts,
 } from '../repos/portfolio-workflow.js';
-import { getAiKeyRow } from '../repos/api-keys.js';
+import { getAiKeyRow } from '../repos/ai-api-key.js';
 import {
   errorResponse,
   lengthMessage,

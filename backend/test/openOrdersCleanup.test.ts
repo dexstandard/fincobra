@@ -7,7 +7,7 @@ import {
   insertLimitOrder,
   getLimitOrdersByReviewResult,
 } from '../src/repos/limit-orders.js';
-import { setAiKey } from '../src/repos/api-keys.js';
+import { setAiKey } from '../src/repos/ai-api-key.js';
 import { reviewAgentPortfolio } from '../src/workflows/portfolio-review.js';
 
 const sampleIndicators = vi.hoisted(() => ({
@@ -77,7 +77,7 @@ describe('cleanup open orders', () => {
 
   it('cancels open orders before running agent', async () => {
     const userId = await insertUser('1');
-    await setAiKey(userId, 'enc');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertAgent({
       userId,
       model: 'gpt',
@@ -124,7 +124,7 @@ describe('cleanup open orders', () => {
     );
 
     const userId = await insertUser('1');
-    await setAiKey(userId, 'enc');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertAgent({
       userId,
       model: 'gpt',
@@ -179,7 +179,7 @@ describe('cleanup open orders', () => {
     parseBinanceError.mockReturnValueOnce({ code: -2013 });
     fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
     const userId = await insertUser('1');
-    await setAiKey(userId, 'enc');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertAgent({
       userId,
       model: 'gpt',
@@ -221,7 +221,7 @@ describe('cleanup open orders', () => {
     parseBinanceError.mockReturnValueOnce({ code: -2013 });
     fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
     const userId = await insertUser('1');
-    await setAiKey(userId, 'enc');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertAgent({
       userId,
       model: 'gpt',
@@ -261,7 +261,7 @@ describe('cleanup open orders', () => {
   it('marks order filled when cancel returns FILLED', async () => {
     cancelOrder.mockResolvedValueOnce({ status: 'FILLED' } as any);
     const userId = await insertUser('2');
-    await setAiKey(userId, 'enc');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertAgent({
       userId,
       model: 'gpt',
