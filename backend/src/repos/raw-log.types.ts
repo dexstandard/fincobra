@@ -4,7 +4,7 @@ export interface ReviewRawLogInsert {
   response: unknown;
 }
 
-export interface ReviewRawLogEntity {
+export interface ReviewRawLog {
   id: string;
   agentId: string;
   prompt: string;
