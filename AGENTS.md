@@ -26,8 +26,8 @@ Tables:
 - `users` — accounts and encrypted API keys.
 - `limit_order` — records of performed trades.
 - `portfolio_workflow` — user-configured trading workflows.
-- `agent_review_raw_log` — prompt/response history per workflow.
-- `agent_review_result` — outcomes and rebalances.
+- `review_raw_log` — prompt/response history per workflow.
+- `review_result` — outcomes and rebalances.
 
 ### Config
 Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.

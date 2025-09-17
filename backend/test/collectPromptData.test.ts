@@ -54,7 +54,7 @@ vi.mock('../src/services/binance.js', () => ({
   fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../src/repos/agent-review-result.js', () => ({
+vi.mock('../src/repos/review-result.js', () => ({
   getRecentReviewResults: vi.fn().mockResolvedValue(
     Array.from({ length: 5 }, (_, i) => ({
       id: `r${i + 1}`,
@@ -65,7 +65,7 @@ vi.mock('../src/repos/agent-review-result.js', () => ({
 }));
 
 vi.mock('../src/repos/limit-orders.js', () => ({
-  getLimitOrdersByReviewResult: vi.fn().mockImplementation(async (_agentId, reviewId) => {
+  getLimitOrdersByReviewResult: vi.fn().mockImplementation(async (_workflowId, reviewId) => {
     const i = Number(reviewId.slice(1));
     return [
       {

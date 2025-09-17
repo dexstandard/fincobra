@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { getNewsByToken } from '../repos/news.js';
-import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
+import { insertReviewRawLog } from '../repos/review-raw-log.js';
 import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
@@ -82,7 +82,7 @@ export async function runNewsAnalyst(
       const { analysis, prompt: p, response } =
         await getTokenNewsSummaryCached(token, model, apiKey, log);
       if (p && response)
-        await insertReviewRawLog({ portfolioId, prompt: p, response });
+        await insertReviewRawLog({ portfolioWorkflowId: portfolioId, prompt: p, response });
       report.news = analysis;
     }),
   );

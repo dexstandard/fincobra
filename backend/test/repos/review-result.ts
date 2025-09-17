@@ -1,8 +1,8 @@
-import { insertReviewResult as insertReviewResultProd } from '../../src/repos/agent-review-result.js';
+import { insertReviewResult as insertReviewResultProd } from '../../src/repos/review-result.js';
 
 export function insertReviewResult(entry: any) {
   return insertReviewResultProd({
-    portfolioId: entry.portfolioId,
+    portfolioWorkflowId: entry.portfolioWorkflowId,
     log: entry.log,
     rebalance: entry.rebalance,
     shortReport: entry.shortReport,

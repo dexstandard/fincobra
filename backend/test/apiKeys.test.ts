@@ -23,7 +23,7 @@ import {
 } from '../src/repos/api-keys.js';
 import { insertAgent, getPortfolioWorkflow } from './repos/portfolio-workflow.js';
 import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
-import { insertReviewResult } from './repos/agent-review-result.js';
+import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { encrypt } from '../src/util/crypto.js';
 import { removeWorkflowFromSchedule } from '../src/workflows/portfolio-review.js';
@@ -388,7 +388,7 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
-    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
@@ -438,7 +438,7 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
-    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
@@ -496,7 +496,7 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
-    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
@@ -555,7 +555,7 @@ describe('key deletion effects on agents', () => {
       useEarn: true,
     });
 
-    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },

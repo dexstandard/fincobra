@@ -6,7 +6,7 @@ vi.mock('../src/util/tokens.js', () => ({
 }));
 
 const insertReviewRawLogMock = vi.hoisted(() => vi.fn());
-vi.mock('../src/repos/agent-review-raw-log.js', () => ({
+vi.mock('../src/repos/review-raw-log.js', () => ({
   insertReviewRawLog: insertReviewRawLogMock,
 }));
 

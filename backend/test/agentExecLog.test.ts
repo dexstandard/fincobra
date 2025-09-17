@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { parseExecLog } from '../src/util/parse-exec-log.js';
-import { insertReviewResult } from '../src/repos/agent-review-result.js';
+import { insertReviewResult } from '../src/repos/review-result.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { insertReviewRawLog } from './repos/agent-review-raw-log.js';
+import { insertReviewRawLog } from './repos/review-raw-log.js';
 import { insertLimitOrder, getLimitOrder, getLimitOrdersByReviewResult } from './repos/limit-orders.js';
 import { db } from '../src/db/index.js';
 import * as binance from '../src/services/binance.js';
@@ -31,7 +31,7 @@ describe('agent exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId: user1Id,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
@@ -87,7 +87,7 @@ describe('agent exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId: user1Id,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
@@ -141,7 +141,7 @@ describe('agent exec log routes', () => {
       manualRebalance: false,
       useEarn: false,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
@@ -184,12 +184,12 @@ describe('agent exec log routes', () => {
       useEarn: true,
     });
     const rawId = await insertReviewRawLog({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       prompt: { a: 1 },
       response: 'resp',
     });
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rawLogId: rawId,
     });
@@ -232,10 +232,10 @@ describe('agent exec log routes', () => {
     const agentId = agent.id;
 
     for (let i = 0; i < 3; i++) {
-      await insertReviewRawLog({ portfolioId: agentId, prompt: `prompt-${i}`, response: `log-${i}` });
+      await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: `prompt-${i}`, response: `log-${i}` });
       const parsed = parseExecLog(`log-${i}`);
       await insertReviewResult({
-        portfolioId: agentId,
+        portfolioWorkflowId: agentId,
         log: parsed.response ? JSON.stringify(parsed.response) : parsed.text,
         ...(parsed.response
           ? {
@@ -306,10 +306,10 @@ describe('agent exec log routes', () => {
       ],
     });
 
-    await insertReviewRawLog({ portfolioId: agentId, prompt: 'p', response: aiLog });
+    await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: 'p', response: aiLog });
     const parsedAi = parseExecLog(aiLog);
     await insertReviewResult({
-      portfolioId: agentId,
+      portfolioWorkflowId: agentId,
       log: JSON.stringify(parsedAi.response),
       rebalance: true,
       shortReport: parsedAi.response?.shortReport,
@@ -361,10 +361,10 @@ describe('agent exec log routes', () => {
     });
     const agentId = agent.id;
     const entry = JSON.stringify({ prompt: { instructions: 'inst' }, response: 'ok' });
-    await insertReviewRawLog({ portfolioId: agentId, prompt: 'p', response: entry });
+    await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: 'p', response: entry });
     const parsedP = parseExecLog(entry);
     await insertReviewResult({
-      portfolioId: agentId,
+      portfolioWorkflowId: agentId,
       log: parsedP.response ? JSON.stringify(parsedP.response) : parsedP.text,
       ...(parsedP.response
         ? {
@@ -419,7 +419,7 @@ describe('agent exec log routes', () => {
       shortReport: 's',
     } as const;
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: JSON.stringify(decision),
       rebalance: true,
       shortReport: 's',
@@ -493,7 +493,7 @@ describe('agent exec log routes', () => {
       shortReport: 's',
     } as const;
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: JSON.stringify(decision),
       rebalance: true,
       shortReport: 's',
@@ -559,7 +559,7 @@ describe('agent exec log routes', () => {
       shortReport: 's',
     } as const;
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: JSON.stringify(decision),
       rebalance: true,
       shortReport: 's',
@@ -613,7 +613,7 @@ describe('agent exec log routes', () => {
       shortReport: 's',
     } as const;
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: JSON.stringify(decision),
       rebalance: true,
       shortReport: 's',
@@ -684,8 +684,8 @@ describe('agent exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    await insertReviewResult({ portfolioId: agent.id, log: 'no', rebalance: false });
-    await insertReviewResult({ portfolioId: agent.id, log: 'yes', rebalance: true });
+    await insertReviewResult({ portfolioWorkflowId: agent.id, log: 'no', rebalance: false });
+    await insertReviewResult({ portfolioWorkflowId: agent.id, log: 'yes', rebalance: true });
     const res = await app.inject({
       method: 'GET',
       url: `/api/portfolio-workflows/${agent.id}/exec-log?rebalanceOnly=true`,

@@ -36,7 +36,7 @@ vi.mock('../src/services/binance.js', () => ({
   fetchFearGreedIndex: fetchFearGreedIndexMock,
   fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../src/repos/agent-review-raw-log.js', () => ({
+vi.mock('../src/repos/review-raw-log.js', () => ({
   insertReviewRawLog: insertReviewRawLogMock,
 }));
 vi.mock('../src/services/indicators.js', () => ({

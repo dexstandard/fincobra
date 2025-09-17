@@ -11,11 +11,11 @@ import {
 } from '../agents/main-trader.js';
 import { runNewsAnalyst } from '../agents/news-analyst.js';
 import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
-import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
-import { getOpenLimitOrdersForAgent } from '../repos/limit-orders.js';
+import { insertReviewRawLog } from '../repos/review-raw-log.js';
+import { getOpenLimitOrdersForWorkflow } from '../repos/limit-orders.js';
 import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
-import { insertReviewResult } from '../repos/agent-review-result.js';
+import { insertReviewResult } from '../repos/review-result.js';
 import type {
   ReviewResultInsert
 } from '../repos/review-result.types.js';
@@ -88,7 +88,7 @@ async function cleanupOpenOrders(
   wf: ActivePortfolioWorkflowRow,
   log: FastifyBaseLogger,
 ) {
-  const orders = await getOpenLimitOrdersForAgent(wf.id);
+  const orders = await getOpenLimitOrdersForWorkflow(wf.id);
   const limit = (pLimit as any)(5);
   await Promise.all(
     orders.map((o) =>
@@ -123,15 +123,17 @@ function buildReviewResultEntry({
   logId: string;
   validationError?: string;
 }): ReviewResultInsert {
-    const ok = !!decision && !validationError;
+  const ok = !!decision && !validationError;
 
-    return {
-        portfolioId: workflowId,
-        log: decision ? JSON.stringify(decision) : "",
-        rawLogId: logId,
-        rebalance: ok ? decision.orders.length > 0 : false,
-        ...(ok ? {shortReport: decision.shortReport} : {error: {message: validationError ?? "decision unavailable"}}),
-    };
+  return {
+    portfolioWorkflowId: workflowId,
+    log: decision ? JSON.stringify(decision) : '',
+    rawLogId: logId,
+    rebalance: ok ? decision.orders.length > 0 : false,
+    ...(ok
+      ? { shortReport: decision.shortReport }
+      : { error: { message: validationError ?? 'decision unavailable' } }),
+  };
 }
 
 export async function executeWorkflow(
@@ -175,7 +177,7 @@ export async function executeWorkflow(
     const decision = await runStep('runMainTrader', () => runMainTrader(params, prompt!));
     const logId = await runStep('insertReviewRawLog', () =>
       insertReviewRawLog({
-        portfolioId: wf.id,
+        portfolioWorkflowId: wf.id,
         prompt: prompt!,
         response: decision,
       }),
@@ -217,35 +219,34 @@ async function saveFailure(
   message: string,
   prompt: RebalancePrompt,
 ) {
-    const rawLogId = await insertReviewRawLog({
-        portfolioId: row.id,
-        prompt,
-        response: { error: message },
-    });
+  const rawLogId = await insertReviewRawLog({
+    portfolioWorkflowId: row.id,
+    prompt,
+    response: { error: message },
+  });
 
-    const parsed = parseExecLog({ error: message });
+  const parsed = parseExecLog({ error: message });
 
-    const rebalance =
-        Array.isArray(parsed.response?.orders) &&
-        parsed.response!.orders.length > 0;
+  const rebalance =
+    Array.isArray(parsed.response?.orders) && parsed.response!.orders.length > 0;
 
-    const entry: ReviewResultInsert = {
-        portfolioId: row.id,
-        log: parsed.text,
-        rawLogId,
-        rebalance,
-        ...(parsed.response?.shortReport != null && {
-            shortReport: parsed.response.shortReport,
-        }),
-        error: {
-            message:
-                typeof (parsed.error as any)?.message === "string"
-                    ? String((parsed.error as any).message)
-                    : message,
-        },
-    };
+  const entry: ReviewResultInsert = {
+    portfolioWorkflowId: row.id,
+    log: parsed.text,
+    rawLogId,
+    rebalance,
+    ...(parsed.response?.shortReport != null && {
+      shortReport: parsed.response.shortReport,
+    }),
+    error: {
+      message:
+        typeof (parsed.error as any)?.message === 'string'
+          ? String((parsed.error as any).message)
+          : message,
+    },
+  };
 
-    await insertReviewResult(entry);
+  await insertReviewResult(entry);
 }
 
 export { reviewPortfolio as reviewAgentPortfolio };

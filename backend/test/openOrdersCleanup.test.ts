@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { insertReviewResult } from './repos/agent-review-result.js';
+import { insertReviewResult } from './repos/review-result.js';
 import { mockLogger } from './helpers.js';
 import {
   insertLimitOrder,
@@ -95,7 +95,7 @@ describe('cleanup open orders', () => {
       useEarn: false,
     });
     const rrId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rebalance: true,
       shortReport: 's',
@@ -142,7 +142,7 @@ describe('cleanup open orders', () => {
       useEarn: false,
     });
     const rrId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rebalance: true,
       shortReport: 's',
@@ -197,7 +197,7 @@ describe('cleanup open orders', () => {
       useEarn: false,
     });
     const rrId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rebalance: true,
       shortReport: 's',
@@ -239,7 +239,7 @@ describe('cleanup open orders', () => {
       useEarn: false,
     });
     const rrId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rebalance: true,
       shortReport: 's',
@@ -279,7 +279,7 @@ describe('cleanup open orders', () => {
       useEarn: false,
     });
     const rrId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rebalance: true,
       shortReport: 's',

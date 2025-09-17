@@ -3,7 +3,7 @@ export interface ReviewResultError {
 }
 
 export interface ReviewResultInsert {
-  portfolioId: string;
+  portfolioWorkflowId: string;
   log: string;
   rebalance: boolean;
   shortReport?: string;
