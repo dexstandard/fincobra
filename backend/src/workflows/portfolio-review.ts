@@ -17,7 +17,7 @@ import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
 import { insertReviewResult } from '../repos/agent-review-result.js';
 import type {
-  CreateReviewResult
+  ReviewResultInsert
 } from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
@@ -122,7 +122,7 @@ function buildReviewResultEntry({
   decision: MainTraderDecision | null;
   logId: string;
   validationError?: string;
-}): CreateReviewResult {
+}): ReviewResultInsert {
     const ok = !!decision && !validationError;
 
     return {
@@ -229,7 +229,7 @@ async function saveFailure(
         Array.isArray(parsed.response?.orders) &&
         parsed.response!.orders.length > 0;
 
-    const entry: CreateReviewResult = {
+    const entry: ReviewResultInsert = {
         portfolioId: row.id,
         log: parsed.text,
         rawLogId,

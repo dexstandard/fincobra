@@ -2,7 +2,7 @@ export interface ReviewResultError {
   message: string;
 }
 
-export interface CreateReviewResult {
+export interface ReviewResultInsert {
   portfolioId: string;
   log: string;
   rebalance: boolean;
@@ -21,7 +21,7 @@ export interface ReviewResult {
   createdAt: Date;
 }
 
-export interface ReviewResultShort {
+export interface ReviewResultSummary {
   id: string;
   createdAt: Date;
   rebalance: boolean;

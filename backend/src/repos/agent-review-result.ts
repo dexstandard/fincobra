@@ -4,11 +4,11 @@ import type {
   ReviewRebalanceInfo,
   ReviewResult,
   ReviewResultError,
-  CreateReviewResult,
-  ReviewResultShort,
+  ReviewResultInsert,
+  ReviewResultSummary,
 } from './review-result.types.js';
 
-export async function insertReviewResult(entry: CreateReviewResult): Promise<string> {
+export async function insertReviewResult(entry: ReviewResultInsert): Promise<string> {
   const { rows } = await db.query(
     'INSERT INTO agent_review_result (agent_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
     [
@@ -26,7 +26,7 @@ export async function insertReviewResult(entry: CreateReviewResult): Promise<str
 export async function getRecentReviewResults(
   portfolioId: string,
   limit: number,
-): Promise<ReviewResultShort[]> {
+): Promise<ReviewResultSummary[]> {
   const { rows } = await db.query(
     'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM agent_review_result WHERE agent_id = $1 ORDER BY created_at DESC LIMIT $2',
     [portfolioId, limit],
@@ -36,7 +36,7 @@ export async function getRecentReviewResults(
       ReviewResult,
       'id' | 'createdAt' | 'rebalance' | 'shortReport' | 'error'
     >;
-    const summary: ReviewResultShort = {
+    const summary: ReviewResultSummary = {
       id: entity.id,
       createdAt: entity.createdAt,
       rebalance: entity.rebalance ?? false,
