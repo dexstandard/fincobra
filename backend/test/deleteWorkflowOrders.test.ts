@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { insertUserWithKeys } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { insertReviewResult } from './repos/agent-review-result.js';
+import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { getLimitOrdersByReviewResult } from '../src/repos/limit-orders.js';
 import { authCookies } from './helpers.js';
@@ -44,7 +44,7 @@ describe('delete workflow cancels all orders', () => {
       manualRebalance: false,
       useEarn: false,
     });
-    const rrId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },

@@ -14,7 +14,7 @@ import { cancelLimitOrder } from '../services/limit-order.js';
 interface Order {
   user_id: string;
   order_id: string;
-  agent_status: string;
+  workflow_status: string;
   planned_json: string;
 }
 
@@ -124,12 +124,12 @@ async function reconcileOrder(
     }
     return;
   }
-  if (o.agent_status !== 'active') {
+  if (o.workflow_status !== 'active') {
     try {
       await cancelLimitOrder(o.user_id, {
         symbol,
         orderId: o.order_id,
-        reason: 'Agent inactive',
+        reason: 'Workflow inactive',
       });
     } catch (err) {
       log.error({ err }, 'failed to cancel order');

@@ -1,12 +1,12 @@
 export interface ReviewRawLogInsert {
-  portfolioId: string;
+  portfolioWorkflowId: string;
   prompt: unknown;
   response: unknown;
 }
 
 export interface ReviewRawLog {
   id: string;
-  agentId: string;
+  portfolioWorkflowId: string;
   prompt: string;
   response: string | null;
   createdAt: Date;

@@ -8,7 +8,7 @@ import {
   setAgentStatus,
   getPortfolioWorkflowStatus,
 } from './repos/portfolio-workflow.js';
-import { insertReviewResult } from './repos/agent-review-result.js';
+import { insertReviewResult } from './repos/review-result.js';
 import {
   insertLimitOrder,
   getLimitOrdersByReviewResult,
@@ -155,7 +155,7 @@ describe('agent routes', () => {
     expect(res.json()).toMatchObject({ total: 1, page: 1, pageSize: 10 });
     expect(res.json().items).toHaveLength(1);
 
-    const execId = await insertReviewResult({ portfolioId: id, log: '' });
+    const execId = await insertReviewResult({ portfolioWorkflowId: id, log: '' });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },

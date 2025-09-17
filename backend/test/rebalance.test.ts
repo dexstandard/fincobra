@@ -3,7 +3,7 @@ import { getLimitOrders, clearLimitOrders } from './repos/limit-orders.js';
 import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { insertReviewResult } from './repos/agent-review-result.js';
+import { insertReviewResult } from './repos/review-result.js';
 import { db } from '../src/db/index.js';
 
 vi.mock('../src/services/binance.js', () => ({
@@ -48,7 +48,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -111,7 +111,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -175,7 +175,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -239,7 +239,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -299,7 +299,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -356,7 +356,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -406,7 +406,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -458,7 +458,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -510,7 +510,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -561,7 +561,7 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',

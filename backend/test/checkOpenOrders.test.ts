@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import checkOpenOrders from '../src/jobs/check-open-orders.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { insertReviewResult } from './repos/agent-review-result.js';
+import { insertReviewResult } from './repos/review-result.js';
 import {
   insertLimitOrder,
   getLimitOrder,
@@ -53,7 +53,7 @@ describe('checkOpenOrders job', () => {
       useEarn: false,
     });
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rebalance: true,
       newAllocation: 50,

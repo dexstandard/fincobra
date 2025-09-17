@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { callAi } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import { fetchAccount, fetchPairData, fetchPairInfo } from '../services/binance.js';
-import { getRecentReviewResults } from '../repos/agent-review-result.js';
+import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import type { ActivePortfolioWorkflowRow } from '../repos/portfolio-workflow.js';
 import type {

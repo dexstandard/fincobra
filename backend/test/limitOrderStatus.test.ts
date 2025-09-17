@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { insertReviewResult } from '../src/repos/agent-review-result.js';
+import { insertReviewResult } from '../src/repos/review-result.js';
 import {
   insertLimitOrder,
   getLimitOrder,
@@ -32,7 +32,7 @@ describe('updateLimitOrderStatus', () => {
       useEarn: true,
     });
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: '',
     });
     await insertLimitOrder({

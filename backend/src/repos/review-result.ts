@@ -10,9 +10,9 @@ import type {
 
 export async function insertReviewResult(entry: ReviewResultInsert): Promise<string> {
   const { rows } = await db.query(
-    'INSERT INTO agent_review_result (agent_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+    'INSERT INTO agent_review_result (portfolio_workflow_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
     [
-      entry.portfolioId,
+      entry.portfolioWorkflowId,
       entry.log,
       entry.rebalance ?? false,
       entry.shortReport ?? null,
@@ -24,12 +24,12 @@ export async function insertReviewResult(entry: ReviewResultInsert): Promise<str
 }
 
 export async function getRecentReviewResults(
-  portfolioId: string,
+  portfolioWorkflowId: string,
   limit: number,
 ): Promise<ReviewResultSummary[]> {
   const { rows } = await db.query(
-    'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM agent_review_result WHERE agent_id = $1 ORDER BY created_at DESC LIMIT $2',
-    [portfolioId, limit],
+    'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM agent_review_result WHERE portfolio_workflow_id = $1 ORDER BY created_at DESC LIMIT $2',
+    [portfolioWorkflowId, limit],
   );
   return rows.map((row) => {
     const entity = convertKeysToCamelCase(row) as Pick<
@@ -55,20 +55,20 @@ export async function getRecentReviewResults(
   });
 }
 
-export async function getAgentReviewResults(
-  portfolioId: string,
+export async function getPortfolioReviewResults(
+  portfolioWorkflowId: string,
   limit: number,
   offset: number,
   rebalanceOnly = false,
 ) {
   const filter = rebalanceOnly ? ' AND rebalance IS TRUE' : '';
   const totalRes = await db.query(
-    `SELECT COUNT(*) as count FROM agent_review_result WHERE agent_id = $1${filter}`,
-    [portfolioId],
+    `SELECT COUNT(*) as count FROM agent_review_result WHERE portfolio_workflow_id = $1${filter}`,
+    [portfolioWorkflowId],
   );
   const { rows } = await db.query(
-    `SELECT id, log, rebalance, short_report, error, created_at, raw_log_id FROM agent_review_result WHERE agent_id = $1${filter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-    [portfolioId, limit, offset],
+    `SELECT id, log, rebalance, short_report, error, created_at, raw_log_id FROM agent_review_result WHERE portfolio_workflow_id = $1${filter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    [portfolioWorkflowId, limit, offset],
   );
   const entities = rows.map(
     (row) => convertKeysToCamelCase(row) as ReviewResult,
@@ -76,10 +76,10 @@ export async function getAgentReviewResults(
   return { rows: entities, total: Number(totalRes.rows[0].count) };
 }
 
-export async function getRebalanceInfo(portfolioId: string, id: string) {
+export async function getRebalanceInfo(portfolioWorkflowId: string, id: string) {
   const { rows } = await db.query(
-    'SELECT rebalance, log FROM agent_review_result WHERE id = $1 AND agent_id = $2',
-    [id, portfolioId],
+    'SELECT rebalance, log FROM agent_review_result WHERE id = $1 AND portfolio_workflow_id = $2',
+    [id, portfolioWorkflowId],
   );
   if (!rows[0]) return undefined;
   return convertKeysToCamelCase(rows[0]) as ReviewRebalanceInfo;

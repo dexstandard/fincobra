@@ -11,7 +11,7 @@ import {
   stopAgent as repoStopAgent,
   type PortfolioWorkflowRow,
 } from '../repos/portfolio-workflow.js';
-import { getAgentReviewResults } from '../repos/agent-review-result.js';
+import { getPortfolioReviewResults } from '../repos/review-result.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import {
   reviewAgentPortfolio,
@@ -29,12 +29,12 @@ import {
 } from '../util/agents.js';
 import {
   getLimitOrdersByReviewResult,
-  getOpenLimitOrdersForAgent,
+  getOpenLimitOrdersForWorkflow,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
-import { getRebalanceInfo } from '../repos/agent-review-result.js';
-import { getPromptForReviewResult } from '../repos/agent-review-raw-log.js';
+import { getRebalanceInfo } from '../repos/review-result.js';
+import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import { parseParams } from '../util/validation.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { parseBinanceError } from '../services/binance.js';
@@ -210,7 +210,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ps = Math.max(parseInt(pageSize, 10), 1);
       const offset = (p - 1) * ps;
       const ro = rebalanceOnly === 'true';
-      const { rows, total } = await getAgentReviewResults(id, ps, offset, ro);
+      const { rows, total } = await getPortfolioReviewResults(id, ps, offset, ro);
       log.info('fetched exec log');
       return {
         items: rows.map((r) => {
@@ -513,7 +513,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { userId, id, log } = ctx;
       await repoDeleteAgent(id);
       removeWorkflowFromSchedule(id);
-      const openOrders = await getOpenLimitOrdersForAgent(id);
+      const openOrders = await getOpenLimitOrdersForWorkflow(id);
       for (const o of openOrders) {
         let symbol: string | undefined;
         try {
