@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
-import { getOpenLimitOrdersForWorkflow, updateLimitOrderStatus } from '../repos/limit-orders.js';
-import { cancelLimitOrder } from '../services/limit-order.js';
+import { getOpenLimitOrdersForWorkflow, updateLimitOrderStatus } from '../../repos/limit-orders.js';
+import { cancelLimitOrder } from '../../services/limit-order.js';
 
 export const userIdParams = z.object({ id: z.string().regex(/^\d+$/) });
 

@@ -27,7 +27,7 @@ import {
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
 import { parseParams } from '../util/validation.js';
-import { cancelOrdersForWorkflow, userIdParams } from './api-key-helpers.js';
+import { cancelOrdersForWorkflow, userIdParams } from './helpers/api-key-helpers.js';
 
 export default async function aiApiKeyRoutes(app: FastifyInstance) {
   app.post(

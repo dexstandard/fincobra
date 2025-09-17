@@ -22,7 +22,7 @@ import {
 } from '../util/api-keys.js';
 import { errorResponse } from '../util/errorMessages.js';
 import { parseParams } from '../util/validation.js';
-import { cancelOrdersForWorkflow, userIdParams } from './api-key-helpers.js';
+import { cancelOrdersForWorkflow, userIdParams } from './helpers/api-key-helpers.js';
 
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
   app.post(
