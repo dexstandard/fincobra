@@ -40,7 +40,7 @@ export default async function modelsRoutes(app: FastifyInstance) {
       if (!row?.own && row?.shared?.model) {
         return { models: [row.shared.model] };
       }
-      const enc = row?.own?.ai_api_key_enc ?? row?.shared?.ai_api_key_enc;
+      const enc = row?.own?.aiApiKeyEnc ?? row?.shared?.aiApiKeyEnc;
       if (!enc)
         return reply
           .code(404)

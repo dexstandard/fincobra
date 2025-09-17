@@ -86,7 +86,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
   const row = await getAiKeyRow(id);
       let err = ensureUser(row);
       if (err) return reply.code(err.code).send(err.body);
-      err = ensureKeyAbsent(row?.own, ['ai_api_key_enc']);
+      err = ensureKeyAbsent(row?.own, ['aiApiKeyEnc']);
       if (err) return reply.code(err.code).send(err.body);
       if (!(await verifyApiKey(ApiKeyType.Ai, key)))
         return reply.code(400).send(errorResponse('verification failed'));
@@ -140,7 +140,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       if (!requireUserIdMatch(req, reply, id)) return;
       const { key } = req.body as { key: string };
       const row = await getAiKeyRow(id);
-      if (!row?.own?.ai_api_key_enc)
+      if (!row?.own?.aiApiKeyEnc)
         return reply
           .code(404)
           .send(errorResponse(ERROR_MESSAGES.notFound));
@@ -161,7 +161,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       const { id } = params;
       if (!requireUserIdMatch(req, reply, id)) return;
       const row = await getAiKeyRow(id);
-      if (!row?.own?.ai_api_key_enc)
+      if (!row?.own?.aiApiKeyEnc)
         return reply
           .code(404)
           .send(errorResponse(ERROR_MESSAGES.notFound));
@@ -211,7 +211,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       if (!model)
         return reply.code(400).send(errorResponse('model required'));
       const row = await getAiKeyRow(id);
-      const err = ensureKeyPresent(row?.own, ['ai_api_key_enc']);
+      const err = ensureKeyPresent(row?.own, ['aiApiKeyEnc']);
       if (err) return reply.code(err.code).send(err.body);
       const target = await findUserByEmail(email);
       if (!target) return reply.code(404).send(errorResponse('user not found'));
@@ -264,7 +264,7 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       const row = await getBinanceKeyRow(id);
       let err = ensureUser(row);
       if (err) return reply.code(err.code).send(err.body);
-      err = ensureKeyAbsent(row, ['binance_api_key_enc', 'binance_api_secret_enc']);
+      err = ensureKeyAbsent(row, ['binanceApiKeyEnc', 'binanceApiSecretEnc']);
       if (err) return reply.code(err.code).send(err.body);
       const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
       if (verRes !== true)
@@ -298,12 +298,12 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       if (!requireUserIdMatch(req, reply, id)) return;
       const row = await getBinanceKeyRow(id);
       const err = ensureKeyPresent(row, [
-        'binance_api_key_enc',
-        'binance_api_secret_enc',
+        'binanceApiKeyEnc',
+        'binanceApiSecretEnc',
       ]);
       if (err) return reply.code(err.code).send(err.body);
-      const key = decryptKey(row!.binance_api_key_enc!);
-      const secret = decryptKey(row!.binance_api_secret_enc!);
+      const key = decryptKey(row!.binanceApiKeyEnc!);
+      const secret = decryptKey(row!.binanceApiSecretEnc!);
       return { key: '<REDACTED>', secret: '<REDACTED>' };
     },
   );
@@ -319,8 +319,8 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       const { key, secret } = req.body as { key: string; secret: string };
       const row = await getBinanceKeyRow(id);
       const err = ensureKeyPresent(row, [
-        'binance_api_key_enc',
-        'binance_api_secret_enc',
+        'binanceApiKeyEnc',
+        'binanceApiSecretEnc',
       ]);
       if (err) return reply.code(err.code).send(err.body);
       const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
@@ -355,8 +355,8 @@ export default async function apiKeyRoutes(app: FastifyInstance) {
       if (!requireUserIdMatch(req, reply, id)) return;
       const row = await getBinanceKeyRow(id);
       const err = ensureKeyPresent(row, [
-        'binance_api_key_enc',
-        'binance_api_secret_enc',
+        'binanceApiKeyEnc',
+        'binanceApiSecretEnc',
       ]);
       if (err) return reply.code(err.code).send(err.body);
       const agents = await getActivePortfolioWorkflowsByUser(id);

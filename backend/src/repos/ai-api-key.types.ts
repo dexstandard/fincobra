@@ -1,6 +1,6 @@
 export interface AiApiKeyDetails {
   id: string;
-  ai_api_key_enc: string;
+  aiApiKeyEnc: string;
 }
 
 export interface SharedAiApiKeyDetails extends AiApiKeyDetails {

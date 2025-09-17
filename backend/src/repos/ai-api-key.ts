@@ -1,4 +1,5 @@
 import { db } from '../db/index.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
   AiApiKeyRow,
   AiApiKeyUpsert,
@@ -8,22 +9,31 @@ import type {
 
 interface AiApiKeyQueryRow {
   own_id?: string | null;
-  own_enc?: string | null;
+  own_ai_api_key_enc?: string | null;
   shared_id?: string | null;
-  shared_enc?: string | null;
+  shared_ai_api_key_enc?: string | null;
   shared_model?: string | null;
 }
 
+interface AiApiKeyQueryEntity {
+  ownId?: string | null;
+  ownAiApiKeyEnc?: string | null;
+  sharedId?: string | null;
+  sharedAiApiKeyEnc?: string | null;
+  sharedModel?: string | null;
+}
+
 function mapAiApiKeyRow(row: AiApiKeyQueryRow): AiApiKeyRow {
+  const entity = convertKeysToCamelCase(row) as AiApiKeyQueryEntity;
   return {
-    own: row.own_id
-      ? { id: row.own_id, ai_api_key_enc: row.own_enc ?? '' }
+    own: entity.ownId
+      ? { id: entity.ownId, aiApiKeyEnc: entity.ownAiApiKeyEnc ?? '' }
       : null,
-    shared: row.shared_id
+    shared: entity.sharedId
       ? {
-          id: row.shared_id,
-          ai_api_key_enc: row.shared_enc ?? '',
-          model: row.shared_model ?? null,
+          id: entity.sharedId,
+          aiApiKeyEnc: entity.sharedAiApiKeyEnc ?? '',
+          model: entity.sharedModel ?? null,
         }
       : null,
   };
@@ -31,7 +41,7 @@ function mapAiApiKeyRow(row: AiApiKeyQueryRow): AiApiKeyRow {
 
 export async function getAiKeyRow(id: string): Promise<AiApiKeyRow | undefined> {
   const { rows } = await db.query(
-    "SELECT ak.id AS own_id, ak.api_key_enc AS own_enc, oak.id AS shared_id, oak.api_key_enc AS shared_enc, s.model AS shared_model FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' WHERE u.id = $1",
+    "SELECT ak.id AS own_id, ak.api_key_enc AS own_ai_api_key_enc, oak.id AS shared_id, oak.api_key_enc AS shared_ai_api_key_enc, s.model AS shared_model FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' WHERE u.id = $1",
     [id],
   );
   const row = rows[0] as AiApiKeyQueryRow | undefined;

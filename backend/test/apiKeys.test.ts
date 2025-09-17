@@ -54,7 +54,7 @@ describe('AI API key routes', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({ error: 'verification failed' });
     let row = await getAiKeyRow(userId);
-    expect(row?.own?.ai_api_key_enc).toBeUndefined();
+    expect(row?.own?.aiApiKeyEnc).toBeUndefined();
 
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     res = await app.inject({
@@ -66,7 +66,7 @@ describe('AI API key routes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ key: '<REDACTED>' });
     row = await getAiKeyRow(userId);
-    expect(row?.own?.ai_api_key_enc).not.toBe(key1);
+    expect(row?.own?.aiApiKeyEnc).not.toBe(key1);
 
     res = await app.inject({
       method: 'GET',
@@ -258,8 +258,8 @@ describe('Binance API key routes', () => {
       error: 'verification failed: Invalid API-key',
     });
     let row = await getBinanceKeyRow(userId);
-    expect(row!.binance_api_key_enc).toBeNull();
-    expect(row!.binance_api_secret_enc).toBeNull();
+    expect(row!.binanceApiKeyEnc).toBeNull();
+    expect(row!.binanceApiSecretEnc).toBeNull();
 
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
@@ -275,8 +275,8 @@ describe('Binance API key routes', () => {
       secret: '<REDACTED>',
     });
     row = await getBinanceKeyRow(userId);
-    expect(row!.binance_api_key_enc).not.toBe(key1);
-    expect(row!.binance_api_secret_enc).not.toBe(secret1);
+    expect(row!.binanceApiKeyEnc).not.toBe(key1);
+    expect(row!.binanceApiSecretEnc).not.toBe(secret1);
 
     res = await app.inject({
       method: 'GET',

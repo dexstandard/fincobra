@@ -1,7 +1,7 @@
-export interface BinanceApiKeyRow {
+export interface BinanceApiKey {
   id: string | null;
-  binance_api_key_enc: string | null;
-  binance_api_secret_enc: string | null;
+  binanceApiKeyEnc: string | null;
+  binanceApiSecretEnc: string | null;
 }
 
 export interface BinanceApiKeyUpsert {
