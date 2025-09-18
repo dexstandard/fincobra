@@ -2,8 +2,8 @@ import { schedule } from 'node-cron';
 import buildServer from '../src/server.js';
 import '../src/util/env.js';
 import reviewPortfolios from '../src/workflows/portfolio-review.js';
-import checkOpenOrders from '../src/jobs/check-open-orders.js';
-import fetchNews from '../src/jobs/fetch-news.js';
+import { syncOpenOrderStatuses } from '../src/services/order-orchestrator.js';
+import { fetchAndStoreNews } from '../src/services/news.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,8 +13,8 @@ async function main() {
   const app = await buildServer(routesDir);
   const log = app.log;
 
-  schedule('*/10 * * * *', () => fetchNews(log));
-  schedule('*/3 * * * *', () => checkOpenOrders(log));
+  schedule('*/10 * * * *', () => fetchAndStoreNews(log));
+  schedule('*/3 * * * *', () => syncOpenOrderStatuses(log));
 
   const schedules: Record<string, string> = {
     '10m': '*/10 * * * *',

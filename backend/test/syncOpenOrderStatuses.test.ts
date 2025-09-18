@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import checkOpenOrders from '../src/jobs/check-open-orders.js';
+import { syncOpenOrderStatuses } from '../src/services/order-orchestrator.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
@@ -25,7 +25,7 @@ vi.mock('../src/services/limit-order.js', () => ({
   cancelLimitOrder: vi.fn(),
 }));
 
-describe('checkOpenOrders job', () => {
+describe('syncOpenOrderStatuses', () => {
   beforeEach(() => {
     fetchOpenOrders.mockReset();
     fetchOrder.mockReset();
@@ -73,7 +73,7 @@ describe('checkOpenOrders job', () => {
     const { orderId } = await setupOrder();
     fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
 
-    await checkOpenOrders(mockLogger());
+    await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
     expect(order?.status).toBe('canceled');
@@ -83,7 +83,7 @@ describe('checkOpenOrders job', () => {
     const { orderId } = await setupOrder('456');
     fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
 
-    await checkOpenOrders(mockLogger());
+    await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
     expect(order?.status).toBe('filled');
@@ -94,7 +94,7 @@ describe('checkOpenOrders job', () => {
     fetchOrder.mockRejectedValueOnce(new Error('err'));
     parseBinanceError.mockReturnValueOnce({ code: -2013 });
 
-    await checkOpenOrders(mockLogger());
+    await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
     expect(order?.status).toBe('canceled');

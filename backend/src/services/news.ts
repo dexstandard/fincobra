@@ -1,6 +1,7 @@
 import Parser from 'rss-parser';
 import NodeCache from 'node-cache';
 import type { FastifyBaseLogger } from 'fastify';
+import { insertNews } from '../repos/news.js';
 import { TOKENS } from '../util/tokens.js';
 
 const parser = new Parser();
@@ -137,4 +138,13 @@ export async function fetchNews(
   }
 
   return collected;
+}
+
+export async function fetchAndStoreNews(log: FastifyBaseLogger): Promise<void> {
+  try {
+    const news = await fetchNews(new Date(), log);
+    await insertNews(news);
+  } catch (err) {
+    log.error({ err }, 'failed to fetch or store news');
+  }
 }
