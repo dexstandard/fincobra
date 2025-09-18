@@ -4,15 +4,15 @@ import { mockLogger } from './helpers.js';
 const insertReviewRawLogMock = vi.hoisted(() => vi.fn());
 const fetchTokenIndicatorsMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
-    ret: {},
-    sma_dist: {},
-    macd_hist: 0,
-    vol: {},
-    range: {},
-    volume: {},
-    corr: {},
-    regime: {},
-    osc: {},
+    ret: { '1h': 1, '4h': 2, '24h': 3, '7d': 4, '30d': 5 },
+    sma_dist: { '20': 6, '50': 7, '200': 8 },
+    macd_hist: 9,
+    vol: { rv_7d: 10, rv_30d: 11, atr_pct: 12 },
+    range: { bb_bw: 13, donchian20: 14 },
+    volume: { z_1h: 15, z_24h: 16 },
+    corr: { BTC_30d: 17 },
+    regime: { BTC: 'range' },
+    osc: { rsi_14: 18, stoch_k: 19, stoch_d: 20 },
   }),
 );
 const callAiMock = vi.hoisted(() => vi.fn());
@@ -70,15 +70,15 @@ const responseJson = JSON.stringify({
 });
 
 const indicators = {
-  ret: {},
-  sma_dist: {},
-  macd_hist: 0,
-  vol: {},
-  range: {},
-  volume: {},
-  corr: {},
-  regime: {},
-  osc: {},
+  ret: { '1h': 1, '4h': 2, '24h': 3, '7d': 4, '30d': 5 },
+  sma_dist: { '20': 6, '50': 7, '200': 8 },
+  macd_hist: 9,
+  vol: { rv_7d: 10, rv_30d: 11, atr_pct: 12 },
+  range: { bb_bw: 13, donchian20: 14 },
+  volume: { z_1h: 15, z_24h: 16 },
+  corr: { BTC_30d: 17 },
+  regime: { BTC: 'range' },
+  osc: { rsi_14: 18, stoch_k: 19, stoch_d: 20 },
 } as const;
 
 describe('technical analyst', () => {
@@ -183,7 +183,11 @@ describe('technical analyst step', () => {
     const report = prompt.reports?.find((r: any) => r.token === 'BTC');
     expect(report?.tech?.comment).toBe('outlook text');
     expect(prompt.reports?.find((r: any) => r.token === 'USDC')?.tech).toBeNull();
-    expect(prompt.marketData.indicators.BTC).toBeDefined();
+    expect(prompt.marketData.indicators.BTC).toMatchObject({
+      ret1h: 1,
+      regimeBtc: 'range',
+      volumeZ24h: 16,
+    });
     expect(prompt.marketData.orderBooks.BTC).toEqual({ bid: [0, 0], ask: [0, 0] });
     expect(prompt.marketData.fearGreedIndex).toEqual({
       value: 50,
@@ -191,6 +195,8 @@ describe('technical analyst step', () => {
     });
     const aiPrompt = callAiMock.mock.calls[0][3];
     expect(aiPrompt.orderBook).toEqual({ bid: [0, 0], ask: [0, 0] });
+    expect(aiPrompt.indicators.ret1h).toBe(1);
+    expect(aiPrompt.indicators.regimeBtc).toBe('range');
     expect(aiPrompt.fearGreedIndex).toEqual({
       value: 50,
       classification: 'Neutral',

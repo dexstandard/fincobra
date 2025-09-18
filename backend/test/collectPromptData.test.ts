@@ -99,9 +99,9 @@ describe('collectPromptData', () => {
     };
 
     const prompt = await collectPromptData(row, mockLogger());
-    expect(prompt?.portfolio.start_balance_usd).toBe(20000);
-    expect(prompt?.portfolio.start_balance_ts).toBe('2025-01-01T00:00:00.000Z');
-    expect(prompt?.portfolio.pnl_usd).toBeCloseTo(1000);
+    expect(prompt?.portfolio.startBalanceUsd).toBe(20000);
+    expect(prompt?.portfolio.startBalanceTs).toBe('2025-01-01T00:00:00.000Z');
+    expect(prompt?.portfolio.pnlUsd).toBeCloseTo(1000);
     expect(prompt?.reviewInterval).toBe('1h');
   });
 
@@ -124,8 +124,8 @@ describe('collectPromptData', () => {
     };
 
     const prompt = await collectPromptData(row, mockLogger());
-    expect(prompt?.previous_reports).toHaveLength(5);
-    expect(prompt?.previous_reports?.[0]).toMatchObject({
+    expect(prompt?.previousReports).toHaveLength(5);
+    expect(prompt?.previousReports?.[0]).toMatchObject({
       datetime: '2025-01-01T00:00:00.000Z',
       orders: [
         {

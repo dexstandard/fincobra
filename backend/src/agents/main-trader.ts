@@ -10,7 +10,7 @@ import type {
   RebalancePosition,
   PreviousReport,
   RebalancePrompt,
-} from './types.js';
+} from './main-trader.types.js';
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
@@ -103,7 +103,7 @@ export async function collectPromptData(
 
   const balCash = account.balances.find((b) => b.asset === cash);
   const cashQty = balCash ? Number(balCash.free) : 0;
-  positions.push({ sym: cash, qty: cashQty, price_usdt: 1, value_usdt: cashQty });
+  positions.push({ sym: cash, qty: cashQty, priceUsdt: 1, valueUsdt: cashQty });
 
   for (const t of row.tokens) {
     const bal = account.balances.find((b) => b.asset === t.token);
@@ -116,8 +116,8 @@ export async function collectPromptData(
     positions.push({
       sym: t.token,
       qty,
-      price_usdt: currentPrice,
-      value_usdt: currentPrice * qty,
+      priceUsdt: currentPrice,
+      valueUsdt: currentPrice * qty,
     });
     floor[t.token] = t.minAllocation;
   }
@@ -149,11 +149,11 @@ export async function collectPromptData(
     positions,
   };
 
-  const totalValue = positions.reduce((sum, p) => sum + p.value_usdt, 0);
+  const totalValue = positions.reduce((sum, p) => sum + p.valueUsdt, 0);
   if (row.startBalance !== null) {
-    portfolio.start_balance_usd = row.startBalance;
-    portfolio.start_balance_ts = row.createdAt;
-    portfolio.pnl_usd = totalValue - row.startBalance;
+    portfolio.startBalanceUsd = row.startBalance;
+    portfolio.startBalanceTs = row.createdAt;
+    portfolio.pnlUsd = totalValue - row.startBalance;
   }
 
   const prevRows = await getRecentReviewResults(row.id, 5);
@@ -195,7 +195,7 @@ export async function collectPromptData(
       .map((token) => ({ token, news: null, tech: null })),
   };
   if (previousReports.length) {
-    prompt.previous_reports = previousReports;
+    prompt.previousReports = previousReports;
   }
   return prompt;
 }
