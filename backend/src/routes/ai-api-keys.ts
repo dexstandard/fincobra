@@ -24,7 +24,10 @@ import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
 import { parseParams } from '../util/validation.js';
 import { userIdParams } from '../services/order-orchestrator.js';
-import { disableUserWorkflows } from '../workflows/portfolio-review.js';
+import {
+  disableUserWorkflows,
+  removeWorkflowFromSchedule,
+} from '../workflows/portfolio-review.js';
 
 interface AiKeyBody {
   key: string;
@@ -37,6 +40,7 @@ interface ShareAiKeyBody {
 
 interface RevokeShareBody {
   email: string;
+  model?: string;
 }
 
 const aiKeyBodySchema: z.ZodType<AiKeyBody> = z
@@ -51,7 +55,10 @@ const shareAiKeyBodySchema: z.ZodType<ShareAiKeyBody> = z
   .strict();
 
 const revokeShareBodySchema: z.ZodType<RevokeShareBody> = z
-  .object({ email: z.string().trim().email() })
+  .object({
+    email: z.string().trim().email(),
+    model: z.string().trim().min(1).optional(),
+  })
   .strict();
 
 type RequestWithUserId = FastifyRequest & { validatedUserId: string };
@@ -205,11 +212,12 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
           .code(404)
           .send(errorResponse(ERROR_MESSAGES.notFound));
 
-      await disableUserWorkflows({
+      const disabledIds = await disableUserWorkflows({
         log: req.log,
         userId: id,
         aiKeyId: aiKey.id,
       });
+      for (const workflowId of disabledIds) removeWorkflowFromSchedule(workflowId);
 
       const targets = await getAiKeyShareTargets(id);
       for (const targetId of targets) {
@@ -218,11 +226,13 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
           getSharedAiKey(targetId),
         ]);
         if (!targetOwnKey && targetSharedKey) {
-          await disableUserWorkflows({
+          const affectedIds = await disableUserWorkflows({
             log: req.log,
             userId: targetId,
             aiKeyId: targetSharedKey.id,
           });
+          for (const workflowId of affectedIds)
+            removeWorkflowFromSchedule(workflowId);
         }
         await revokeAiKeyShare({ ownerUserId: id, targetUserId: targetId });
       }
@@ -272,11 +282,13 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
         getSharedAiKey(target.id),
       ]);
       if (!targetOwnKey && targetSharedKey) {
-        await disableUserWorkflows({
+        const affectedIds = await disableUserWorkflows({
           log: req.log,
           userId: target.id,
           aiKeyId: targetSharedKey.id,
         });
+        for (const workflowId of affectedIds)
+          removeWorkflowFromSchedule(workflowId);
       }
       await revokeAiKeyShare({ ownerUserId: id, targetUserId: target.id });
       return { ok: true };

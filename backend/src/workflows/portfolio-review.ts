@@ -49,16 +49,15 @@ export async function disableUserWorkflows({
   log,
   userId,
   aiKeyId,
-}: DisableUserWorkflowsParams): Promise<void> {
+}: DisableUserWorkflowsParams): Promise<string[]> {
   const workflows = await getActivePortfolioWorkflowsByUser(userId);
   const relevant = aiKeyId
     ? workflows.filter((wf) => wf.aiApiKeyId === aiKeyId)
     : workflows;
 
-  if (!relevant.length) return;
+  if (!relevant.length) return [];
 
   for (const workflow of relevant) {
-    removeWorkflowFromSchedule(workflow.id);
     try {
       await cancelOrdersForWorkflow({
         workflowId: workflow.id,
@@ -71,6 +70,8 @@ export async function disableUserWorkflows({
   }
 
   await deactivateWorkflowsByUser(userId, aiKeyId);
+
+  return relevant.map((workflow) => workflow.id);
 }
 
 export async function reviewPortfolio(
