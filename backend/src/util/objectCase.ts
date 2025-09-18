@@ -1,6 +1,6 @@
-import lodash from 'lodash';
-
-const { camelCase, isPlainObject, snakeCase } = lodash;
+import camelCase from 'lodash/camelCase.js';
+import snakeCase from 'lodash/snakeCase.js';
+import isPlainObject from 'lodash/isPlainObject.js';
 
 type KeyConverter = (value: string) => string;
 
@@ -10,11 +10,17 @@ function convertKeys<T>(input: T, transformer: KeyConverter): T {
   }
 
   if (isPlainObject(input)) {
-    const record = input as Record<string, unknown>;
-    const result: Record<string, unknown> = {};
+    const record = input as Record<string | symbol, unknown>;
+    const result: Record<string | symbol, unknown> = {};
+
     for (const [key, value] of Object.entries(record)) {
       result[transformer(key)] = convertKeys(value, transformer);
     }
+
+    for (const sym of Object.getOwnPropertySymbols(record)) {
+      result[sym] = record[sym];
+    }
+
     return result as unknown as T;
   }
 
