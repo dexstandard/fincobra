@@ -1,5 +1,4 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { z } from 'zod';
 import {
   getAllOpenLimitOrders,
   getOpenLimitOrdersForWorkflow,
@@ -13,8 +12,6 @@ import {
   type OpenOrder,
 } from './binance.js';
 import { cancelLimitOrder } from './limit-order.js';
-
-export const userIdParams = z.object({ id: z.string().regex(/^\d+$/) });
 
 export const CANCEL_ORDER_REASONS = {
   API_KEY_REMOVED: 'API key removed',

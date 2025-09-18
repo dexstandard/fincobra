@@ -35,8 +35,8 @@ import { randomUUID } from 'crypto';
 /** Workflows currently running. Used to avoid concurrent runs. */
 const runningWorkflows = new Set<string>();
 
-export function removeWorkflowFromSchedule(id: string) {
-  runningWorkflows.delete(id);
+export function removeWorkflowFromSchedule(id: string): boolean {
+  return runningWorkflows.delete(id);
 }
 
 interface DisableUserWorkflowsParams {
@@ -45,17 +45,22 @@ interface DisableUserWorkflowsParams {
   aiKeyId?: string | null;
 }
 
+interface DisableUserWorkflowsSummary {
+  disabledWorkflowIds: string[];
+  unscheduledWorkflowIds: string[];
+}
+
 export async function disableUserWorkflows({
   log,
   userId,
   aiKeyId,
-}: DisableUserWorkflowsParams): Promise<string[]> {
+}: DisableUserWorkflowsParams): Promise<DisableUserWorkflowsSummary> {
   const workflows = await getActivePortfolioWorkflowsByUser(userId);
   const relevant = aiKeyId
     ? workflows.filter((wf) => wf.aiApiKeyId === aiKeyId)
     : workflows;
 
-  if (!relevant.length) return [];
+  if (!relevant.length) return { disabledWorkflowIds: [], unscheduledWorkflowIds: [] };
 
   for (const workflow of relevant) {
     try {
@@ -71,7 +76,15 @@ export async function disableUserWorkflows({
 
   await deactivateWorkflowsByUser(userId, aiKeyId);
 
-  return relevant.map((workflow) => workflow.id);
+  const disabledWorkflowIds = relevant.map((workflow) => workflow.id);
+  const unscheduledWorkflowIds: string[] = [];
+  for (const workflowId of disabledWorkflowIds) {
+    if (removeWorkflowFromSchedule(workflowId)) {
+      unscheduledWorkflowIds.push(workflowId);
+    }
+  }
+
+  return { disabledWorkflowIds, unscheduledWorkflowIds };
 }
 
 export async function reviewPortfolio(
