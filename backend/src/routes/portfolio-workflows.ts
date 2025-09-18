@@ -14,8 +14,7 @@ import {
 import { getPortfolioReviewResults } from '../repos/review-result.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import {
-  reviewAgentPortfolio,
-  removeWorkflowFromSchedule,
+    removeWorkflowFromSchedule, reviewPortfolio,
 } from '../workflows/portfolio-review.js';
 import { requireUserId } from '../util/auth.js';
 import { RATE_LIMITS } from '../rate-limit.js';
@@ -186,7 +185,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           useEarn: validated.useEarn,
         });
         if (status === AgentStatus.Active)
-          reviewAgentPortfolio(req.log, row.id).catch((err) =>
+          reviewPortfolio(req.log, row.id).catch((err) =>
             log.error({ err, workflowId: row.id }, 'initial review failed'),
           );
         log.info({ workflowId: row.id }, 'created workflow');
@@ -498,7 +497,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         });
         const row = (await getAgent(id))!;
         if (status === AgentStatus.Active)
-          await reviewAgentPortfolio(req.log, id);
+          await reviewPortfolio(req.log, id);
         log.info('updated workflow');
         return toApi(row);
       }
@@ -547,7 +546,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const bal = await getStartBalance(log, userId, tokens);
       if (typeof bal !== 'number') return reply.code(bal.code).send(bal.body);
       await repoStartAgent(id, bal);
-      reviewAgentPortfolio(req.log, id).catch((err) =>
+      reviewPortfolio(req.log, id).catch((err) =>
         log.error({ err }, 'initial review failed')
       );
       const row = (await getAgent(id))!;
@@ -593,7 +592,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           .send(errorResponse('workflow not active'));
       }
       try {
-        await reviewAgentPortfolio(req.log, id);
+        await reviewPortfolio(req.log, id);
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : 'manual review failed';
