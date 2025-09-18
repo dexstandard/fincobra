@@ -21,7 +21,7 @@ import {
 } from '../util/api-keys.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
-import { disableUserWorkflows } from '../workflows/portfolio-review.js';
+import { disableUserWorkflows } from '../workflows/disable.js';
 import {
   adminPreHandlers,
   getValidatedUserId,

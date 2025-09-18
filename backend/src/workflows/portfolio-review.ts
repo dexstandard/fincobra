@@ -2,8 +2,6 @@ import type { FastifyBaseLogger } from 'fastify';
 import {
   getActivePortfolioWorkflowById,
   getActivePortfolioWorkflowsByInterval,
-  getActivePortfolioWorkflowsByUser,
-  deactivateWorkflowsByUser,
   type ActivePortfolioWorkflow,
 } from '../repos/portfolio-workflow.js';
 import {
@@ -23,10 +21,6 @@ import type {
 } from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
-import {
-  CANCEL_ORDER_REASONS,
-  cancelOrdersForWorkflow,
-} from '../services/order-orchestrator.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { type RebalancePrompt } from '../agents/main-trader.types.js';
 import pLimit from 'p-limit';
@@ -37,54 +31,6 @@ const runningWorkflows = new Set<string>();
 
 export function removeWorkflowFromSchedule(id: string): boolean {
   return runningWorkflows.delete(id);
-}
-
-interface DisableUserWorkflowsParams {
-  log: FastifyBaseLogger;
-  userId: string;
-  aiKeyId?: string | null;
-}
-
-interface DisableUserWorkflowsSummary {
-  disabledWorkflowIds: string[];
-  unscheduledWorkflowIds: string[];
-}
-
-export async function disableUserWorkflows({
-  log,
-  userId,
-  aiKeyId,
-}: DisableUserWorkflowsParams): Promise<DisableUserWorkflowsSummary> {
-  const workflows = await getActivePortfolioWorkflowsByUser(userId);
-  const relevant = aiKeyId
-    ? workflows.filter((wf) => wf.aiApiKeyId === aiKeyId)
-    : workflows;
-
-  if (!relevant.length) return { disabledWorkflowIds: [], unscheduledWorkflowIds: [] };
-
-  for (const workflow of relevant) {
-    try {
-      await cancelOrdersForWorkflow({
-        workflowId: workflow.id,
-        reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
-        log,
-      });
-    } catch (err) {
-      log.error({ err, workflowId: workflow.id }, 'failed to cancel orders');
-    }
-  }
-
-  await deactivateWorkflowsByUser(userId, aiKeyId);
-
-  const disabledWorkflowIds = relevant.map((workflow) => workflow.id);
-  const unscheduledWorkflowIds: string[] = [];
-  for (const workflowId of disabledWorkflowIds) {
-    if (removeWorkflowFromSchedule(workflowId)) {
-      unscheduledWorkflowIds.push(workflowId);
-    }
-  }
-
-  return { disabledWorkflowIds, unscheduledWorkflowIds };
 }
 
 export async function reviewPortfolio(
