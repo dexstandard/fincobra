@@ -11,15 +11,27 @@ import { setAiKey } from '../src/repos/ai-api-key.js';
 import { reviewAgentPortfolio } from '../src/workflows/portfolio-review.js';
 
 const sampleIndicators = vi.hoisted(() => ({
-  ret: { '1h': 0, '4h': 0, '24h': 0, '7d': 0, '30d': 0 },
-  sma_dist: { '20': 0, '50': 0, '200': 0 },
-  macd_hist: 0,
-  vol: { rv_7d: 0, rv_30d: 0, atr_pct: 0 },
-  range: { bb_bw: 0, donchian20: 0 },
-  volume: { z_1h: 0, z_24h: 0 },
-  corr: { BTC_30d: 0 },
-  regime: { BTC: 'range' },
-  osc: { rsi_14: 0, stoch_k: 0, stoch_d: 0 },
+  ret1h: 0,
+  ret4h: 0,
+  ret24h: 0,
+  ret7d: 0,
+  ret30d: 0,
+  smaDist20: 0,
+  smaDist50: 0,
+  smaDist200: 0,
+  macdHist: 0,
+  volRv7d: 0,
+  volRv30d: 0,
+  volAtrPct: 0,
+  rangeBbBw: 0,
+  rangeDonchian20: 0,
+  volumeZ1h: 0,
+  volumeZ24h: 0,
+  corrBtc30d: 0,
+  regimeBtc: 'range',
+  oscRsi14: 0,
+  oscStochK: 0,
+  oscStochD: 0,
 }));
 
 vi.mock('../src/util/ai.js', () => ({
