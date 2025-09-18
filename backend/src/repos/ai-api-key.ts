@@ -10,7 +10,7 @@ import type {
 } from './ai-api-key.types.js';
 
 export async function getAiKey(
-  id: string,
+  userId: string,
 ): Promise<AiApiKeyDetails | null | undefined> {
   const { rows } = await db.query(
     `SELECT ak.id AS ai_api_key_id,
@@ -18,7 +18,7 @@ export async function getAiKey(
        FROM users u
        LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai'
       WHERE u.id = $1`,
-    [id],
+    [userId],
   );
   const row = rows[0];
   if (!row) return undefined;

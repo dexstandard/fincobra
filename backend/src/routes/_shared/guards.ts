@@ -4,41 +4,43 @@ import { parseParams } from '../../util/validation.js';
 import { errorResponse, ERROR_MESSAGES } from '../../util/errorMessages.js';
 import { userIdParams } from './validation.js';
 
-export type RequestWithUserId = FastifyRequest & { validatedUserId: string };
-
 export async function parseUserIdParam(
-  req: FastifyRequest,
-  reply: FastifyReply,
+    req: FastifyRequest,
+    reply: FastifyReply,
 ): Promise<void | FastifyReply> {
   const params = parseParams(userIdParams, req.params, reply);
   if (!params) return reply;
-  (req as RequestWithUserId).validatedUserId = params.id;
+  req.validatedUserId = params.id;
 }
 
 export async function requireUserOwner(
-  req: FastifyRequest,
-  reply: FastifyReply,
+    req: FastifyRequest,
+    reply: FastifyReply,
 ): Promise<void | FastifyReply> {
-  const { validatedUserId } = req as RequestWithUserId;
-  if (!requireUserIdMatch(req, reply, validatedUserId)) return reply;
+  if (!req.validatedUserId) {
+    return reply.code(400).send(errorResponse('missing user id'));
+  }
+  if (!requireUserIdMatch(req, reply, req.validatedUserId)) return reply;
 }
 
-export async function requireOwnerAdmin(
-  req: FastifyRequest,
-  reply: FastifyReply,
+export async function requireAdminOwner(
+    req: FastifyRequest,
+    reply: FastifyReply,
 ): Promise<void | FastifyReply> {
   const adminId = await requireAdmin(req, reply);
   if (!adminId) return reply;
-  const { validatedUserId } = req as RequestWithUserId;
-  if (adminId !== validatedUserId) {
-    reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
-    return reply;
+  if (!req.validatedUserId) {
+    return reply.code(400).send(errorResponse('missing user id'));
   }
+  if (adminId !== req.validatedUserId) {
+    return reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
+  }
+  req.adminUserId = adminId;
 }
 
 export function getValidatedUserId(req: FastifyRequest): string {
-  return (req as RequestWithUserId).validatedUserId;
+  return req.validatedUserId!;
 }
 
 export const userPreHandlers = [parseUserIdParam, requireUserOwner];
-export const adminPreHandlers = [parseUserIdParam, requireOwnerAdmin];
+export const adminPreHandlers = [parseUserIdParam, requireAdminOwner];

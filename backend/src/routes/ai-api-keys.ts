@@ -15,9 +15,6 @@ import {
   ApiKeyType,
   verifyApiKey,
   encryptKey,
-  ensureUser,
-  ensureKeyAbsent,
-  ensureKeyPresent,
 } from '../util/api-keys.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
@@ -88,6 +85,8 @@ function parseBody<S extends z.ZodTypeAny>(
 }
 
 export default async function aiApiKeyRoutes(app: FastifyInstance) {
+  const redacted = '<REDACTED>';
+
   app.post(
     '/users/:id/ai-key',
     {
@@ -95,20 +94,17 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: userPreHandlers,
     },
     async (req, reply) => {
-      const id = getValidatedUserId(req);
+      const userId = getValidatedUserId(req);
       const body = parseBody(aiKeyBodySchema, req, reply);
       if (!body) return;
       const { key } = body;
-      const aiKey = await getAiKey(id);
-      const userErr = ensureUser(aiKey !== undefined);
-      if (userErr) return reply.code(userErr.code).send(userErr.body);
-      const keyErr = ensureKeyAbsent(aiKey, ['aiApiKeyEnc']);
-      if (keyErr) return reply.code(keyErr.code).send(keyErr.body);
+      const aiKey = await getAiKey(userId);
+      if (aiKey) return reply.code(409).send(errorResponse('key already exists'));
       if (!(await verifyApiKey(ApiKeyType.Ai, key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
-      await setAiKey({ userId: id, apiKeyEnc: enc });
-      return { key: '<REDACTED>' };
+      await setAiKey({ userId: userId, apiKeyEnc: enc });
+      return { key: redacted };
     },
   );
 
@@ -121,11 +117,9 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const id = getValidatedUserId(req);
       const aiKey = await getAiKey(id);
-      if (!aiKey?.aiApiKeyEnc)
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
-      return { key: '<REDACTED>' };
+      if (!aiKey)
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      return { key: redacted };
     },
   );
 
@@ -138,11 +132,8 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const id = getValidatedUserId(req);
       const sharedKey = await getSharedAiKey(id);
-      if (!sharedKey?.aiApiKeyEnc)
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
-      return { key: '<REDACTED>', shared: true, model: sharedKey.model };
+      if (!sharedKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      return { key: redacted, shared: true, model: sharedKey.model };
     },
   );
 
@@ -158,15 +149,12 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key } = body;
       const aiKey = await getAiKey(id);
-      if (!aiKey?.aiApiKeyEnc)
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!aiKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
       if (!(await verifyApiKey(ApiKeyType.Ai, key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
       await setAiKey({ userId: id, apiKeyEnc: enc });
-      return { key: '<REDACTED>' };
+      return { key: redacted };
     },
   );
 
@@ -179,10 +167,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const id = getValidatedUserId(req);
       const aiKey = await getAiKey(id);
-      if (!aiKey?.aiApiKeyEnc)
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!aiKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
 
       const disableSummary = await disableUserWorkflows({
         log: req.log,
@@ -224,16 +209,15 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: adminPreHandlers,
     },
     async (req, reply) => {
-      const id = getValidatedUserId(req);
+      const userId = getValidatedUserId(req);
       const body = parseBody(shareAiKeyBodySchema, req, reply);
       if (!body) return;
       const { email, model } = body;
-      const aiKey = await getAiKey(id);
-      const keyErr = ensureKeyPresent(aiKey, ['aiApiKeyEnc']);
-      if (keyErr) return reply.code(keyErr.code).send(keyErr.body);
+      const aiKey = await getAiKey(userId);
+      if (!aiKey) return reply.code(404).send(errorResponse('no key to share'));
       const target = await findUserByEmail(email);
       if (!target) return reply.code(404).send(errorResponse('user not found'));
-      await shareAiKey({ ownerUserId: id, targetUserId: target.id, model });
+      await shareAiKey({ ownerUserId: userId, targetUserId: target.id, model });
       return { ok: true };
     },
   );
