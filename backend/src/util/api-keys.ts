@@ -77,8 +77,14 @@ export interface ValidationErr {
   body: ErrorResponse;
 }
 
-export function ensureUser(row: unknown): ValidationErr | null {
-  if (!row) return { code: 404, body: errorResponse('user not found') };
+export function ensureUser(rowOrExists: unknown): ValidationErr | null {
+  if (typeof rowOrExists === 'boolean') {
+    return rowOrExists
+      ? null
+      : { code: 404, body: errorResponse('user not found') };
+  }
+  if (!rowOrExists)
+    return { code: 404, body: errorResponse('user not found') };
   return null;
 }
 
