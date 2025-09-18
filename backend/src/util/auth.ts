@@ -40,7 +40,7 @@ export async function requireAdmin(
   const userId = requireUserId(req, reply);
   if (!userId) return null;
   const row = await getUser(userId);
-  if (!row || row.role !== 'admin' || !row.is_enabled) {
+  if (!row || row.role !== 'admin' || !row.isEnabled) {
     reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
     return null;
   }

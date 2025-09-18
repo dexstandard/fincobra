@@ -21,11 +21,11 @@ export default async function usersRoutes(app: FastifyInstance) {
       return rows.map((u) => ({
         id: u.id,
         role: u.role,
-        isEnabled: !!u.is_enabled,
-        email: u.email_enc ? decrypt(u.email_enc, env.KEY_PASSWORD) : null,
-        createdAt: u.created_at,
-        hasAiKey: u.has_ai_key,
-        hasBinanceKey: u.has_binance_key,
+        isEnabled: u.isEnabled,
+        email: u.emailEnc ? decrypt(u.emailEnc, env.KEY_PASSWORD) : null,
+        createdAt: u.createdAt,
+        hasAiKey: u.hasAiKey,
+        hasBinanceKey: u.hasBinanceKey,
       }));
     },
   );
