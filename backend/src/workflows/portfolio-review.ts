@@ -258,3 +258,5 @@ async function saveFailure(
   await insertReviewResult(entry);
 }
 
+export { reviewPortfolio as reviewAgentPortfolio };
+
