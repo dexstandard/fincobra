@@ -9,7 +9,7 @@ import {
   deleteAgent as repoDeleteAgent,
   startAgent as repoStartAgent,
   stopAgent as repoStopAgent,
-  type PortfolioWorkflowRow,
+  type PortfolioWorkflow,
 } from '../repos/portfolio-workflow.js';
 import { getPortfolioReviewResults } from '../repos/review-result.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
@@ -48,7 +48,7 @@ type WorkflowRequestContext = {
   userId: string;
   id: string;
   log: FastifyBaseLogger;
-  workflow: PortfolioWorkflowRow;
+  workflow: PortfolioWorkflow;
 };
 
 async function getWorkflowForRequest(

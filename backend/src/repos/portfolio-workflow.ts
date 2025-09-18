@@ -5,13 +5,13 @@ import type {
   ActivePortfolioWorkflow,
   PortfolioWorkflowDraftSearch,
   PortfolioWorkflowInsert,
-  PortfolioWorkflowRow,
+  PortfolioWorkflow,
   PortfolioWorkflowUpdate,
   PortfolioWorkflowUserApiKeys,
 } from './portfolio-workflow.types.js';
 
 export type {
-  PortfolioWorkflowRow,
+  PortfolioWorkflow,
   ActivePortfolioWorkflow,
   PortfolioWorkflowToken,
   PortfolioWorkflowInsert,
@@ -19,7 +19,7 @@ export type {
   PortfolioWorkflowUserApiKeys,
 } from './portfolio-workflow.types.js';
 
-export function toApi(row: PortfolioWorkflowRow) {
+export function toApi(row: PortfolioWorkflow) {
   return {
     id: row.id,
     userId: row.userId,
@@ -57,13 +57,13 @@ const baseSelect = `
     LEFT JOIN exchange_keys ek ON ek.user_id = a.user_id AND ek.provider = 'binance'
 `;
 
-export async function getAgent(id: string): Promise<PortfolioWorkflowRow | undefined> {
+export async function getAgent(id: string): Promise<PortfolioWorkflow | undefined> {
   const { rows } = await db.query(
     `${baseSelect} WHERE a.id = $1 AND a.status != $2 GROUP BY a.id, ak.id, oak.id, ek.id`,
     [id, AgentStatus.Retired],
   );
   if (!rows[0]) return undefined;
-  return convertKeysToCamelCase(rows[0]) as PortfolioWorkflowRow;
+  return convertKeysToCamelCase(rows[0]) as PortfolioWorkflow;
 }
 
 export async function getAgentsPaginated(
@@ -84,7 +84,7 @@ export async function getAgentsPaginated(
       [userId, status, limit, offset],
     );
     return {
-      rows: convertKeysToCamelCase(rows) as PortfolioWorkflowRow[],
+      rows: convertKeysToCamelCase(rows) as PortfolioWorkflow[],
       total: Number(totalRes.rows[0].count),
     };
   }
@@ -98,7 +98,7 @@ export async function getAgentsPaginated(
     [userId, AgentStatus.Retired, limit, offset],
   );
   return {
-    rows: convertKeysToCamelCase(rows) as PortfolioWorkflowRow[],
+    rows: convertKeysToCamelCase(rows) as PortfolioWorkflow[],
     total: Number(totalRes.rows[0].count),
   };
 }
@@ -177,7 +177,7 @@ export async function getUserApiKeys(userId: string) {
 
 export async function insertAgent(
   data: PortfolioWorkflowInsert,
-): Promise<PortfolioWorkflowRow> {
+): Promise<PortfolioWorkflow> {
   let id = '';
   await withTransaction(async (client) => {
     const { rows } = await client.query(

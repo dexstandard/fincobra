@@ -3,7 +3,7 @@ export interface PortfolioWorkflowToken {
   minAllocation: number;
 }
 
-export interface PortfolioWorkflowRow {
+export interface PortfolioWorkflow {
   id: string;
   userId: string;
   model: string | null;
