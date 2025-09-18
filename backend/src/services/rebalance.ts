@@ -21,6 +21,13 @@ function splitPair(pair: string): [string, string] {
 }
 
 const MIN_MAX_PRICE_DIVERGENCE = 0.0001;
+const NOMINAL_BUFFER_RATIO = 1.0001;
+
+interface NominalAdjustmentOptions {
+  price: number;
+  precision: number;
+  targetNominal: number;
+}
 
 function adjustLimitPrice(requested: number, current: number, side: 'BUY' | 'SELL'): number {
   const anchor = side === 'BUY' ? current * 0.999 : current * 1.001;
@@ -39,6 +46,28 @@ function roundLimitPrice(price: number, precision: number, side: 'BUY' | 'SELL')
   const ceiled = Math.ceil(price * factor);
   const adjusted = ceiled <= 0 ? 1 : ceiled;
   return adjusted / factor;
+}
+
+function increaseQuantityToMeetNominal({
+  price,
+  precision,
+  targetNominal,
+}: NominalAdjustmentOptions): number | null {
+  if (!Number.isFinite(price) || price <= 0) return null;
+  if (!Number.isFinite(targetNominal) || targetNominal <= 0) return null;
+  const factor = 10 ** precision;
+  if (!Number.isFinite(factor) || factor <= 0) return null;
+  const requiredQty = Math.ceil((targetNominal / price) * factor) / factor;
+  if (!Number.isFinite(requiredQty) || requiredQty <= 0) return null;
+  const adjusted = Number(requiredQty.toFixed(precision));
+  if (!Number.isFinite(adjusted) || adjusted <= 0) return null;
+  return adjusted;
+}
+
+function meetsMinNotional(value: number, minNotional: number): boolean {
+  if (!Number.isFinite(value) || !Number.isFinite(minNotional)) return false;
+  const tolerance = Math.max(Math.abs(value), Math.abs(minNotional), 1) * Number.EPSILON;
+  return value + tolerance >= minNotional;
 }
 
 export async function createDecisionLimitOrders(opts: {
@@ -168,7 +197,24 @@ export async function createDecisionLimitOrders(opts: {
     } else {
       continue;
     }
-    const qty = Number(quantity.toFixed(info.quantityPrecision));
+    const rawQuantity = quantity;
+    let qty = Number(rawQuantity.toFixed(info.quantityPrecision));
+    const freshNominal = rawQuantity * roundedLimit;
+    const meetsFreshNominal = meetsMinNotional(freshNominal, info.minNotional);
+    const roundedNominal = qty * roundedLimit;
+    if (side === 'BUY' && meetsFreshNominal && !meetsMinNotional(roundedNominal, info.minNotional)) {
+      const targetNominal =
+        Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;
+      const adjustedQty = increaseQuantityToMeetNominal({
+        price: roundedLimit,
+        precision: info.quantityPrecision,
+        targetNominal,
+      });
+      if (adjustedQty !== null && adjustedQty > qty) {
+        qty = adjustedQty;
+      }
+    }
+    const nominalValue = qty * roundedLimit;
     const params = { symbol: info.symbol, side, quantity: qty, price: roundedLimit } as const;
     const planned = {
       ...plannedBase,
@@ -179,7 +225,7 @@ export async function createDecisionLimitOrders(opts: {
       maxPriceDivergencePct: divergenceLimit,
     };
 
-    if (qty * roundedLimit < info.minNotional) {
+    if (!meetsMinNotional(nominalValue, info.minNotional)) {
       await insertLimitOrder({
         userId: opts.userId,
         planned,
