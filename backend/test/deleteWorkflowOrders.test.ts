@@ -6,6 +6,7 @@ import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { getLimitOrdersByReviewResult } from '../src/repos/limit-orders.js';
 import { authCookies } from './helpers.js';
+import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 
 vi.mock('../src/workflows/portfolio-review.js', () => ({
   reviewAgentPortfolio: vi.fn(() => Promise.resolve()),
@@ -23,8 +24,14 @@ vi.mock('../src/services/binance.js', async () => {
   return { ...actual, cancelOrder };
 });
 
+const cancelOrdersSpy = vi.spyOn(
+  orderOrchestrator,
+  'cancelOrdersForWorkflow',
+);
+
 describe('delete workflow cancels all orders', () => {
   it('cancels open orders for all symbols', async () => {
+    cancelOrdersSpy.mockClear();
     const app = await buildServer();
     const userId = await insertUserWithKeys('multi');
     const agent = await insertAgent({
@@ -75,6 +82,13 @@ describe('delete workflow cancels all orders', () => {
       orderId: 2,
     });
     expect(cancelOrder).toHaveBeenCalledTimes(2);
+    expect(cancelOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(cancelOrdersSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: agent.id,
+        reason: orderOrchestrator.CANCEL_ORDER_REASONS.WORKFLOW_DELETED,
+      }),
+    );
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders.map((o) => o.status)).toEqual(['canceled', 'canceled']);
     await app.close();

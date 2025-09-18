@@ -26,6 +26,12 @@ import { encrypt } from '../src/util/crypto.js';
 import { removeWorkflowFromSchedule } from '../src/workflows/portfolio-review.js';
 import { cancelOrder } from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
+import * as orderOrchestrator from '../src/services/order-orchestrator.js';
+
+const cancelOrdersSpy = vi.spyOn(
+  orderOrchestrator,
+  'cancelOrdersForWorkflow',
+);
 
 describe('AI API key routes', () => {
   it('performs CRUD operations', async () => {
@@ -359,6 +365,7 @@ describe('key deletion effects on agents', () => {
   beforeEach(() => {
     (removeWorkflowFromSchedule as any).mockClear();
     (cancelOrder as any).mockClear();
+    cancelOrdersSpy.mockClear();
   });
   it('stops agents when binance key is deleted', async () => {
     const app = await buildServer();
@@ -411,6 +418,13 @@ describe('key deletion effects on agents', () => {
       symbol: 'BTCETH',
       orderId: 1,
     });
+    expect(cancelOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(cancelOrdersSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: agent.id,
+        reason: orderOrchestrator.CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+      }),
+    );
     await app.close();
   });
 
@@ -465,6 +479,13 @@ describe('key deletion effects on agents', () => {
       symbol: 'BTCETH',
       orderId: 2,
     });
+    expect(cancelOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(cancelOrdersSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: agent.id,
+        reason: orderOrchestrator.CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+      }),
+    );
     await app.close();
   });
 
@@ -532,6 +553,13 @@ describe('key deletion effects on agents', () => {
       symbol: 'BTCETH',
       orderId: 3,
     });
+    expect(cancelOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(cancelOrdersSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: agent.id,
+        reason: orderOrchestrator.CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+      }),
+    );
     await app.close();
   });
 
@@ -598,6 +626,13 @@ describe('key deletion effects on agents', () => {
       symbol: 'BTCETH',
       orderId: 4,
     });
+    expect(cancelOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(cancelOrdersSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: agent.id,
+        reason: orderOrchestrator.CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+      }),
+    );
     const keyRow = await getUserApiKeys(userId);
     expect(keyRow?.ai_api_key_enc).toBeNull();
     const shareExists = await hasAiKeyShare({
@@ -662,6 +697,7 @@ describe('key deletion effects on agents', () => {
     expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
     expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
     expect(cancelOrder).not.toHaveBeenCalled();
+    expect(cancelOrdersSpy).not.toHaveBeenCalled();
     const keyRow = await getUserApiKeys(userId);
     expect(keyRow?.ai_api_key_enc).toBeDefined();
     await app.close();
@@ -716,6 +752,7 @@ describe('key deletion effects on agents', () => {
     expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
     expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
     expect(cancelOrder).not.toHaveBeenCalled();
+    expect(cancelOrdersSpy).not.toHaveBeenCalled();
     await app.close();
   });
 });
