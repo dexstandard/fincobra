@@ -18,12 +18,14 @@ import {
 } from '../util/api-keys.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
+import type { DisableWorkflowsSummary } from '../workflows/disable.js';
 import { disableUserWorkflows } from '../workflows/disable.js';
 import {
   adminPreHandlers,
   getValidatedUserId,
   userPreHandlers,
 } from './_shared/guards.js';
+import {REDACTED_KEY} from "./_shared/constants.js";
 
 interface AiKeyBody {
   key: string;
@@ -55,8 +57,6 @@ const revokeShareBodySchema: z.ZodType<RevokeShareBody> = z
   })
   .strict();
 
-type DisableWorkflowsSummary = Awaited<ReturnType<typeof disableUserWorkflows>>;
-
 function logDisabledWorkflows(
   req: FastifyRequest,
   userId: string,
@@ -85,8 +85,6 @@ function parseBody<S extends z.ZodTypeAny>(
 }
 
 export default async function aiApiKeyRoutes(app: FastifyInstance) {
-  const redacted = '<REDACTED>';
-
   app.post(
     '/users/:id/ai-key',
     {
@@ -104,7 +102,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
       await setAiKey({ userId: userId, apiKeyEnc: enc });
-      return { key: redacted };
+      return { key: REDACTED_KEY };
     },
   );
 
@@ -119,7 +117,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       const aiKey = await getAiKey(id);
       if (!aiKey)
         return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
-      return { key: redacted };
+      return { key: REDACTED_KEY };
     },
   );
 
@@ -133,7 +131,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       const id = getValidatedUserId(req);
       const sharedKey = await getSharedAiKey(id);
       if (!sharedKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
-      return { key: redacted, shared: true, model: sharedKey.model };
+      return { key: REDACTED_KEY, shared: true, model: sharedKey.model };
     },
   );
 
@@ -154,7 +152,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
       await setAiKey({ userId: id, apiKeyEnc: enc });
-      return { key: redacted };
+      return { key: REDACTED_KEY };
     },
   );
 

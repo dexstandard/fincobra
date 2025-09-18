@@ -15,7 +15,7 @@ interface DisableUserWorkflowsParams {
   aiKeyId?: string | null;
 }
 
-export interface DisableUserWorkflowsSummary {
+export interface DisableWorkflowsSummary {
   disabledWorkflowIds: string[];
   unscheduledWorkflowIds: string[];
 }
@@ -24,7 +24,7 @@ export async function disableUserWorkflows({
   log,
   userId,
   aiKeyId,
-}: DisableUserWorkflowsParams): Promise<DisableUserWorkflowsSummary> {
+}: DisableUserWorkflowsParams): Promise<DisableWorkflowsSummary> {
   const workflows = await getActivePortfolioWorkflowsByUser(userId);
   const relevant = aiKeyId
     ? workflows.filter((wf) => wf.aiApiKeyId === aiKeyId)
