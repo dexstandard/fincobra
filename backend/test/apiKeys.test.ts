@@ -84,7 +84,7 @@ describe('AI API key routes', () => {
       cookies: authCookies(userId),
       payload: { key: 'dup' },
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(409);
 
     fetchMock.mockResolvedValueOnce({ ok: false } as any);
     res = await app.inject({
