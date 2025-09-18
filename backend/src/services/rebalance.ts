@@ -64,6 +64,12 @@ function increaseQuantityToMeetNominal({
   return adjusted;
 }
 
+function meetsMinNotional(value: number, minNotional: number): boolean {
+  if (!Number.isFinite(value) || !Number.isFinite(minNotional)) return false;
+  const tolerance = Math.max(Math.abs(value), Math.abs(minNotional), 1) * Number.EPSILON;
+  return value + tolerance >= minNotional;
+}
+
 export async function createDecisionLimitOrders(opts: {
   userId: string;
   orders: (MainTraderOrder & { manuallyEdited?: boolean })[];
@@ -194,11 +200,9 @@ export async function createDecisionLimitOrders(opts: {
     const rawQuantity = quantity;
     let qty = Number(rawQuantity.toFixed(info.quantityPrecision));
     const freshNominal = rawQuantity * roundedLimit;
-    if (
-      side === 'BUY' &&
-      freshNominal >= info.minNotional &&
-      qty * roundedLimit < info.minNotional
-    ) {
+    const meetsFreshNominal = meetsMinNotional(freshNominal, info.minNotional);
+    const roundedNominal = qty * roundedLimit;
+    if (side === 'BUY' && meetsFreshNominal && !meetsMinNotional(roundedNominal, info.minNotional)) {
       const targetNominal =
         Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;
       const adjustedQty = increaseQuantityToMeetNominal({
@@ -221,7 +225,7 @@ export async function createDecisionLimitOrders(opts: {
       maxPriceDivergencePct: divergenceLimit,
     };
 
-    if (nominalValue < info.minNotional) {
+    if (!meetsMinNotional(nominalValue, info.minNotional)) {
       await insertLimitOrder({
         userId: opts.userId,
         planned,
