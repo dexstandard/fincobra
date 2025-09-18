@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../src/workflows/portfolio-review.js', () => ({
-  removeWorkflowFromSchedule: vi.fn(),
-}));
-
 vi.mock('../src/services/binance.js', async () => {
   const actual = await vi.importActual<typeof import('../src/services/binance.js')>(
     '../src/services/binance.js',
@@ -23,7 +19,7 @@ import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { encrypt } from '../src/util/crypto.js';
-import { removeWorkflowFromSchedule } from '../src/workflows/portfolio-review.js';
+import * as portfolioReview from '../src/workflows/portfolio-review.js';
 import { cancelOrder } from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
@@ -31,6 +27,11 @@ import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 const cancelOrdersSpy = vi.spyOn(
   orderOrchestrator,
   'cancelOrdersForWorkflow',
+);
+
+const removeWorkflowFromScheduleSpy = vi.spyOn(
+  portfolioReview,
+  'removeWorkflowFromSchedule',
 );
 
 describe('AI API key routes', () => {
@@ -200,7 +201,7 @@ describe('AI API key routes', () => {
       method: 'DELETE',
       url: `/api/users/${adminId}/ai-key/share`,
       cookies: authCookies(adminId),
-      payload: { email: 'user@example.com', model: 'gpt-5' },
+      payload: { email: 'user@example.com' },
     });
     expect(res.statusCode).toBe(200);
 
@@ -363,7 +364,7 @@ describe('Binance API key routes', () => {
 
 describe('key deletion effects on agents', () => {
   beforeEach(() => {
-    (removeWorkflowFromSchedule as any).mockClear();
+    removeWorkflowFromScheduleSpy.mockClear();
     (cancelOrder as any).mockClear();
     cancelOrdersSpy.mockClear();
   });
@@ -413,7 +414,7 @@ describe('key deletion effects on agents', () => {
     expect(res.statusCode).toBe(200);
     const row = await getPortfolioWorkflow(agent.id);
     expect(row?.status).toBe('inactive');
-    expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
+    expect(removeWorkflowFromScheduleSpy).toHaveBeenCalledWith(agent.id);
     expect(cancelOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCETH',
       orderId: 1,
@@ -428,7 +429,7 @@ describe('key deletion effects on agents', () => {
     await app.close();
   });
 
-  it('sets agents to draft when ai key is deleted', async () => {
+  it('deactivates agents when ai key is deleted', async () => {
     const app = await buildServer();
     const userId = await insertUser('4');
     const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
@@ -473,8 +474,8 @@ describe('key deletion effects on agents', () => {
     });
     expect(res.statusCode).toBe(200);
     const row = await getPortfolioWorkflow(agent.id);
-    expect(row).toMatchObject({ status: 'draft', model: null });
-    expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
+    expect(row).toMatchObject({ status: 'inactive' });
+    expect(removeWorkflowFromScheduleSpy).toHaveBeenCalledWith(agent.id);
     expect(cancelOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCETH',
       orderId: 2,
@@ -489,7 +490,7 @@ describe('key deletion effects on agents', () => {
     await app.close();
   });
 
-  it('drafts agents when shared ai key is revoked', async () => {
+  it('deactivates agents when shared ai key is revoked', async () => {
     const app = await buildServer();
     const adminId = await insertAdminUser(
       'a5',
@@ -547,8 +548,8 @@ describe('key deletion effects on agents', () => {
     });
     expect(res.statusCode).toBe(200);
     const row = await getPortfolioWorkflow(agent.id);
-    expect(row).toMatchObject({ status: 'draft', model: null });
-    expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
+    expect(row).toMatchObject({ status: 'inactive' });
+    expect(removeWorkflowFromScheduleSpy).toHaveBeenCalledWith(agent.id);
     expect(cancelOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCETH',
       orderId: 3,
@@ -563,7 +564,7 @@ describe('key deletion effects on agents', () => {
     await app.close();
   });
 
-  it('revokes shares and drafts agents when admin deletes ai key', async () => {
+  it('revokes shares and deactivates agents when admin deletes ai key', async () => {
     const app = await buildServer();
     const adminId = await insertAdminUser(
       'a8',
@@ -620,8 +621,8 @@ describe('key deletion effects on agents', () => {
     });
     expect(res.statusCode).toBe(200);
     const row = await getPortfolioWorkflow(agent.id);
-    expect(row).toMatchObject({ status: 'draft', model: null });
-    expect(removeWorkflowFromSchedule).toHaveBeenCalledWith(agent.id);
+    expect(row).toMatchObject({ status: 'inactive' });
+    expect(removeWorkflowFromScheduleSpy).toHaveBeenCalledWith(agent.id);
     expect(cancelOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCETH',
       orderId: 4,
@@ -695,7 +696,7 @@ describe('key deletion effects on agents', () => {
     expect(res.statusCode).toBe(200);
     const row = await getPortfolioWorkflow(agent.id);
     expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
-    expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
+    expect(removeWorkflowFromScheduleSpy).not.toHaveBeenCalled();
     expect(cancelOrder).not.toHaveBeenCalled();
     expect(cancelOrdersSpy).not.toHaveBeenCalled();
     const keyRow = await getUserApiKeys(userId);
@@ -750,7 +751,7 @@ describe('key deletion effects on agents', () => {
     expect(res.statusCode).toBe(404);
     const row = await getPortfolioWorkflow(agent.id);
     expect(row).toMatchObject({ status: 'active', model: 'gpt-5' });
-    expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
+    expect(removeWorkflowFromScheduleSpy).not.toHaveBeenCalled();
     expect(cancelOrder).not.toHaveBeenCalled();
     expect(cancelOrdersSpy).not.toHaveBeenCalled();
     await app.close();
