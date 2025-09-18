@@ -25,8 +25,8 @@ import { parseParams } from '../util/validation.js';
 import {
   CANCEL_ORDER_REASONS,
   cancelOrdersForWorkflow,
-  userIdParams,
 } from '../services/order-orchestrator.js';
+import { userIdParams } from './_shared/validation.js';
 
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
   app.post(

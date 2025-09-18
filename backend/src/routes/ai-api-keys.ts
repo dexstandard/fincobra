@@ -11,7 +11,6 @@ import {
   hasAiKeyShare,
   getAiKeyShareTargets,
 } from '../repos/ai-api-key.js';
-import { requireUserIdMatch, requireAdmin } from '../util/auth.js';
 import {
   ApiKeyType,
   verifyApiKey,
@@ -22,12 +21,12 @@ import {
 } from '../util/api-keys.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
-import { parseParams } from '../util/validation.js';
-import { userIdParams } from '../services/order-orchestrator.js';
+import { disableUserWorkflows } from '../workflows/disable.js';
 import {
-  disableUserWorkflows,
-  removeWorkflowFromSchedule,
-} from '../workflows/portfolio-review.js';
+  adminPreHandlers,
+  getValidatedUserId,
+  userPreHandlers,
+} from './_shared/guards.js';
 
 interface AiKeyBody {
   key: string;
@@ -59,46 +58,21 @@ const revokeShareBodySchema: z.ZodType<RevokeShareBody> = z
   })
   .strict();
 
-type RequestWithUserId = FastifyRequest & { validatedUserId: string };
-type RequestWithOwnerAdmin = RequestWithUserId & { adminUserId: string };
+type DisableWorkflowsSummary = Awaited<ReturnType<typeof disableUserWorkflows>>;
 
-const parseUserIdParam = async (
+function logDisabledWorkflows(
   req: FastifyRequest,
-  reply: FastifyReply,
-) => {
-  const params = parseParams(userIdParams, req.params, reply);
-  if (!params) return reply;
-  (req as RequestWithUserId).validatedUserId = params.id;
-};
-
-const requireUserOwner = async (
-  req: FastifyRequest,
-  reply: FastifyReply,
-) => {
-  const { validatedUserId } = req as RequestWithUserId;
-  if (!requireUserIdMatch(req, reply, validatedUserId)) return reply;
-};
-
-const requireOwnerAdmin = async (
-  req: FastifyRequest,
-  reply: FastifyReply,
-) => {
-  const adminId = await requireAdmin(req, reply);
-  if (!adminId) return reply;
-  const { validatedUserId } = req as RequestWithUserId;
-  if (adminId !== validatedUserId) {
-    reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
-    return reply;
-  }
-  (req as RequestWithOwnerAdmin).adminUserId = adminId;
-};
-
-function getUserId(req: FastifyRequest): string {
-  return (req as RequestWithUserId).validatedUserId;
+  userId: string,
+  summary: DisableWorkflowsSummary,
+  context: string,
+) {
+  const { disabledWorkflowIds, unscheduledWorkflowIds } = summary;
+  if (!disabledWorkflowIds.length && !unscheduledWorkflowIds.length) return;
+  req.log.info(
+    { userId, disabledWorkflowIds, unscheduledWorkflowIds, context },
+    'disabled workflows after AI key update',
+  );
 }
-
-const userPreHandlers = [parseUserIdParam, requireUserOwner];
-const adminPreHandlers = [parseUserIdParam, requireOwnerAdmin];
 
 function parseBody<S extends z.ZodTypeAny>(
   schema: S,
@@ -121,12 +95,12 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: userPreHandlers,
     },
     async (req, reply) => {
-      const id = getUserId(req);
+      const id = getValidatedUserId(req);
       const body = parseBody(aiKeyBodySchema, req, reply);
       if (!body) return;
       const { key } = body;
       const aiKey = await getAiKey(id);
-      const userErr = ensureUser(aiKey === undefined ? undefined : {});
+      const userErr = ensureUser(aiKey !== undefined);
       if (userErr) return reply.code(userErr.code).send(userErr.body);
       const keyErr = ensureKeyAbsent(aiKey, ['aiApiKeyEnc']);
       if (keyErr) return reply.code(keyErr.code).send(keyErr.body);
@@ -145,7 +119,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: userPreHandlers,
     },
     async (req, reply) => {
-      const id = getUserId(req);
+      const id = getValidatedUserId(req);
       const aiKey = await getAiKey(id);
       if (!aiKey?.aiApiKeyEnc)
         return reply
@@ -162,7 +136,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: userPreHandlers,
     },
     async (req, reply) => {
-      const id = getUserId(req);
+      const id = getValidatedUserId(req);
       const sharedKey = await getSharedAiKey(id);
       if (!sharedKey?.aiApiKeyEnc)
         return reply
@@ -179,7 +153,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: userPreHandlers,
     },
     async (req, reply) => {
-      const id = getUserId(req);
+      const id = getValidatedUserId(req);
       const body = parseBody(aiKeyBodySchema, req, reply);
       if (!body) return;
       const { key } = body;
@@ -203,19 +177,19 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: userPreHandlers,
     },
     async (req, reply) => {
-      const id = getUserId(req);
+      const id = getValidatedUserId(req);
       const aiKey = await getAiKey(id);
       if (!aiKey?.aiApiKeyEnc)
         return reply
           .code(404)
           .send(errorResponse(ERROR_MESSAGES.notFound));
 
-      const disabledIds = await disableUserWorkflows({
+      const disableSummary = await disableUserWorkflows({
         log: req.log,
         userId: id,
         aiKeyId: aiKey.id,
       });
-      for (const workflowId of disabledIds) removeWorkflowFromSchedule(workflowId);
+      logDisabledWorkflows(req, id, disableSummary, 'owner-ai-key-removed');
 
       const targets = await getAiKeyShareTargets(id);
       for (const targetId of targets) {
@@ -224,13 +198,17 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
           getSharedAiKey(targetId),
         ]);
         if (!targetOwnKey && targetSharedKey) {
-          const affectedIds = await disableUserWorkflows({
+          const targetSummary = await disableUserWorkflows({
             log: req.log,
             userId: targetId,
             aiKeyId: targetSharedKey.id,
           });
-          for (const workflowId of affectedIds)
-            removeWorkflowFromSchedule(workflowId);
+          logDisabledWorkflows(
+            req,
+            targetId,
+            targetSummary,
+            'shared-ai-key-removed',
+          );
         }
         await revokeAiKeyShare({ ownerUserId: id, targetUserId: targetId });
       }
@@ -246,7 +224,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: adminPreHandlers,
     },
     async (req, reply) => {
-      const id = getUserId(req);
+      const id = getValidatedUserId(req);
       const body = parseBody(shareAiKeyBodySchema, req, reply);
       if (!body) return;
       const { email, model } = body;
@@ -267,7 +245,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       preHandler: adminPreHandlers,
     },
     async (req, reply) => {
-      const id = getUserId(req);
+      const id = getValidatedUserId(req);
       const body = parseBody(revokeShareBodySchema, req, reply);
       if (!body) return;
       const { email } = body;
@@ -280,13 +258,17 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
         getSharedAiKey(target.id),
       ]);
       if (!targetOwnKey && targetSharedKey) {
-        const affectedIds = await disableUserWorkflows({
+        const disableSummary = await disableUserWorkflows({
           log: req.log,
           userId: target.id,
           aiKeyId: targetSharedKey.id,
         });
-        for (const workflowId of affectedIds)
-          removeWorkflowFromSchedule(workflowId);
+        logDisabledWorkflows(
+          req,
+          target.id,
+          disableSummary,
+          'shared-ai-key-revoked',
+        );
       }
       await revokeAiKeyShare({ ownerUserId: id, targetUserId: target.id });
       return { ok: true };
