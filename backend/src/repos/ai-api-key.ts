@@ -1,4 +1,5 @@
 import { db } from '../db/index.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
   AiApiKeyDetails,
   AiApiKeyUpsert,
@@ -12,51 +13,48 @@ export async function getAiKey(
   id: string,
 ): Promise<AiApiKeyDetails | null | undefined> {
   const { rows } = await db.query(
-    `SELECT ak.id AS "aiApiKeyId",
-            ak.api_key_enc AS "aiApiKeyEnc"
+    `SELECT ak.id AS ai_api_key_id,
+            ak.api_key_enc AS ai_api_key_enc
        FROM users u
        LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai'
       WHERE u.id = $1`,
     [id],
   );
-  const row = rows[0] as
-    | {
-        aiApiKeyId: string | null;
-        aiApiKeyEnc: string | null;
-      }
-    | undefined;
+  const row = rows[0];
   if (!row) return undefined;
-  if (!row.aiApiKeyId) return null;
-  return { id: row.aiApiKeyId, aiApiKeyEnc: row.aiApiKeyEnc ?? '' };
+  const entity = convertKeysToCamelCase(row) as {
+    aiApiKeyId: string | null;
+    aiApiKeyEnc: string | null;
+  };
+  if (!entity.aiApiKeyId) return null;
+  return { id: entity.aiApiKeyId, aiApiKeyEnc: entity.aiApiKeyEnc ?? '' };
 }
 
 export async function getSharedAiKey(
   id: string,
 ): Promise<SharedAiApiKeyDetails | null | undefined> {
   const { rows } = await db.query(
-    `SELECT oak.id AS "sharedAiApiKeyId",
-            oak.api_key_enc AS "sharedAiApiKeyEnc",
-            s.model AS "sharedModel"
+    `SELECT oak.id AS shared_ai_api_key_id,
+            oak.api_key_enc AS shared_ai_api_key_enc,
+            s.model AS shared_model
        FROM users u
        LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id
        LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
       WHERE u.id = $1`,
     [id],
   );
-  const row = rows[0] as
-    | {
-        sharedAiApiKeyId: string | null;
-        sharedAiApiKeyEnc: string | null;
-        sharedModel: string | null;
-      }
-    | undefined;
+  const row = rows[0];
   if (!row) return undefined;
-  if (!row.sharedAiApiKeyId)
-    return null;
+  const entity = convertKeysToCamelCase(row) as {
+    sharedAiApiKeyId: string | null;
+    sharedAiApiKeyEnc: string | null;
+    sharedModel: string | null;
+  };
+  if (!entity.sharedAiApiKeyId) return null;
   return {
-    id: row.sharedAiApiKeyId,
-    aiApiKeyEnc: row.sharedAiApiKeyEnc ?? '',
-    model: row.sharedModel ?? null,
+    id: entity.sharedAiApiKeyId,
+    aiApiKeyEnc: entity.sharedAiApiKeyEnc ?? '',
+    model: entity.sharedModel ?? null,
   };
 }
 
@@ -101,5 +99,7 @@ export async function getAiKeyShareTargets(ownerId: string): Promise<string[]> {
     'SELECT target_user_id FROM ai_api_key_shares WHERE owner_user_id = $1',
     [ownerId],
   );
-  return rows.map((r: { target_user_id: string }) => r.target_user_id);
+  return (convertKeysToCamelCase(rows) as { targetUserId: string }[]).map(
+    (row) => row.targetUserId,
+  );
 }

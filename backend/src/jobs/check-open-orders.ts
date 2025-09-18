@@ -3,6 +3,7 @@ import {
   getAllOpenLimitOrders,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
+import type { LimitOrderOpen } from '../repos/limit-orders.types.js';
 import {
   fetchOpenOrders,
   fetchOrder,
@@ -11,14 +12,7 @@ import {
 } from '../services/binance.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 
-interface Order {
-  user_id: string;
-  order_id: string;
-  workflow_status: string;
-  planned_json: string;
-}
-
-interface GroupedOrder extends Order {
+interface GroupedOrder extends LimitOrderOpen {
   planned: { symbol: string };
 }
 
@@ -40,11 +34,11 @@ export default async function checkOpenOrders(log: FastifyBaseLogger) {
   }
 }
 
-function groupByUserAndSymbol(orders: Order[]) {
+function groupByUserAndSymbol(orders: LimitOrderOpen[]) {
   const groups = new Map<string, GroupedOrder[]>();
   for (const o of orders) {
-    const planned = JSON.parse(o.planned_json) as { symbol: string };
-    const key = `${o.user_id}-${planned.symbol}`;
+    const planned = JSON.parse(o.plannedJson) as { symbol: string };
+    const key = `${o.userId}-${planned.symbol}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push({ ...o, planned });
   }
@@ -52,10 +46,10 @@ function groupByUserAndSymbol(orders: Order[]) {
 }
 
 async function reconcileGroup(log: FastifyBaseLogger, list: GroupedOrder[]) {
-  const { user_id, planned } = list[0];
+  const { userId, planned } = list[0];
   let open: OpenOrder[] = [];
   try {
-    const res = await fetchOpenOrders(user_id, { symbol: planned.symbol });
+    const res = await fetchOpenOrders(userId, { symbol: planned.symbol });
     open = Array.isArray(res) ? res : [];
   } catch (err) {
     log.error({ err }, 'failed to fetch open orders');
@@ -71,20 +65,20 @@ async function resolveClosedStatus(
   order: GroupedOrder,
   symbol: string,
 ): Promise<'filled' | 'canceled' | null> {
-  const orderId = Number(order.order_id);
+  const orderId = Number(order.orderId);
   if (!Number.isFinite(orderId)) {
     log.error(
-      { orderId: order.order_id },
+      { orderId: order.orderId },
       'invalid order id while reconciling limit order',
     );
     return null;
   }
 
   try {
-    const res = await fetchOrder(order.user_id, { symbol, orderId });
+    const res = await fetchOrder(order.userId, { symbol, orderId });
     if (!res || !res.status) {
       log.error(
-        { orderId: order.order_id },
+        { orderId: order.orderId },
         'missing Binance order status while reconciling',
       );
       return null;
@@ -93,7 +87,7 @@ async function resolveClosedStatus(
     if (status === 'FILLED') return 'filled';
     if (CLOSED_ORDER_STATUSES.has(status)) return 'canceled';
     log.error(
-      { orderId: order.order_id, status },
+      { orderId: order.orderId, status },
       'unexpected Binance order status while reconciling',
     );
     return null;
@@ -101,7 +95,7 @@ async function resolveClosedStatus(
     const { code } = parseBinanceError(err);
     if (code === -2013) return 'canceled';
     log.error(
-      { err, orderId: order.order_id },
+      { err, orderId: order.orderId },
       'failed to fetch Binance order while reconciling',
     );
     return null;
@@ -114,21 +108,21 @@ async function reconcileOrder(
   symbol: string,
   open: OpenOrder[],
 ) {
-  const exists = open.some((r) => String(r.orderId) === o.order_id);
+  const exists = open.some((r) => String(r.orderId) === o.orderId);
   if (!exists) {
     const status = await resolveClosedStatus(log, o, symbol);
     if (status === 'filled') {
-      await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
+      await updateLimitOrderStatus(o.userId, o.orderId, 'filled');
     } else if (status === 'canceled') {
-      await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
+      await updateLimitOrderStatus(o.userId, o.orderId, 'canceled');
     }
     return;
   }
-  if (o.workflow_status !== 'active') {
+  if (o.workflowStatus !== 'active') {
     try {
-      await cancelLimitOrder(o.user_id, {
+      await cancelLimitOrder(o.userId, {
         symbol,
-        orderId: o.order_id,
+        orderId: o.orderId,
         reason: 'Workflow inactive',
       });
     } catch (err) {

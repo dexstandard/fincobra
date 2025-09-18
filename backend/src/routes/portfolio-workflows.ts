@@ -281,16 +281,16 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       log.info({ execLogId: logId }, 'fetched exec orders');
       return {
         orders: rows.map((r) => {
-          const planned = JSON.parse(r.planned_json);
+          const planned = JSON.parse(r.plannedJson);
           return {
-            id: r.order_id,
+            id: r.orderId,
             side: planned.side,
             quantity: planned.quantity,
             price: planned.price,
             symbol: planned.symbol,
             status: r.status,
-            createdAt: r.created_at.getTime(),
-            cancellationReason: r.cancellation_reason ?? undefined,
+            createdAt: r.createdAt.getTime(),
+            cancellationReason: r.cancellationReason ?? undefined,
           } as const;
         }),
       };
@@ -367,14 +367,14 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           .send(errorResponse('failed to create limit order'));
       }
       const latest = orders[orders.length - 1];
-      if (latest.status === 'canceled' && latest.cancellation_reason) {
+      if (latest.status === 'canceled' && latest.cancellationReason) {
         log.error(
-          { execLogId: logId, reason: latest.cancellation_reason },
+          { execLogId: logId, reason: latest.cancellationReason },
           'manual order canceled',
         );
         return reply
           .code(400)
-          .send(errorResponse(latest.cancellation_reason));
+          .send(errorResponse(latest.cancellationReason));
       }
       log.info({ execLogId: logId }, 'created manual order');
       return reply.code(201).send({ ok: true });
@@ -394,7 +394,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if (!lp) return;
       const { logId, orderId } = lp;
       const rows = await getLimitOrdersByReviewResult(id, logId);
-      const row = rows.find((r) => r.order_id === orderId);
+      const row = rows.find((r) => r.orderId === orderId);
       if (!row) {
         log.error({ execLogId: logId, orderId }, 'order not found');
         return reply.code(404).send(errorResponse('order not found'));
@@ -403,7 +403,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         log.error({ execLogId: logId, orderId }, 'order not open');
         return reply.code(400).send(errorResponse('order not open'));
       }
-      const planned = JSON.parse(row.planned_json);
+      const planned = JSON.parse(row.plannedJson);
       try {
         await cancelLimitOrder(userId, {
           symbol: planned.symbol,
@@ -517,28 +517,28 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       for (const o of openOrders) {
         let symbol: string | undefined;
         try {
-          const planned = JSON.parse(o.planned_json);
+          const planned = JSON.parse(o.plannedJson);
           if (typeof planned.symbol === 'string') symbol = planned.symbol;
         } catch (err) {
-          log.error({ err, orderId: o.order_id }, 'failed to parse planned order');
+          log.error({ err, orderId: o.orderId }, 'failed to parse planned order');
         }
         if (!symbol) {
           await updateLimitOrderStatus(
-            o.user_id,
-            o.order_id,
+            o.userId,
+            o.orderId,
             'canceled',
             'Workflow deleted',
           );
           continue;
         }
         try {
-          await cancelLimitOrder(o.user_id, {
+          await cancelLimitOrder(o.userId, {
             symbol,
-            orderId: o.order_id,
+            orderId: o.orderId,
             reason: 'Workflow deleted',
           });
         } catch (err) {
-          log.error({ err, symbol, orderId: o.order_id }, 'failed to cancel order');
+          log.error({ err, symbol, orderId: o.orderId }, 'failed to cancel order');
         }
       }
       log.info('deleted workflow');
