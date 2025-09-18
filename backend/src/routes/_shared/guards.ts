@@ -39,3 +39,9 @@ export async function requireOwnerAdmin(
     return reply;
   }
 }
+
+export const userOwnerPreHandlers = [parseUserIdParam, requireUserOwner];
+export const ownerAdminPreHandlers = [
+  parseUserIdParam,
+  requireOwnerAdmin,
+];

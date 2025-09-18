@@ -6,12 +6,6 @@ import {
   clearBinanceKey,
 } from '../repos/exchange-api-keys.js';
 import {
-  getActivePortfolioWorkflowsByUser,
-  deactivateWorkflowsByUser,
-} from '../repos/portfolio-workflow.js';
-import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
-import { requireUserIdMatch } from '../util/auth.js';
-import {
   ApiKeyType,
   verifyApiKey,
   encryptKey,
@@ -21,22 +15,21 @@ import {
   decryptKey,
 } from '../util/api-keys.js';
 import { errorResponse } from '../util/errorMessages.js';
-import { parseParams } from '../util/validation.js';
+import { disableUserWorkflows } from '../workflows/portfolio-review.js';
 import {
-  CANCEL_ORDER_REASONS,
-  cancelOrdersForWorkflow,
-} from '../services/order-orchestrator.js';
-import { userIdParams } from './_shared/validation.js';
+  getValidatedUserId as getUserId,
+  userOwnerPreHandlers,
+} from './_shared/guards.js';
 
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
   app.post(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: userOwnerPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
+      const id = getUserId(req);
       const { key, secret } = req.body as { key: string; secret: string };
       const row = await getBinanceKeyRow(id);
       let err = ensureUser(row);
@@ -67,12 +60,12 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
 
   app.get(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.MODERATE } },
+    {
+      config: { rateLimit: RATE_LIMITS.MODERATE },
+      preHandler: userOwnerPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
+      const id = getUserId(req);
       const row = await getBinanceKeyRow(id);
       const err = ensureKeyPresent(row, [
         'binanceApiKeyEnc',
@@ -87,12 +80,12 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
 
   app.put(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: userOwnerPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
+      const id = getUserId(req);
       const { key, secret } = req.body as { key: string; secret: string };
       const row = await getBinanceKeyRow(id);
       const err = ensureKeyPresent(row, [
@@ -124,32 +117,28 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
 
   app.delete(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.VERY_TIGHT },
+      preHandler: userOwnerPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
+      const id = getUserId(req);
       const row = await getBinanceKeyRow(id);
       const err = ensureKeyPresent(row, [
         'binanceApiKeyEnc',
         'binanceApiSecretEnc',
       ]);
       if (err) return reply.code(err.code).send(err.body);
-      const agents = await getActivePortfolioWorkflowsByUser(id);
-      for (const agent of agents) {
-        removeWorkflowFromSchedule(agent.id);
-        try {
-          await cancelOrdersForWorkflow({
-            workflowId: agent.id,
-            reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
-            log: req.log,
-          });
-        } catch (err) {
-          req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
-        }
+      const { disabledWorkflowIds } = await disableUserWorkflows({
+        log: req.log,
+        userId: id,
+      });
+      if (disabledWorkflowIds.length) {
+        req.log.info(
+          { userId: id, disabledWorkflowIds },
+          'disabled workflows after Binance key removal',
+        );
       }
-      await deactivateWorkflowsByUser(id);
       await clearBinanceKey(id);
       return { ok: true };
     },

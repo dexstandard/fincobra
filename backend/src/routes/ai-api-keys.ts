@@ -23,9 +23,8 @@ import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
 import {
   getValidatedUserId as getUserId,
-  parseUserIdParam,
-  requireOwnerAdmin,
-  requireUserOwner,
+  ownerAdminPreHandlers,
+  userOwnerPreHandlers,
 } from './_shared/guards.js';
 import { disableUserWorkflows } from '../workflows/portfolio-review.js';
 
@@ -59,9 +58,6 @@ const revokeShareBodySchema: z.ZodType<RevokeShareBody> = z
   })
   .strict();
 
-const userPreHandlers = [parseUserIdParam, requireUserOwner];
-const adminPreHandlers = [parseUserIdParam, requireOwnerAdmin];
-
 function parseBody<S extends z.ZodTypeAny>(
   schema: S,
   req: FastifyRequest,
@@ -80,7 +76,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     '/users/:id/ai-key',
     {
       config: { rateLimit: RATE_LIMITS.TIGHT },
-      preHandler: userPreHandlers,
+      preHandler: userOwnerPreHandlers,
     },
     async (req, reply) => {
       const id = getUserId(req);
@@ -104,7 +100,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     '/users/:id/ai-key',
     {
       config: { rateLimit: RATE_LIMITS.MODERATE },
-      preHandler: userPreHandlers,
+      preHandler: userOwnerPreHandlers,
     },
     async (req, reply) => {
       const id = getUserId(req);
@@ -121,7 +117,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     '/users/:id/ai-key/shared',
     {
       config: { rateLimit: RATE_LIMITS.MODERATE },
-      preHandler: userPreHandlers,
+      preHandler: userOwnerPreHandlers,
     },
     async (req, reply) => {
       const id = getUserId(req);
@@ -138,7 +134,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     '/users/:id/ai-key',
     {
       config: { rateLimit: RATE_LIMITS.TIGHT },
-      preHandler: userPreHandlers,
+      preHandler: userOwnerPreHandlers,
     },
     async (req, reply) => {
       const id = getUserId(req);
@@ -162,7 +158,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     '/users/:id/ai-key',
     {
       config: { rateLimit: RATE_LIMITS.VERY_TIGHT },
-      preHandler: userPreHandlers,
+      preHandler: userOwnerPreHandlers,
     },
     async (req, reply) => {
       const id = getUserId(req);
@@ -215,7 +211,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     '/users/:id/ai-key/share',
     {
       config: { rateLimit: RATE_LIMITS.MODERATE },
-      preHandler: adminPreHandlers,
+      preHandler: ownerAdminPreHandlers,
     },
     async (req, reply) => {
       const id = getUserId(req);
@@ -236,7 +232,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     '/users/:id/ai-key/share',
     {
       config: { rateLimit: RATE_LIMITS.MODERATE },
-      preHandler: adminPreHandlers,
+      preHandler: ownerAdminPreHandlers,
     },
     async (req, reply) => {
       const id = getUserId(req);
