@@ -3,8 +3,8 @@ import { z } from 'zod';
 import {
   getOpenLimitOrdersForWorkflow,
   updateLimitOrderStatus,
-} from '../../repos/limit-orders.js';
-import { cancelLimitOrder } from '../../services/limit-order.js';
+} from '../repos/limit-orders.js';
+import { cancelLimitOrder } from './limit-order.js';
 
 export const userIdParams = z.object({ id: z.string().regex(/^\d+$/) });
 
