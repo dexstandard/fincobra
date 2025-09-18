@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import { RATE_LIMITS } from '../rate-limit.js';
 import {
   getBinanceKeyRow,
@@ -10,7 +11,6 @@ import {
   deactivateWorkflowsByUser,
 } from '../repos/portfolio-workflow.js';
 import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
-import { requireUserIdMatch } from '../util/auth.js';
 import {
   ApiKeyType,
   verifyApiKey,
@@ -21,24 +21,57 @@ import {
   decryptKey,
 } from '../util/api-keys.js';
 import { errorResponse } from '../util/errorMessages.js';
-import { parseParams } from '../util/validation.js';
 import {
   CANCEL_ORDER_REASONS,
   cancelOrdersForWorkflow,
 } from '../services/order-orchestrator.js';
-import { userIdParams } from './_shared/validation.js';
+import { REDACTED_KEY } from './_shared/constants.js';
+import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
+
+interface ExchangeKeyBody {
+  key: string;
+  secret: string;
+}
+
+const exchangeKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
+  .object({
+    key: z.string().trim().min(1),
+    secret: z.string().trim().min(1),
+  })
+  .strict();
+
+function parseBody<S extends z.ZodTypeAny>(
+  schema: S,
+  req: FastifyRequest,
+  reply: FastifyReply,
+): z.infer<S> | undefined {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    reply.code(400).send(errorResponse('invalid request body'));
+    return undefined;
+  }
+  return result.data;
+}
+
+function formatVerificationError(result: boolean | string): string {
+  return `verification failed${
+    typeof result === 'string' ? `: ${result}` : ''
+  }`;
+}
 
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
   app.post(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: userPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
-      const { key, secret } = req.body as { key: string; secret: string };
-      const row = await getBinanceKeyRow(id);
+      const userId = getValidatedUserId(req);
+      const body = parseBody(exchangeKeyBodySchema, req, reply);
+      if (!body) return;
+      const { key, secret } = body;
+      const row = await getBinanceKeyRow(userId);
       let err = ensureUser(row);
       if (err) return reply.code(err.code).send(err.body);
       err = ensureKeyAbsent(row, ['binanceApiKeyEnc', 'binanceApiSecretEnc']);
@@ -48,32 +81,28 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
         return reply
           .code(400)
           .send(
-            errorResponse(
-              `verification failed${
-                typeof verRes === 'string' ? `: ${verRes}` : ''
-              }`,
-            ),
+            errorResponse(formatVerificationError(verRes)),
           );
       const encKey = encryptKey(key);
       const encSecret = encryptKey(secret);
       await setBinanceKey({
-        userId: id,
+        userId,
         apiKeyEnc: encKey,
         apiSecretEnc: encSecret,
       });
-      return { key: '<REDACTED>', secret: '<REDACTED>' };
+      return { key: REDACTED_KEY, secret: REDACTED_KEY };
     },
   );
 
   app.get(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.MODERATE } },
+    {
+      config: { rateLimit: RATE_LIMITS.MODERATE },
+      preHandler: userPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
-      const row = await getBinanceKeyRow(id);
+      const userId = getValidatedUserId(req);
+      const row = await getBinanceKeyRow(userId);
       const err = ensureKeyPresent(row, [
         'binanceApiKeyEnc',
         'binanceApiSecretEnc',
@@ -81,20 +110,22 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       if (err) return reply.code(err.code).send(err.body);
       decryptKey(row!.binanceApiKeyEnc!);
       decryptKey(row!.binanceApiSecretEnc!);
-      return { key: '<REDACTED>', secret: '<REDACTED>' };
+      return { key: REDACTED_KEY, secret: REDACTED_KEY };
     },
   );
 
   app.put(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: userPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
-      const { key, secret } = req.body as { key: string; secret: string };
-      const row = await getBinanceKeyRow(id);
+      const userId = getValidatedUserId(req);
+      const body = parseBody(exchangeKeyBodySchema, req, reply);
+      if (!body) return;
+      const { key, secret } = body;
+      const row = await getBinanceKeyRow(userId);
       const err = ensureKeyPresent(row, [
         'binanceApiKeyEnc',
         'binanceApiSecretEnc',
@@ -105,38 +136,34 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
         return reply
           .code(400)
           .send(
-            errorResponse(
-              `verification failed${
-                typeof verRes === 'string' ? `: ${verRes}` : ''
-              }`,
-            ),
+            errorResponse(formatVerificationError(verRes)),
           );
       const encKey = encryptKey(key);
       const encSecret = encryptKey(secret);
       await setBinanceKey({
-        userId: id,
+        userId,
         apiKeyEnc: encKey,
         apiSecretEnc: encSecret,
       });
-      return { key: '<REDACTED>', secret: '<REDACTED>' };
+      return { key: REDACTED_KEY, secret: REDACTED_KEY };
     },
   );
 
   app.delete(
     '/users/:id/binance-key',
-    { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.VERY_TIGHT },
+      preHandler: userPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(userIdParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
-      const row = await getBinanceKeyRow(id);
+      const userId = getValidatedUserId(req);
+      const row = await getBinanceKeyRow(userId);
       const err = ensureKeyPresent(row, [
         'binanceApiKeyEnc',
         'binanceApiSecretEnc',
       ]);
       if (err) return reply.code(err.code).send(err.body);
-      const agents = await getActivePortfolioWorkflowsByUser(id);
+      const agents = await getActivePortfolioWorkflowsByUser(userId);
       for (const agent of agents) {
         removeWorkflowFromSchedule(agent.id);
         try {
@@ -149,8 +176,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
           req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
         }
       }
-      await deactivateWorkflowsByUser(id);
-      await clearBinanceKey(id);
+      await deactivateWorkflowsByUser(userId);
+      await clearBinanceKey(userId);
       return { ok: true };
     },
   );
