@@ -3,13 +3,12 @@ import { getNewsByToken } from '../repos/news.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
 import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
+import type { RebalancePrompt, RunParams } from './main-trader.types.js';
 import {
-  type RebalancePrompt,
   type AnalysisLog,
   type Analysis,
   analysisSchema,
-  type RunParams,
-} from './types.js';
+} from './news-analyst.types.js';
 
 const CACHE_MS = 3 * 60 * 1000;
 const cache = new Map<

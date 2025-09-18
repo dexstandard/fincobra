@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { callAi } from '../src/util/ai.js';
 import { developerInstructions, rebalanceResponseSchema } from '../src/agents/main-trader.js';
-import { type RebalancePrompt } from '../src/agents/types.js';
+import { type RebalancePrompt } from '../src/agents/main-trader.types.js';
 
 describe('callAi structured output', () => {
   it('includes json schema in request', async () => {
@@ -16,13 +16,13 @@ describe('callAi structured output', () => {
       portfolio: {
         ts: new Date().toISOString(),
         positions: [
-          { sym: 'USDT', qty: 1, price_usdt: 1, value_usdt: 1 },
+          { sym: 'USDT', qty: 1, priceUsdt: 1, valueUsdt: 1 },
         ],
       },
       routes: [],
       marketData: {},
       reviewInterval: '1h',
-      previous_reports: [
+      previousReports: [
         { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
         {
           datetime: '2025-01-02T00:00:00.000Z',
@@ -48,7 +48,7 @@ describe('callAi structured output', () => {
     expect(body.instructions).toMatch(/On error, return \{error:"message"\}/i);
     expect(typeof body.input).toBe('string');
     const parsed = JSON.parse(body.input);
-    expect(parsed.previous_reports).toEqual([
+    expect(parsed.previousReports).toEqual([
       { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
       {
         datetime: '2025-01-02T00:00:00.000Z',

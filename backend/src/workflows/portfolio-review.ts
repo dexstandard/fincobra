@@ -22,7 +22,7 @@ import type {
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
-import { type RebalancePrompt } from '../agents/types.js';
+import { type RebalancePrompt } from '../agents/main-trader.types.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
 
