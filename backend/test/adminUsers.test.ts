@@ -67,7 +67,7 @@ describe('admin user routes', () => {
     });
     expect(resDisable.statusCode).toBe(200);
     let row = await getUser(userId);
-    expect(row?.is_enabled).toBe(false);
+    expect(row?.isEnabled).toBe(false);
 
     const resEnable = await app.inject({
       method: 'POST',
@@ -76,7 +76,7 @@ describe('admin user routes', () => {
     });
     expect(resEnable.statusCode).toBe(200);
     row = await getUser(userId);
-    expect(row?.is_enabled).toBe(true);
+    expect(row?.isEnabled).toBe(true);
 
     await app.close();
   });

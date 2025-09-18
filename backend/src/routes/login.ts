@@ -85,7 +85,7 @@ export default async function loginRoutes(app: FastifyInstance) {
       }
       id = row.id;
       if (emailEnc) await setUserEmail(id, emailEnc);
-      if (!row.is_enabled) {
+      if (!row.isEnabled) {
         return reply.code(403).send(errorResponse('user disabled'));
       }
       const err = validateOtp(row, body.otp);
@@ -104,7 +104,7 @@ export default async function loginRoutes(app: FastifyInstance) {
       const info = await getUserAuthInfo(id);
       if (!info)
         return reply.code(404).send(errorResponse('user not found'));
-      if (!info.is_enabled)
+      if (!info.isEnabled)
         return reply.code(403).send(errorResponse('user disabled'));
       return { id, email: info.email, role: info.role };
     },
@@ -112,12 +112,12 @@ export default async function loginRoutes(app: FastifyInstance) {
 }
 
 function validateOtp(
-  row: { totp_secret?: string; is_totp_enabled?: boolean },
+  row: { totpSecret?: string; isTotpEnabled?: boolean },
   otp: string | undefined,
 ): ValidationErr | null {
-  if (row.is_totp_enabled && row.totp_secret) {
+  if (row.isTotpEnabled && row.totpSecret) {
     if (!otp) return { code: 401, body: errorResponse('otp required') };
-    const valid = authenticator.verify({ token: otp, secret: row.totp_secret });
+    const valid = authenticator.verify({ token: otp, secret: row.totpSecret });
     if (!valid) return { code: 401, body: errorResponse('invalid otp') };
   }
   return null;
