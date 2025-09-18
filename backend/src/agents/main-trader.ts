@@ -4,7 +4,7 @@ import { isStablecoin } from '../util/tokens.js';
 import { fetchAccount, fetchPairData, fetchPairInfo } from '../services/binance.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
-import type { ActivePortfolioWorkflowRow } from '../repos/portfolio-workflow.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflow.js';
 import type {
   RunParams,
   RebalancePosition,
@@ -84,7 +84,7 @@ export const rebalanceResponseSchema = {
 };
 
 export async function collectPromptData(
-  row: ActivePortfolioWorkflowRow,
+  row: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ): Promise<RebalancePrompt | undefined> {
   const cash = row.cashToken;

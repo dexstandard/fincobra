@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mockLogger } from './helpers.js';
-import type { ActivePortfolioWorkflowRow } from '../src/repos/portfolio-workflow.js';
+import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflow.js';
 import { collectPromptData } from '../src/agents/main-trader.js';
 import { fetchAccount } from '../src/services/binance.js';
 
@@ -81,7 +81,7 @@ vi.mock('../src/repos/limit-orders.js', () => ({
 
 describe('collectPromptData', () => {
   it('includes start balance and PnL in prompt', async () => {
-    const row: ActivePortfolioWorkflowRow = {
+    const row: ActivePortfolioWorkflow = {
       id: '1',
       userId: 'u1',
       model: 'm',
@@ -107,7 +107,7 @@ describe('collectPromptData', () => {
   });
 
   it('includes recent limit orders in prompt', async () => {
-    const row: ActivePortfolioWorkflowRow = {
+    const row: ActivePortfolioWorkflow = {
       id: '1',
       userId: 'u1',
       model: 'm',
@@ -144,7 +144,7 @@ describe('collectPromptData', () => {
   });
 
   it('handles three-token portfolio', async () => {
-    const row: ActivePortfolioWorkflowRow = {
+    const row: ActivePortfolioWorkflow = {
       id: '1',
       userId: 'u1',
       model: 'm',
@@ -187,7 +187,7 @@ describe('collectPromptData', () => {
       ],
     });
 
-    const row: ActivePortfolioWorkflowRow = {
+    const row: ActivePortfolioWorkflow = {
       id: '1',
       userId: 'u1',
       model: 'm',

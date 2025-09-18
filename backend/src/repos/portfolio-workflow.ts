@@ -2,7 +2,7 @@ import { db, withTransaction } from '../db/index.js';
 import { AgentStatus } from '../util/agents.js';
 import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
-  ActivePortfolioWorkflowRow,
+  ActivePortfolioWorkflow,
   PortfolioWorkflowDraftSearch,
   PortfolioWorkflowInsert,
   PortfolioWorkflowRow,
@@ -12,7 +12,7 @@ import type {
 
 export type {
   PortfolioWorkflowRow,
-  ActivePortfolioWorkflowRow,
+  ActivePortfolioWorkflow,
   PortfolioWorkflowToken,
   PortfolioWorkflowInsert,
   PortfolioWorkflowUpdate,
@@ -275,7 +275,7 @@ export async function stopAgent(id: string): Promise<void> {
 
 export async function getActivePortfolioWorkflowById(
   portfolioWorkflowId: string,
-): Promise<ActivePortfolioWorkflowRow | undefined> {
+): Promise<ActivePortfolioWorkflow | undefined> {
   const sql = `SELECT a.id, a.user_id, a.model,
                       a.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       a.risk, a.review_interval, a.agent_instructions,
@@ -303,12 +303,12 @@ export async function getActivePortfolioWorkflowById(
                 WHERE a.status = 'active' AND a.id = $1`;
   const { rows } = await db.query(sql, [portfolioWorkflowId]);
   if (!rows[0]) return undefined;
-  return convertKeysToCamelCase(rows[0]) as ActivePortfolioWorkflowRow;
+  return convertKeysToCamelCase(rows[0]) as ActivePortfolioWorkflow;
 }
 
 export async function getActivePortfolioWorkflowsByInterval(
   interval: string,
-): Promise<ActivePortfolioWorkflowRow[]> {
+): Promise<ActivePortfolioWorkflow[]> {
   const sql = `SELECT a.id, a.user_id, a.model,
                       a.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       a.risk, a.review_interval, a.agent_instructions,
@@ -335,12 +335,12 @@ export async function getActivePortfolioWorkflowsByInterval(
                  ) t ON true
                 WHERE a.status = 'active' AND a.review_interval = $1`;
   const { rows } = await db.query(sql, [interval]);
-  return convertKeysToCamelCase(rows) as ActivePortfolioWorkflowRow[];
+  return convertKeysToCamelCase(rows) as ActivePortfolioWorkflow[];
 }
 
 export async function getActivePortfolioWorkflowsByUser(
   userId: string,
-): Promise<ActivePortfolioWorkflowRow[]> {
+): Promise<ActivePortfolioWorkflow[]> {
   const sql = `SELECT a.id, a.user_id, a.model,
                       a.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       a.risk, a.review_interval, a.agent_instructions,
@@ -367,7 +367,7 @@ export async function getActivePortfolioWorkflowsByUser(
                  ) t ON true
                 WHERE a.status = 'active' AND a.user_id = $1`;
   const { rows } = await db.query(sql, [userId]);
-  return convertKeysToCamelCase(rows) as ActivePortfolioWorkflowRow[];
+  return convertKeysToCamelCase(rows) as ActivePortfolioWorkflow[];
 }
 
 export async function deactivateWorkflowsByUser(

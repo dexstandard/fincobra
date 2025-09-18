@@ -4,7 +4,7 @@ import {
   getActivePortfolioWorkflowsByInterval,
   getActivePortfolioWorkflowsByUser,
   deactivateWorkflowsByUser,
-  type ActivePortfolioWorkflowRow,
+  type ActivePortfolioWorkflow,
 } from '../repos/portfolio-workflow.js';
 import {
   run as runMainTrader,
@@ -97,7 +97,7 @@ export default async function reviewPortfolios(
 
 async function runReviewWorkflows(
   log: FastifyBaseLogger,
-  workflowRows: ActivePortfolioWorkflowRow[],
+  workflowRows: ActivePortfolioWorkflow[],
 ) {
   await Promise.all(
     workflowRows.map((wf) =>
@@ -111,9 +111,9 @@ async function runReviewWorkflows(
   );
 }
 
-function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflowRow[]) {
-  const toRun: ActivePortfolioWorkflowRow[] = [];
-  const skipped: ActivePortfolioWorkflowRow[] = [];
+function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflow[]) {
+  const toRun: ActivePortfolioWorkflow[] = [];
+  const skipped: ActivePortfolioWorkflow[] = [];
   for (const row of workflowRows) {
     if (runningWorkflows.has(row.id)) skipped.push(row);
     else {
@@ -126,7 +126,7 @@ function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflowRow[]) {
 
 
 async function cleanupOpenOrders(
-  wf: ActivePortfolioWorkflowRow,
+  wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ) {
   const orders = await getOpenLimitOrdersForWorkflow(wf.id);
@@ -178,7 +178,7 @@ function buildReviewResultEntry({
 }
 
 export async function executeWorkflow(
-  wf: ActivePortfolioWorkflowRow,
+  wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ) {
   const execLogId = randomUUID();
@@ -265,7 +265,7 @@ export async function executeWorkflow(
 }
 
 async function saveFailure(
-  row: ActivePortfolioWorkflowRow,
+  row: ActivePortfolioWorkflow,
   message: string,
   prompt: RebalancePrompt,
 ) {

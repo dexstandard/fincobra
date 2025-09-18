@@ -71,7 +71,7 @@ export interface PortfolioWorkflowUserApiKeys {
   binanceApiSecretEnc?: string | null;
 }
 
-export interface ActivePortfolioWorkflowRow {
+export interface ActivePortfolioWorkflow {
   id: string;
   userId: string;
   model: string | null;
