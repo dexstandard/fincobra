@@ -168,9 +168,9 @@ describe('cleanup open orders', () => {
     resolves.forEach((r) => r());
     await runPromise;
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders.map((o) => ({ order_id: o.order_id, status: o.status }))).toEqual([
-      { order_id: '123', status: 'canceled' },
-      { order_id: '456', status: 'canceled' },
+    expect(orders.map((o) => ({ orderId: o.orderId, status: o.status }))).toEqual([
+      { orderId: '123', status: 'canceled' },
+      { orderId: '456', status: 'canceled' },
     ]);
   });
 
