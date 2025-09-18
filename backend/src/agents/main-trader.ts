@@ -87,11 +87,11 @@ export async function collectPromptData(
   row: ActivePortfolioWorkflowRow,
   log: FastifyBaseLogger,
 ): Promise<RebalancePrompt | undefined> {
-  const cash = row.cash_token;
+  const cash = row.cashToken;
   const tokens = row.tokens.map((t) => t.token);
   const allTokens = [cash, ...tokens];
 
-  const account = await fetchAccount(row.user_id).catch((err) => {
+  const account = await fetchAccount(row.userId).catch((err) => {
     log.error({ err }, 'failed to fetch balance');
     return null;
   });
@@ -119,7 +119,7 @@ export async function collectPromptData(
       price_usdt: currentPrice,
       value_usdt: currentPrice * qty,
     });
-    floor[t.token] = t.min_allocation;
+    floor[t.token] = t.minAllocation;
   }
 
   for (let i = 0; i < allTokens.length; i++) {
@@ -150,10 +150,10 @@ export async function collectPromptData(
   };
 
   const totalValue = positions.reduce((sum, p) => sum + p.value_usdt, 0);
-  if (row.start_balance !== null) {
-    portfolio.start_balance_usd = row.start_balance;
-    portfolio.start_balance_ts = row.created_at;
-    portfolio.pnl_usd = totalValue - row.start_balance;
+  if (row.startBalance !== null) {
+    portfolio.start_balance_usd = row.startBalance;
+    portfolio.start_balance_ts = row.createdAt;
+    portfolio.pnl_usd = totalValue - row.startBalance;
   }
 
   const prevRows = await getRecentReviewResults(row.id, 5);
@@ -183,8 +183,8 @@ export async function collectPromptData(
   }
 
   const prompt: RebalancePrompt = {
-    instructions: row.agent_instructions,
-    reviewInterval: row.review_interval,
+    instructions: row.agentInstructions,
+    reviewInterval: row.reviewInterval,
     policy: { floor },
     cash,
     portfolio,

@@ -422,7 +422,7 @@ describe('agent routes', () => {
     });
     expect(resUpdate.statusCode).toBe(200);
     const row = await getAgent(id);
-    expect(row?.start_balance).toBeGreaterThanOrEqual(0);
+    expect(row?.startBalance).toBeGreaterThanOrEqual(0);
     expect(fetchMock).toHaveBeenCalledTimes(4);
 
     await app.close();

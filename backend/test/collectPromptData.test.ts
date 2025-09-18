@@ -83,18 +83,19 @@ describe('collectPromptData', () => {
   it('includes start balance and PnL in prompt', async () => {
     const row: ActivePortfolioWorkflowRow = {
       id: '1',
-      user_id: 'u1',
+      userId: 'u1',
       model: 'm',
-      cash_token: 'USDT',
-      tokens: [{ token: 'BTC', min_allocation: 50 }],
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
       risk: 'low',
-      review_interval: '1h',
-      agent_instructions: 'inst',
-      ai_api_key_enc: '',
-      manual_rebalance: false,
-      start_balance: 20000,
-      created_at: '2025-01-01T00:00:00.000Z',
-      portfolio_id: '1',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: 20000,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: '1',
     };
 
     const prompt = await collectPromptData(row, mockLogger());
@@ -107,18 +108,19 @@ describe('collectPromptData', () => {
   it('includes recent limit orders in prompt', async () => {
     const row: ActivePortfolioWorkflowRow = {
       id: '1',
-      user_id: 'u1',
+      userId: 'u1',
       model: 'm',
-      cash_token: 'USDT',
-      tokens: [{ token: 'BTC', min_allocation: 50 }],
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
       risk: 'low',
-      review_interval: '1h',
-      agent_instructions: 'inst',
-      ai_api_key_enc: '',
-      manual_rebalance: false,
-      start_balance: null,
-      created_at: '2025-01-01T00:00:00.000Z',
-      portfolio_id: '1',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: '1',
     };
 
     const prompt = await collectPromptData(row, mockLogger());
@@ -142,21 +144,22 @@ describe('collectPromptData', () => {
   it('handles three-token portfolio', async () => {
     const row: ActivePortfolioWorkflowRow = {
       id: '1',
-      user_id: 'u1',
+      userId: 'u1',
       model: 'm',
-      cash_token: 'USDT',
+      cashToken: 'USDT',
       tokens: [
-        { token: 'BTC', min_allocation: 40 },
-        { token: 'ETH', min_allocation: 30 },
+        { token: 'BTC', minAllocation: 40 },
+        { token: 'ETH', minAllocation: 30 },
       ],
       risk: 'low',
-      review_interval: '1h',
-      agent_instructions: 'inst',
-      ai_api_key_enc: '',
-      manual_rebalance: false,
-      start_balance: null,
-      created_at: '2025-01-01T00:00:00.000Z',
-      portfolio_id: '1',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: '1',
     };
 
     const prompt = await collectPromptData(row, mockLogger());
@@ -183,18 +186,19 @@ describe('collectPromptData', () => {
 
     const row: ActivePortfolioWorkflowRow = {
       id: '1',
-      user_id: 'u1',
+      userId: 'u1',
       model: 'm',
-      cash_token: 'USDT',
-      tokens: [{ token: 'BTC', min_allocation: 50 }],
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
       risk: 'low',
-      review_interval: '1h',
-      agent_instructions: 'inst',
-      ai_api_key_enc: '',
-      manual_rebalance: false,
-      start_balance: null,
-      created_at: '2025-01-01T00:00:00.000Z',
-      portfolio_id: '1',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: '1',
     };
 
     const prompt = await collectPromptData(row, mockLogger());

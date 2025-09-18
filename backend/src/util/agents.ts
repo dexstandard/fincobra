@@ -138,9 +138,9 @@ export async function ensureApiKeys(
 ): Promise<ValidationErr | null> {
   const userRow = await getUserApiKeys(userId);
   if (
-    !userRow?.ai_api_key_enc ||
-    !userRow.binance_api_key_enc ||
-    !userRow.binance_api_secret_enc
+    !userRow?.aiApiKeyEnc ||
+    !userRow.binanceApiKeyEnc ||
+    !userRow.binanceApiSecretEnc
   ) {
     log.error('missing api keys');
     return { code: 400, body: errorResponse('missing api keys') };
