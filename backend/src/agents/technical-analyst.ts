@@ -5,7 +5,6 @@ import { fetchFearGreedIndex, type FearGreedIndex } from '../services/binance.js
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
 import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
-import { convertKeysToCamelCase } from '../util/objectCase.js';
 import {
   type RebalancePrompt,
   type RunParams,
@@ -26,37 +25,41 @@ const indicatorCache = new Map<
 >();
 
 function toTokenMetrics(indicators: TokenIndicators): TokenMetrics {
-  const flattened = {
-    ret_1h: indicators.ret['1h'],
-    ret_4h: indicators.ret['4h'],
-    ret_24h: indicators.ret['24h'],
-    ret_7d: indicators.ret['7d'],
-    ret_30d: indicators.ret['30d'],
-    sma_dist_20: indicators.sma_dist['20'],
-    sma_dist_50: indicators.sma_dist['50'],
-    sma_dist_200: indicators.sma_dist['200'],
-    macd_hist: indicators.macd_hist,
-    vol_rv_7d: indicators.vol.rv_7d,
-    vol_rv_30d: indicators.vol.rv_30d,
-    vol_atr_pct: indicators.vol.atr_pct,
-    range_bb_bw: indicators.range.bb_bw,
-    range_donchian20: indicators.range.donchian20,
-    volume_z_1h: indicators.volume.z_1h,
-    volume_z_24h: indicators.volume.z_24h,
-    corr_btc_30d: indicators.corr.BTC_30d,
-    regime_btc: indicators.regime.BTC,
-    osc_rsi_14: indicators.osc.rsi_14,
-    osc_stoch_k: indicators.osc.stoch_k,
-    osc_stoch_d: indicators.osc.stoch_d,
+  const {
+    ret,
+    sma_dist: smaDist,
+    macd_hist: macdHist,
+    vol,
+    range,
+    volume,
+    corr,
+    regime,
+    osc,
+  } = indicators;
+
+  return {
+    ret1h: ret['1h'],
+    ret4h: ret['4h'],
+    ret24h: ret['24h'],
+    ret7d: ret['7d'],
+    ret30d: ret['30d'],
+    smaDist20: smaDist['20'],
+    smaDist50: smaDist['50'],
+    smaDist200: smaDist['200'],
+    macdHist,
+    volRv7d: vol.rv_7d,
+    volRv30d: vol.rv_30d,
+    volAtrPct: vol.atr_pct,
+    rangeBbBw: range.bb_bw,
+    rangeDonchian20: range.donchian20,
+    volumeZ1h: volume.z_1h,
+    volumeZ24h: volume.z_24h,
+    corrBtc30d: corr.BTC_30d,
+    regimeBtc: regime.BTC,
+    oscRsi14: osc.rsi_14,
+    oscStochK: osc.stoch_k,
+    oscStochD: osc.stoch_d,
   };
-  const camel = convertKeysToCamelCase(flattened) as Record<string, number | string>;
-  const normalized = Object.fromEntries(
-    Object.entries(camel).map(([key, value]) => [
-      key.replace(/(\d)([A-Z])/g, (_match, digit, letter) => `${digit}${letter.toLowerCase()}`),
-      value,
-    ]),
-  );
-  return normalized as TokenMetrics;
 }
 
 export function fetchTokenIndicatorsCached(
