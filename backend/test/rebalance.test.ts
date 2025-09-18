@@ -542,6 +542,66 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
 
+  it('bumps nominal above min when rounding reduces buy order value', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('26');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'DOGE', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'DOGEUSDT',
+      baseAsset: 'DOGE',
+      quoteAsset: 'USDT',
+      quantityPrecision: 1,
+      pricePrecision: 2,
+      minNotional: 0.02056,
+    });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 0.0207 });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'DOGEUSDT',
+          token: 'USDT',
+          side: 'BUY',
+          quantity: 0.02056,
+          limitPrice: 0.02065,
+          basePrice: 0.02065,
+          maxPriceDivergencePct: 0.01,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const rows = await getLimitOrders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('open');
+    const planned = JSON.parse(rows[0].planned_json);
+    expect(planned.quantity).toBe(1.1);
+    expect(planned.price).toBe(0.02);
+    expect(planned.quantity * planned.price).toBeGreaterThan(0.02056);
+    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'DOGEUSDT',
+      side: 'BUY',
+      quantity: 1.1,
+      price: 0.02,
+    });
+  });
+
   it('preserves manuallyEdited flag when provided', async () => {
     const log = mockLogger();
     const userId = await insertUser('20');
