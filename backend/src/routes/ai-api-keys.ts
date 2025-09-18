@@ -40,7 +40,6 @@ interface ShareAiKeyBody {
 
 interface RevokeShareBody {
   email: string;
-  model?: string;
 }
 
 const aiKeyBodySchema: z.ZodType<AiKeyBody> = z
@@ -57,7 +56,6 @@ const shareAiKeyBodySchema: z.ZodType<ShareAiKeyBody> = z
 const revokeShareBodySchema: z.ZodType<RevokeShareBody> = z
   .object({
     email: z.string().trim().email(),
-    model: z.string().trim().min(1).optional(),
   })
   .strict();
 

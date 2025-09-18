@@ -201,7 +201,7 @@ describe('AI API key routes', () => {
       method: 'DELETE',
       url: `/api/users/${adminId}/ai-key/share`,
       cookies: authCookies(adminId),
-      payload: { email: 'user@example.com', model: 'gpt-5' },
+      payload: { email: 'user@example.com' },
     });
     expect(res.statusCode).toBe(200);
 
