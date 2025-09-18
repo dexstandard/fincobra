@@ -67,7 +67,7 @@ async function getWorkflowForRequest(
     reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
     return;
   }
-  if (workflow.user_id !== userId) {
+  if (workflow.userId !== userId) {
     log.error('forbidden');
     reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
     return;
@@ -304,7 +304,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, userId, log, workflow } = ctx;
-      if (!workflow.manual_rebalance) {
+      if (!workflow.manualRebalance) {
         log.error('workflow not in manual mode');
         return reply
           .code(400)
@@ -427,7 +427,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, userId, log, workflow } = ctx;
-      if (!workflow.manual_rebalance) {
+      if (!workflow.manualRebalance) {
         log.error('workflow not in manual mode');
         return reply
           .code(400)

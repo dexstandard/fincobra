@@ -1,48 +1,45 @@
 import { db, withTransaction } from '../db/index.js';
 import { AgentStatus } from '../util/agents.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
+import type {
+  ActivePortfolioWorkflowRow,
+  PortfolioWorkflowDraftSearch,
+  PortfolioWorkflowInsert,
+  PortfolioWorkflowRow,
+  PortfolioWorkflowUpdate,
+  PortfolioWorkflowUserApiKeys,
+} from './portfolio-workflow.types.js';
 
-export interface PortfolioWorkflowTokenRow { token: string; min_allocation: number; }
-
-export interface PortfolioWorkflowRow {
-  id: string;
-  user_id: string;
-  model: string;
-  status: string;
-  created_at: string;
-  start_balance: number | null;
-  name: string;
-  cash_token: string;
-  tokens: PortfolioWorkflowTokenRow[];
-  risk: string;
-  review_interval: string;
-  agent_instructions: string;
-  manual_rebalance: boolean;
-  use_earn: boolean;
-  ai_api_key_id: string | null;
-  exchange_api_key_id: string | null;
-}
+export type {
+  PortfolioWorkflowRow,
+  ActivePortfolioWorkflowRow,
+  PortfolioWorkflowToken,
+  PortfolioWorkflowInsert,
+  PortfolioWorkflowUpdate,
+  PortfolioWorkflowUserApiKeys,
+} from './portfolio-workflow.types.js';
 
 export function toApi(row: PortfolioWorkflowRow) {
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.userId,
     model: row.model,
     status: row.status,
-    createdAt: Date.parse(row.created_at),
-    startBalanceUsd: row.start_balance ?? null,
+    createdAt: new Date(row.createdAt).getTime(),
+    startBalanceUsd: row.startBalance ?? null,
     name: row.name,
-    cashToken: row.cash_token,
+    cashToken: row.cashToken,
     tokens: row.tokens.map((t) => ({
       token: t.token,
-      minAllocation: t.min_allocation,
+      minAllocation: t.minAllocation,
     })),
     risk: row.risk,
-    reviewInterval: row.review_interval,
-    agentInstructions: row.agent_instructions,
-    manualRebalance: row.manual_rebalance,
-    useEarn: row.use_earn,
-    aiApiKeyId: row.ai_api_key_id ?? null,
-    exchangeApiKeyId: row.exchange_api_key_id ?? null,
+    reviewInterval: row.reviewInterval,
+    agentInstructions: row.agentInstructions,
+    manualRebalance: row.manualRebalance,
+    useEarn: row.useEarn,
+    aiApiKeyId: row.aiApiKeyId ?? null,
+    exchangeApiKeyId: row.exchangeApiKeyId ?? null,
   };
 }
 
@@ -65,7 +62,8 @@ export async function getAgent(id: string): Promise<PortfolioWorkflowRow | undef
     `${baseSelect} WHERE a.id = $1 AND a.status != $2 GROUP BY a.id, ak.id, oak.id, ek.id`,
     [id, AgentStatus.Retired],
   );
-  return rows[0] as PortfolioWorkflowRow | undefined;
+  if (!rows[0]) return undefined;
+  return convertKeysToCamelCase(rows[0]) as PortfolioWorkflowRow;
 }
 
 export async function getAgentsPaginated(
@@ -85,7 +83,10 @@ export async function getAgentsPaginated(
       `${baseSelect} ${where} GROUP BY a.id, ak.id, oak.id, ek.id LIMIT $3 OFFSET $4`,
       [userId, status, limit, offset],
     );
-    return { rows: rows as PortfolioWorkflowRow[], total: Number(totalRes.rows[0].count) };
+    return {
+      rows: convertKeysToCamelCase(rows) as PortfolioWorkflowRow[],
+      total: Number(totalRes.rows[0].count),
+    };
   }
   const where = 'WHERE a.user_id = $1 AND a.status != $2';
   const totalRes = await db.query(
@@ -96,22 +97,14 @@ export async function getAgentsPaginated(
     `${baseSelect} ${where} GROUP BY a.id, ak.id, oak.id, ek.id LIMIT $3 OFFSET $4`,
     [userId, AgentStatus.Retired, limit, offset],
   );
-  return { rows: rows as PortfolioWorkflowRow[], total: Number(totalRes.rows[0].count) };
+  return {
+    rows: convertKeysToCamelCase(rows) as PortfolioWorkflowRow[],
+    total: Number(totalRes.rows[0].count),
+  };
 }
 
 export async function findIdenticalDraftAgent(
-  data: {
-    userId: string;
-    model: string;
-    name: string;
-    cashToken: string;
-    tokens: { token: string; minAllocation: number }[];
-    risk: string;
-    reviewInterval: string;
-    agentInstructions: string;
-    manualRebalance: boolean;
-    useEarn: boolean;
-  },
+  data: PortfolioWorkflowDraftSearch,
   excludeId?: string,
 ) {
   const query = `SELECT a.id, a.name FROM portfolio_workflow a
@@ -178,29 +171,13 @@ export async function getUserApiKeys(userId: string) {
     "SELECT COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc, ek.api_key_enc AS binance_api_key_enc, ek.api_secret_enc AS binance_api_secret_enc FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance' WHERE u.id = $1",
     [userId],
   );
-  return rows[0] as
-    | {
-        ai_api_key_enc?: string;
-        binance_api_key_enc?: string;
-        binance_api_secret_enc?: string;
-      }
-    | undefined;
+  if (!rows[0]) return undefined;
+  return convertKeysToCamelCase(rows[0]) as PortfolioWorkflowUserApiKeys;
 }
 
-export async function insertAgent(data: {
-  userId: string;
-  model: string;
-  status: string;
-  startBalance: number | null;
-  name: string;
-  cashToken: string;
-  tokens: { token: string; minAllocation: number }[];
-  risk: string;
-  reviewInterval: string;
-  agentInstructions: string;
-  manualRebalance: boolean;
-  useEarn: boolean;
-}): Promise<PortfolioWorkflowRow> {
+export async function insertAgent(
+  data: PortfolioWorkflowInsert,
+): Promise<PortfolioWorkflowRow> {
   let id = '';
   await withTransaction(async (client) => {
     const { rows } = await client.query(
@@ -237,20 +214,9 @@ export async function insertAgent(data: {
   return (await getAgent(id))!;
 }
 
-export async function updateAgent(data: {
-  id: string;
-  model: string;
-  status: string;
-  name: string;
-  cashToken: string;
-  tokens: { token: string; minAllocation: number }[];
-  risk: string;
-  reviewInterval: string;
-  agentInstructions: string;
-  startBalance: number | null;
-  manualRebalance: boolean;
-  useEarn: boolean;
-}): Promise<void> {
+export async function updateAgent(
+  data: PortfolioWorkflowUpdate,
+): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
       `UPDATE portfolio_workflow SET model = $1, status = $2, name = $3, cash_token = $4, risk = $5, review_interval = $6, agent_instructions = $7, start_balance = $8, manual_rebalance = $9, use_earn = $10 WHERE id = $11`,
@@ -307,23 +273,6 @@ export async function stopAgent(id: string): Promise<void> {
   );
 }
 
-export interface ActivePortfolioWorkflowRow {
-  id: string;
-  user_id: string;
-  model: string;
-  cash_token: string;
-  tokens: PortfolioWorkflowTokenRow[];
-  risk: string;
-  review_interval: string;
-  agent_instructions: string;
-  ai_api_key_enc: string;
-  manual_rebalance: boolean;
-  use_earn: boolean;
-  start_balance: number | null;
-  created_at: string;
-  portfolio_id: string;
-}
-
 export async function getActivePortfolioWorkflowById(
   portfolioWorkflowId: string,
 ): Promise<ActivePortfolioWorkflowRow | undefined> {
@@ -353,7 +302,8 @@ export async function getActivePortfolioWorkflowById(
                  ) t ON true
                 WHERE a.status = 'active' AND a.id = $1`;
   const { rows } = await db.query(sql, [portfolioWorkflowId]);
-  return rows[0] as ActivePortfolioWorkflowRow | undefined;
+  if (!rows[0]) return undefined;
+  return convertKeysToCamelCase(rows[0]) as ActivePortfolioWorkflowRow;
 }
 
 export async function getActivePortfolioWorkflowsByInterval(
@@ -385,9 +335,9 @@ export async function getActivePortfolioWorkflowsByInterval(
                  ) t ON true
                 WHERE a.status = 'active' AND a.review_interval = $1`;
   const { rows } = await db.query(sql, [interval]);
-  return rows as ActivePortfolioWorkflowRow[];
+  return convertKeysToCamelCase(rows) as ActivePortfolioWorkflowRow[];
 }
- 
+
 export async function getActivePortfolioWorkflowsByUser(
   userId: string,
 ): Promise<ActivePortfolioWorkflowRow[]> {
@@ -417,7 +367,7 @@ export async function getActivePortfolioWorkflowsByUser(
                  ) t ON true
                 WHERE a.status = 'active' AND a.user_id = $1`;
   const { rows } = await db.query(sql, [userId]);
-  return rows as ActivePortfolioWorkflowRow[];
+  return convertKeysToCamelCase(rows) as ActivePortfolioWorkflowRow[];
 }
 
 export async function deactivateAgentsByUser(

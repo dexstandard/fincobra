@@ -151,7 +151,7 @@ describe('AI API key routes', () => {
     expect(res.json()).toMatchObject({ key: '<REDACTED>', shared: true });
 
     let keyRow = await getUserApiKeys(userId);
-    expect(keyRow?.ai_api_key_enc).toBeDefined();
+    expect(keyRow?.aiApiKeyEnc).toBeDefined();
 
     res = await app.inject({
       method: 'POST',
@@ -199,7 +199,7 @@ describe('AI API key routes', () => {
     expect(res.statusCode).toBe(200);
 
     keyRow = await getUserApiKeys(userId);
-    expect(keyRow?.ai_api_key_enc).toBeNull();
+    expect(keyRow?.aiApiKeyEnc).toBeNull();
 
     res = await app.inject({
       method: 'GET',
@@ -599,7 +599,7 @@ describe('key deletion effects on agents', () => {
       orderId: 4,
     });
     const keyRow = await getUserApiKeys(userId);
-    expect(keyRow?.ai_api_key_enc).toBeNull();
+    expect(keyRow?.aiApiKeyEnc).toBeNull();
     const shareExists = await hasAiKeyShare({
       ownerUserId: adminId,
       targetUserId: userId,
@@ -663,7 +663,7 @@ describe('key deletion effects on agents', () => {
     expect(removeWorkflowFromSchedule).not.toHaveBeenCalled();
     expect(cancelOrder).not.toHaveBeenCalled();
     const keyRow = await getUserApiKeys(userId);
-    expect(keyRow?.ai_api_key_enc).toBeDefined();
+    expect(keyRow?.aiApiKeyEnc).toBeDefined();
     await app.close();
   });
 

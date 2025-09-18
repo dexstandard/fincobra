@@ -62,7 +62,7 @@ async function runReviewWorkflows(
     workflowRows.map((wf) =>
       executeWorkflow(
         wf,
-        log.child({ userId: wf.user_id, portfolioId: wf.id }),
+        log.child({ userId: wf.userId, portfolioId: wf.id }),
       ).finally(() => {
         runningWorkflows.delete(wf.id);
       }),
@@ -160,7 +160,16 @@ export async function executeWorkflow(
   try {
     await runStep('cleanupOpenOrders', () => cleanupOpenOrders(wf, runLog));
 
-    const key = decrypt(wf.ai_api_key_enc, env.KEY_PASSWORD);
+    if (!wf.aiApiKeyEnc) {
+      runLog.error('workflow run failed: missing AI API key');
+      return;
+    }
+    if (!wf.model) {
+      runLog.error('workflow run failed: missing model');
+      return;
+    }
+
+    const key = decrypt(wf.aiApiKeyEnc, env.KEY_PASSWORD);
 
     prompt = await runStep('collectPromptData', () => collectPromptData(wf, runLog));
     if (!prompt) {
@@ -197,11 +206,11 @@ export async function executeWorkflow(
     if (
       decision &&
       !validationError &&
-      !wf.manual_rebalance &&
+      !wf.manualRebalance &&
       decision.orders.length
     ) {
       await createDecisionLimitOrders({
-        userId: wf.user_id,
+        userId: wf.userId,
         orders: decision.orders,
         reviewResultId: resultId,
         log: runLog,
