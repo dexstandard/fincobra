@@ -370,7 +370,7 @@ export async function getActivePortfolioWorkflowsByUser(
   return convertKeysToCamelCase(rows) as ActivePortfolioWorkflowRow[];
 }
 
-export async function deactivateAgentsByUser(
+export async function deactivateWorkflowsByUser(
   userId: string,
 ): Promise<void> {
   await db.query(
@@ -379,7 +379,7 @@ export async function deactivateAgentsByUser(
   );
 }
 
-export async function draftAgentsByUser(userId: string): Promise<void> {
+export async function draftWorkflowsByUser(userId: string): Promise<void> {
   await db.query(
     `UPDATE portfolio_workflow SET status = $1, model = NULL, start_balance = NULL WHERE user_id = $2 AND status = $3`,
     [AgentStatus.Draft, userId, AgentStatus.Active],

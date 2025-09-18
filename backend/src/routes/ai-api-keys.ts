@@ -12,7 +12,7 @@ import {
 } from '../repos/ai-api-key.js';
 import {
   getActivePortfolioWorkflowsByUser,
-  draftAgentsByUser,
+  draftWorkflowsByUser,
 } from '../repos/portfolio-workflow.js';
 import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
 import { requireUserIdMatch, requireAdmin } from '../util/auth.js';
@@ -138,7 +138,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
           req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
         }
       }
-      await draftAgentsByUser(id);
+      await draftWorkflowsByUser(id);
 
       const targets = await getAiKeyShareTargets(id);
       for (const targetId of targets) {
@@ -163,7 +163,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
               );
             }
           }
-          await draftAgentsByUser(targetId);
+          await draftWorkflowsByUser(targetId);
         }
         await revokeAiKeyShare({ ownerUserId: id, targetUserId: targetId });
       }
@@ -226,7 +226,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
             req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
           }
         }
-        await draftAgentsByUser(target.id);
+        await draftWorkflowsByUser(target.id);
       }
       await revokeAiKeyShare({ ownerUserId: id, targetUserId: target.id });
       return { ok: true };

@@ -7,7 +7,7 @@ import {
 } from '../repos/exchange-api-keys.js';
 import {
   getActivePortfolioWorkflowsByUser,
-  deactivateAgentsByUser,
+  deactivateWorkflowsByUser,
 } from '../repos/portfolio-workflow.js';
 import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
 import { requireUserIdMatch } from '../util/auth.js';
@@ -149,7 +149,7 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
           req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
         }
       }
-      await deactivateAgentsByUser(id);
+      await deactivateWorkflowsByUser(id);
       await clearBinanceKey(id);
       return { ok: true };
     },
