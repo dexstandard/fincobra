@@ -48,7 +48,7 @@ const baseSelect = `
          COALESCE(json_agg(json_build_object('token', t.token, 'min_allocation', t.min_allocation) ORDER BY t.position)
                   FILTER (WHERE t.token IS NOT NULL), '[]') AS tokens,
          a.risk, a.review_interval, a.agent_instructions, a.manual_rebalance, a.use_earn,
-         COALESCE(ak.id, oak.id) AS ai_api_key_id, ek.id AS exchange_api_key_id
+         COALESCE(a.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id, ek.id AS exchange_api_key_id
     FROM portfolio_workflow a
     LEFT JOIN portfolio_workflow_tokens t ON t.portfolio_workflow_id = a.id
     LEFT JOIN ai_api_keys ak ON ak.user_id = a.user_id AND ak.provider = 'openai'
@@ -280,7 +280,11 @@ export async function getActivePortfolioWorkflowById(
                       a.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       a.risk, a.review_interval, a.agent_instructions,
                       COALESCE(a.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id,
-                      COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc,
+                      CASE
+                        WHEN a.ai_api_key_id IS NOT NULL THEN wak.api_key_enc
+                        WHEN ak.id IS NOT NULL THEN ak.api_key_enc
+                        ELSE oak.api_key_enc
+                      END AS ai_api_key_enc,
                       a.manual_rebalance,
                       a.use_earn,
                       a.start_balance,
@@ -290,6 +294,7 @@ export async function getActivePortfolioWorkflowById(
                  LEFT JOIN ai_api_keys ak ON ak.user_id = a.user_id AND ak.provider = 'openai'
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = a.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+                 LEFT JOIN ai_api_keys wak ON wak.id = a.ai_api_key_id
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -308,7 +313,11 @@ export async function getActivePortfolioWorkflowsByInterval(
                       a.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       a.risk, a.review_interval, a.agent_instructions,
                       COALESCE(a.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id,
-                      COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc,
+                      CASE
+                        WHEN a.ai_api_key_id IS NOT NULL THEN wak.api_key_enc
+                        WHEN ak.id IS NOT NULL THEN ak.api_key_enc
+                        ELSE oak.api_key_enc
+                      END AS ai_api_key_enc,
                       a.manual_rebalance,
                       a.use_earn,
                       a.start_balance,
@@ -318,6 +327,7 @@ export async function getActivePortfolioWorkflowsByInterval(
                  LEFT JOIN ai_api_keys ak ON ak.user_id = a.user_id AND ak.provider = 'openai'
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = a.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+                 LEFT JOIN ai_api_keys wak ON wak.id = a.ai_api_key_id
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -335,7 +345,11 @@ export async function getActivePortfolioWorkflowsByUser(
                       a.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       a.risk, a.review_interval, a.agent_instructions,
                       COALESCE(a.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id,
-                      COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc,
+                      CASE
+                        WHEN a.ai_api_key_id IS NOT NULL THEN wak.api_key_enc
+                        WHEN ak.id IS NOT NULL THEN ak.api_key_enc
+                        ELSE oak.api_key_enc
+                      END AS ai_api_key_enc,
                       a.manual_rebalance,
                       a.use_earn,
                       a.start_balance,
@@ -345,6 +359,7 @@ export async function getActivePortfolioWorkflowsByUser(
                  LEFT JOIN ai_api_keys ak ON ak.user_id = a.user_id AND ak.provider = 'openai'
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = a.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+                 LEFT JOIN ai_api_keys wak ON wak.id = a.ai_api_key_id
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
