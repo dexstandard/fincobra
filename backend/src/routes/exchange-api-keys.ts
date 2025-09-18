@@ -79,8 +79,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
         'binanceApiSecretEnc',
       ]);
       if (err) return reply.code(err.code).send(err.body);
-      const key = decryptKey(row!.binanceApiKeyEnc!);
-      const secret = decryptKey(row!.binanceApiSecretEnc!);
+      decryptKey(row!.binanceApiKeyEnc!);
+      decryptKey(row!.binanceApiSecretEnc!);
       return { key: '<REDACTED>', secret: '<REDACTED>' };
     },
   );

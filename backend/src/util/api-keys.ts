@@ -77,6 +77,11 @@ export interface ValidationErr {
   body: ErrorResponse;
 }
 
+export function ensureUser(row: unknown): ValidationErr | null {
+  if (!row) return { code: 404, body: errorResponse('user not found') };
+  return null;
+}
+
 export function ensureKeyAbsent(row: any, fields: string[]): ValidationErr | null {
   if (fields.some((f) => row?.[f]))
     return { code: 400, body: errorResponse('key exists') };
