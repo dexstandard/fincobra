@@ -80,6 +80,7 @@ export interface ActivePortfolioWorkflowRow {
   risk: string;
   reviewInterval: string;
   agentInstructions: string;
+  aiApiKeyId: string | null;
   aiApiKeyEnc: string | null;
   manualRebalance: boolean;
   useEarn: boolean;
