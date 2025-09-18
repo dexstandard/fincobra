@@ -27,16 +27,16 @@ import {
   ensureApiKeys,
   getStartBalance,
 } from '../util/agents.js';
-import {
-  getLimitOrdersByReviewResult,
-  getOpenLimitOrdersForWorkflow,
-  updateLimitOrderStatus,
-} from '../repos/limit-orders.js';
+import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { getRebalanceInfo } from '../repos/review-result.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import { parseParams } from '../util/validation.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
+import {
+  CANCEL_ORDER_REASONS,
+  cancelOrdersForWorkflow,
+} from '../services/order-orchestrator.js';
 import { parseBinanceError } from '../services/binance.js';
 import type { MainTraderDecision, MainTraderOrder } from '../agents/main-trader.js';
 
@@ -510,37 +510,14 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { userId, id, log } = ctx;
+      const { id, log } = ctx;
       await repoDeleteAgent(id);
       removeWorkflowFromSchedule(id);
-      const openOrders = await getOpenLimitOrdersForWorkflow(id);
-      for (const o of openOrders) {
-        let symbol: string | undefined;
-        try {
-          const planned = JSON.parse(o.plannedJson);
-          if (typeof planned.symbol === 'string') symbol = planned.symbol;
-        } catch (err) {
-          log.error({ err, orderId: o.orderId }, 'failed to parse planned order');
-        }
-        if (!symbol) {
-          await updateLimitOrderStatus(
-            o.userId,
-            o.orderId,
-            'canceled',
-            'Workflow deleted',
-          );
-          continue;
-        }
-        try {
-          await cancelLimitOrder(o.userId, {
-            symbol,
-            orderId: o.orderId,
-            reason: 'Workflow deleted',
-          });
-        } catch (err) {
-          log.error({ err, symbol, orderId: o.orderId }, 'failed to cancel order');
-        }
-      }
+      await cancelOrdersForWorkflow({
+        workflowId: id,
+        reason: CANCEL_ORDER_REASONS.WORKFLOW_DELETED,
+        log,
+      });
       log.info('deleted workflow');
       return { ok: true };
     }
@@ -587,6 +564,15 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if (!ctx) return;
       const { id, log } = ctx;
       await repoStopAgent(id);
+      try {
+        await cancelOrdersForWorkflow({
+          workflowId: id,
+          reason: CANCEL_ORDER_REASONS.WORKFLOW_STOPPED,
+          log,
+        });
+      } catch (err) {
+        log.error({ err }, 'failed to cancel open orders after stop');
+      }
       const row = (await getAgent(id))!;
       log.info('stopped workflow');
       return toApi(row);

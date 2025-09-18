@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
 import { getActivePortfolioWorkflowById, getAgent } from '../src/repos/portfolio-workflow.js';
@@ -15,6 +15,7 @@ import {
 } from './repos/limit-orders.js';
 import { cancelOrder } from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
+import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 
 vi.mock('../src/workflows/portfolio-review.js', () => ({
   reviewAgentPortfolio: vi.fn(() => Promise.resolve()),
@@ -29,7 +30,16 @@ vi.mock('../src/services/binance.js', async () => {
 });
 
 
+const cancelOrdersSpy = vi.spyOn(
+  orderOrchestrator,
+  'cancelOrdersForWorkflow',
+);
+
+
 describe('agent routes', () => {
+  beforeEach(() => {
+    cancelOrdersSpy.mockClear();
+  });
   it('performs CRUD operations', async () => {
     const app = await buildServer();
     const userId = await insertUserWithKeys('1');
@@ -310,6 +320,13 @@ describe('agent routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: 'inactive' });
+    expect(cancelOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(cancelOrdersSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: id,
+        reason: orderOrchestrator.CANCEL_ORDER_REASONS.WORKFLOW_STOPPED,
+      }),
+    );
     expect(await getActivePortfolioWorkflowById(id)).toBeUndefined();
 
     await app.close();
