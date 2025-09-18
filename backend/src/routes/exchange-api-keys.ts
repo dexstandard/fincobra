@@ -22,7 +22,11 @@ import {
 } from '../util/api-keys.js';
 import { errorResponse } from '../util/errorMessages.js';
 import { parseParams } from '../util/validation.js';
-import { cancelOrdersForWorkflow, userIdParams } from '../services/order-orchestrator.js';
+import {
+  CANCEL_ORDER_REASONS,
+  cancelOrdersForWorkflow,
+  userIdParams,
+} from '../services/order-orchestrator.js';
 
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
   app.post(
@@ -136,7 +140,11 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       for (const agent of agents) {
         removeWorkflowFromSchedule(agent.id);
         try {
-          await cancelOrdersForWorkflow(agent.id, req.log);
+          await cancelOrdersForWorkflow({
+            workflowId: agent.id,
+            reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+            log: req.log,
+          });
         } catch (err) {
           req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
         }

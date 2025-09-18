@@ -27,7 +27,11 @@ import {
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
 import { parseParams } from '../util/validation.js';
-import { cancelOrdersForWorkflow, userIdParams } from '../services/order-orchestrator.js';
+import {
+  CANCEL_ORDER_REASONS,
+  cancelOrdersForWorkflow,
+  userIdParams,
+} from '../services/order-orchestrator.js';
 
 export default async function aiApiKeyRoutes(app: FastifyInstance) {
   app.post(
@@ -125,7 +129,11 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       for (const agent of agents) {
         removeWorkflowFromSchedule(agent.id);
         try {
-          await cancelOrdersForWorkflow(agent.id, req.log);
+          await cancelOrdersForWorkflow({
+            workflowId: agent.id,
+            reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+            log: req.log,
+          });
         } catch (err) {
           req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
         }
@@ -143,7 +151,11 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
           for (const agent of targetAgents) {
             removeWorkflowFromSchedule(agent.id);
             try {
-              await cancelOrdersForWorkflow(agent.id, req.log);
+              await cancelOrdersForWorkflow({
+                workflowId: agent.id,
+                reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+                log: req.log,
+              });
             } catch (err) {
               req.log.error(
                 { err, workflowId: agent.id },
@@ -205,7 +217,11 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
         for (const agent of agents) {
           removeWorkflowFromSchedule(agent.id);
           try {
-            await cancelOrdersForWorkflow(agent.id, req.log);
+            await cancelOrdersForWorkflow({
+              workflowId: agent.id,
+              reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+              log: req.log,
+            });
           } catch (err) {
             req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
           }
