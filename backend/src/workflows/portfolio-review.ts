@@ -93,15 +93,15 @@ async function cleanupOpenOrders(
   await Promise.all(
     orders.map((o) =>
       limit(async () => {
-        const planned = JSON.parse(o.planned_json);
+        const planned = JSON.parse(o.plannedJson);
         try {
-          const res = await cancelLimitOrder(o.user_id, {
+          const res = await cancelLimitOrder(o.userId, {
             symbol: planned.symbol,
-            orderId: o.order_id,
+            orderId: o.orderId,
             reason: 'Could not fill within interval',
           });
           log.info(
-            { orderId: o.order_id },
+            { orderId: o.orderId },
             res === 'canceled' ? 'canceled stale order' : 'order already filled',
           );
         } catch (err) {

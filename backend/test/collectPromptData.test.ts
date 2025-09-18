@@ -69,11 +69,11 @@ vi.mock('../src/repos/limit-orders.js', () => ({
     const i = Number(reviewId.slice(1));
     return [
       {
-        planned_json: JSON.stringify({ symbol: 'BTCUSDT', side: 'BUY', quantity: i }),
+        plannedJson: JSON.stringify({ symbol: 'BTCUSDT', side: 'BUY', quantity: i }),
         status: 'filled',
-        created_at: new Date(`2025-01-0${i}T00:00:00.000Z`),
-        order_id: String(i),
-        cancellation_reason: 'price limit',
+        createdAt: new Date(`2025-01-0${i}T00:00:00.000Z`),
+        orderId: String(i),
+        cancellationReason: 'price limit',
       },
     ];
   }),

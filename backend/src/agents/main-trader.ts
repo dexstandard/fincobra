@@ -161,15 +161,15 @@ export async function collectPromptData(
   for (const r of prevRows) {
     const ordersRows = await getLimitOrdersByReviewResult(row.id, r.id);
     const orders = ordersRows.map((o) => {
-      const planned = JSON.parse(o.planned_json);
+      const planned = JSON.parse(o.plannedJson);
       return {
         symbol: planned.symbol,
         side: planned.side,
         quantity: planned.quantity,
         status: o.status,
-        datetime: o.created_at.toISOString(),
-        ...(o.cancellation_reason
-          ? { cancellationReason: o.cancellation_reason }
+        datetime: o.createdAt.toISOString(),
+        ...(o.cancellationReason
+          ? { cancellationReason: o.cancellationReason }
           : {}),
       } as const;
     });

@@ -1,17 +1,14 @@
 import { db } from '../db/index.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
+import type {
+  LimitOrderByReviewResult,
+  LimitOrderInsert,
+  LimitOrderOpen,
+  LimitOrderOpenWorkflow,
+  LimitOrderStatus,
+} from './limit-orders.types.js';
 
-export type LimitOrderStatus = 'open' | 'filled' | 'canceled';
-
-export interface LimitOrderEntry {
-  userId: string;
-  planned: Record<string, unknown>;
-  status: LimitOrderStatus;
-  reviewResultId: string;
-  orderId: string;
-  cancellationReason?: string;
-}
-
-export async function insertLimitOrder(entry: LimitOrderEntry): Promise<void> {
+export async function insertLimitOrder(entry: LimitOrderInsert): Promise<void> {
   await db.query(
     'INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id, cancellation_reason) VALUES ($1, $2, $3, $4, $5, $6)',
     [
@@ -19,7 +16,7 @@ export async function insertLimitOrder(entry: LimitOrderEntry): Promise<void> {
       JSON.stringify(entry.planned),
       entry.status,
       entry.reviewResultId,
-       entry.orderId,
+      entry.orderId,
       entry.cancellationReason ?? null,
     ],
   );
@@ -28,13 +25,7 @@ export async function insertLimitOrder(entry: LimitOrderEntry): Promise<void> {
 export async function getLimitOrdersByReviewResult(
   portfolioWorkflowId: string,
   reviewResultId: string,
-): Promise<{
-  planned_json: string;
-  status: LimitOrderStatus;
-  created_at: Date;
-  order_id: string;
-  cancellation_reason: string | null;
-}[]> {
+): Promise<LimitOrderByReviewResult[]> {
   const { rows } = await db.query(
     `SELECT e.planned_json, e.status, e.created_at, e.order_id, e.cancellation_reason
        FROM limit_order e
@@ -42,16 +33,12 @@ export async function getLimitOrdersByReviewResult(
       WHERE r.portfolio_workflow_id = $1 AND e.review_result_id = $2`,
     [portfolioWorkflowId, reviewResultId],
   );
-  return rows as {
-    planned_json: string;
-    status: LimitOrderStatus;
-    created_at: Date;
-    order_id: string;
-    cancellation_reason: string | null;
-  }[];
+  return convertKeysToCamelCase(rows) as LimitOrderByReviewResult[];
 }
 
-export async function getOpenLimitOrdersForWorkflow(portfolioWorkflowId: string) {
+export async function getOpenLimitOrdersForWorkflow(
+  portfolioWorkflowId: string,
+): Promise<LimitOrderOpenWorkflow[]> {
   const { rows } = await db.query(
     `SELECT e.user_id, e.order_id, e.planned_json
        FROM limit_order e
@@ -59,10 +46,10 @@ export async function getOpenLimitOrdersForWorkflow(portfolioWorkflowId: string)
       WHERE r.portfolio_workflow_id = $1 AND e.status = 'open'`,
     [portfolioWorkflowId],
   );
-  return rows as { user_id: string; order_id: string; planned_json: string }[];
+  return convertKeysToCamelCase(rows) as LimitOrderOpenWorkflow[];
 }
 
-export async function getAllOpenLimitOrders() {
+export async function getAllOpenLimitOrders(): Promise<LimitOrderOpen[]> {
   const { rows } = await db.query(
     `SELECT e.user_id, e.order_id, e.planned_json, r.portfolio_workflow_id, pw.status AS workflow_status
        FROM limit_order e
@@ -70,13 +57,7 @@ export async function getAllOpenLimitOrders() {
        JOIN portfolio_workflow pw ON r.portfolio_workflow_id = pw.id
       WHERE e.status = 'open'`,
   );
-  return rows as {
-    user_id: string;
-    order_id: string;
-    planned_json: string;
-    portfolio_workflow_id: string;
-    workflow_status: string;
-  }[];
+  return convertKeysToCamelCase(rows) as LimitOrderOpen[];
 }
 
 export async function updateLimitOrderStatus(
@@ -84,7 +65,7 @@ export async function updateLimitOrderStatus(
   orderId: string,
   status: LimitOrderStatus,
   cancellationReason?: string,
-) {
+): Promise<void> {
   await db.query(
     `UPDATE limit_order SET status = $3, cancellation_reason = $4 WHERE user_id = $1 AND order_id = $2`,
     [userId, orderId, status, cancellationReason ?? null],

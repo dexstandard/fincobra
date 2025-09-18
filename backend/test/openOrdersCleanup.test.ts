@@ -168,9 +168,9 @@ describe('cleanup open orders', () => {
     resolves.forEach((r) => r());
     await runPromise;
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders.map((o) => ({ order_id: o.order_id, status: o.status }))).toEqual([
-      { order_id: '123', status: 'canceled' },
-      { order_id: '456', status: 'canceled' },
+    expect(orders.map((o) => ({ orderId: o.orderId, status: o.status }))).toEqual([
+      { orderId: '123', status: 'canceled' },
+      { orderId: '456', status: 'canceled' },
     ]);
   });
 
@@ -213,7 +213,7 @@ describe('cleanup open orders', () => {
     await reviewAgentPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe('filled');
-    expect(orders[0].cancellation_reason).toBeNull();
+    expect(orders[0].cancellationReason).toBeNull();
   });
 
   it('marks order canceled when Binance reports unknown order with canceled status', async () => {
@@ -255,7 +255,7 @@ describe('cleanup open orders', () => {
     await reviewAgentPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe('canceled');
-    expect(orders[0].cancellation_reason).toBe('Could not fill within interval');
+    expect(orders[0].cancellationReason).toBe('Could not fill within interval');
   });
 
   it('marks order filled when cancel returns FILLED', async () => {
@@ -295,6 +295,6 @@ describe('cleanup open orders', () => {
     await reviewAgentPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe('filled');
-    expect(orders[0].cancellation_reason).toBeNull();
+    expect(orders[0].cancellationReason).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
-import camelCase from 'lodash/camelCase.js';
-import isPlainObject from 'lodash/isPlainObject.js';
-import snakeCase from 'lodash/snakeCase.js';
+import lodash from 'lodash';
+
+const { camelCase, isPlainObject, snakeCase } = lodash;
 
 type KeyConverter = (value: string) => string;
 
