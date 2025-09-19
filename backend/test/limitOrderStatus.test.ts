@@ -6,6 +6,7 @@ import {
   insertLimitOrder,
   getLimitOrder,
 } from './repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { updateLimitOrderStatus } from '../src/repos/limit-orders.js';
 
 /**
@@ -38,22 +39,22 @@ describe('updateLimitOrderStatus', () => {
     await insertLimitOrder({
       userId,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '42',
     });
     await updateLimitOrderStatus(
       userId,
       '42',
-      'canceled',
+      LimitOrderStatus.Canceled,
       'Could not fill within interval',
     );
     let row = await getLimitOrder('42');
-    expect(row?.status).toBe('canceled');
+    expect(row?.status).toBe(LimitOrderStatus.Canceled);
     expect(row?.cancellation_reason).toBe('Could not fill within interval');
-    await updateLimitOrderStatus(userId, '42', 'filled');
+    await updateLimitOrderStatus(userId, '42', LimitOrderStatus.Filled);
     row = await getLimitOrder('42');
-    expect(row?.status).toBe('filled');
+    expect(row?.status).toBe(LimitOrderStatus.Filled);
     expect(row?.cancellation_reason).toBeNull();
   });
 });

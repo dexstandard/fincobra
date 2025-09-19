@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { insertLimitOrder } from '../repos/limit-orders.js';
-import type { LimitOrderStatus } from '../repos/limit-orders.types.js';
+import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import type { MainTraderOrder } from '../agents/main-trader.js';
 import {
   fetchPairData,
@@ -100,7 +100,7 @@ export async function createDecisionLimitOrders(opts: {
       await insertLimitOrder({
         userId: opts.userId,
         planned: plannedBase,
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: `Invalid order side: ${requestedSide}`,
@@ -114,7 +114,7 @@ export async function createDecisionLimitOrders(opts: {
       await insertLimitOrder({
         userId: opts.userId,
         planned: plannedBase,
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: `Malformed basePrice: ${o.basePrice}`,
@@ -126,7 +126,7 @@ export async function createDecisionLimitOrders(opts: {
       await insertLimitOrder({
         userId: opts.userId,
         planned: plannedBase,
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: `Malformed limitPrice: ${o.limitPrice}`,
@@ -141,7 +141,7 @@ export async function createDecisionLimitOrders(opts: {
       await insertLimitOrder({
         userId: opts.userId,
         planned: plannedBase,
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: `Malformed maxPriceDivergencePct: ${o.maxPriceDivergencePct}`,
@@ -162,7 +162,7 @@ export async function createDecisionLimitOrders(opts: {
           limitPrice: requestedLimitPrice,
           maxPriceDivergencePct: divergenceLimit,
         },
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: 'price divergence too high',
@@ -181,7 +181,7 @@ export async function createDecisionLimitOrders(opts: {
           limitPrice: adjustedLimit,
           maxPriceDivergencePct: divergenceLimit,
         },
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: `Malformed adjusted limitPrice: ${adjustedLimit}`,
@@ -229,7 +229,7 @@ export async function createDecisionLimitOrders(opts: {
       await insertLimitOrder({
         userId: opts.userId,
         planned,
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: 'order below min notional',
@@ -243,7 +243,7 @@ export async function createDecisionLimitOrders(opts: {
         await insertLimitOrder({
           userId: opts.userId,
           planned,
-          status: 'canceled' as LimitOrderStatus,
+          status: LimitOrderStatus.Canceled,
           reviewResultId: opts.reviewResultId,
           orderId: String(Date.now()),
           cancellationReason: 'order id missing',
@@ -253,7 +253,7 @@ export async function createDecisionLimitOrders(opts: {
       await insertLimitOrder({
         userId: opts.userId,
         planned,
-        status: 'open' as LimitOrderStatus,
+        status: LimitOrderStatus.Open,
         reviewResultId: opts.reviewResultId,
         orderId: String(res.orderId),
       });
@@ -264,7 +264,7 @@ export async function createDecisionLimitOrders(opts: {
       await insertLimitOrder({
         userId: opts.userId,
         planned,
-        status: 'canceled' as LimitOrderStatus,
+        status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
         cancellationReason: reason,

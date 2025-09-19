@@ -28,6 +28,7 @@ import {
   getStartBalance,
 } from '../util/agents.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
+import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { getRebalanceInfo } from '../repos/review-result.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
@@ -367,7 +368,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           .send(errorResponse('failed to create limit order'));
       }
       const latest = orders[orders.length - 1];
-      if (latest.status === 'canceled' && latest.cancellationReason) {
+      if (latest.status === LimitOrderStatus.Canceled && latest.cancellationReason) {
         log.error(
           { execLogId: logId, reason: latest.cancellationReason },
           'manual order canceled',
@@ -399,7 +400,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         log.error({ execLogId: logId, orderId }, 'order not found');
         return reply.code(404).send(errorResponse('order not found'));
       }
-      if (row.status !== 'open') {
+      if (row.status !== LimitOrderStatus.Open) {
         log.error({ execLogId: logId, orderId }, 'order not open');
         return reply.code(400).send(errorResponse('order not open'));
       }

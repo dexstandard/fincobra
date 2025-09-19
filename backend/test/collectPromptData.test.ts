@@ -1,3 +1,4 @@
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { describe, it, expect, vi } from 'vitest';
 import { mockLogger } from './helpers.js';
 import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflow.js';
@@ -70,7 +71,7 @@ vi.mock('../src/repos/limit-orders.js', () => ({
     return [
       {
         plannedJson: JSON.stringify({ symbol: 'BTCUSDT', side: 'BUY', quantity: i }),
-        status: 'filled',
+        status: LimitOrderStatus.Filled,
         createdAt: new Date(`2025-01-0${i}T00:00:00.000Z`),
         orderId: String(i),
         cancellationReason: 'price limit',
@@ -134,7 +135,7 @@ describe('collectPromptData', () => {
           symbol: 'BTCUSDT',
           side: 'BUY',
           quantity: 1,
-          status: 'filled',
+          status: LimitOrderStatus.Filled,
           datetime: '2025-01-01T00:00:00.000Z',
           cancellationReason: 'price limit',
         },

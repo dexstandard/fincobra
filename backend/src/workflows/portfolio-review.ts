@@ -13,6 +13,7 @@ import { runNewsAnalyst } from '../agents/news-analyst.js';
 import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
 import { getOpenLimitOrdersForWorkflow } from '../repos/limit-orders.js';
+import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
 import { insertReviewResult } from '../repos/review-result.js';
@@ -102,7 +103,7 @@ async function cleanupOpenOrders(
           });
           log.info(
             { orderId: o.orderId },
-            res === 'canceled' ? 'canceled stale order' : 'order already filled',
+            res === LimitOrderStatus.Canceled ? 'canceled stale order' : 'order already filled',
           );
         } catch (err) {
           log.error({ err }, 'failed to cancel order');

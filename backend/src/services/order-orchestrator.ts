@@ -4,7 +4,10 @@ import {
   getOpenLimitOrdersForWorkflow,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
-import type { LimitOrderOpen } from '../repos/limit-orders.types.js';
+import {
+  LimitOrderStatus,
+  type LimitOrderOpen,
+} from '../repos/limit-orders.types.js';
 import {
   fetchOpenOrders,
   fetchOrder,
@@ -36,13 +39,23 @@ interface GroupedOrder extends LimitOrderOpen {
   planned: PlannedOrder;
 }
 
-const CLOSED_ORDER_STATUSES = new Set([
-  'CANCELED',
-  'PENDING_CANCEL',
-  'EXPIRED',
-  'REJECTED',
-  'EXPIRED_IN_MATCH',
-]);
+const CLOSED_ORDER_STATUS_DESCRIPTIONS: Record<string, string> = {
+  CANCELED: 'canceled the order',
+  PENDING_CANCEL: 'marked the order as pending cancellation',
+  EXPIRED: 'expired the order before it could fill',
+  REJECTED: 'rejected the order',
+  EXPIRED_IN_MATCH: 'expired the order while matching',
+};
+
+const CLOSED_ORDER_STATUSES = new Set<string>(
+  Object.keys(CLOSED_ORDER_STATUS_DESCRIPTIONS),
+);
+
+function resolveExternalCancellationReason(status: string): string {
+  const description =
+    CLOSED_ORDER_STATUS_DESCRIPTIONS[status] ?? 'closed the order';
+  return `Binance ${description} (status ${status})`;
+}
 
 export async function syncOpenOrderStatuses(
   log: FastifyBaseLogger,
@@ -81,7 +94,12 @@ export async function cancelOrdersForWorkflow({
   for (const order of openOrders) {
     const symbol = parsePlannedOrderSymbol(order.plannedJson, log, order.orderId);
     if (!symbol) {
-      await updateLimitOrderStatus(order.userId, order.orderId, 'canceled', reason);
+      await updateLimitOrderStatus(
+        order.userId,
+        order.orderId,
+        LimitOrderStatus.Canceled,
+        reason,
+      );
       continue;
     }
     try {
@@ -114,19 +132,30 @@ async function reconcileGroup(log: FastifyBaseLogger, list: GroupedOrder[]) {
     const res = await fetchOpenOrders(userId, { symbol: planned.symbol });
     open = Array.isArray(res) ? res : [];
   } catch (err) {
-    log.error({ err }, 'failed to fetch open orders');
+    log.error(
+      { err, userId, symbol: planned.symbol },
+      'failed to fetch open orders',
+    );
     return;
   }
   for (const order of list) {
-    await reconcileOrder(log, order, planned.symbol, open);
+    try {
+      await reconcileOrder(log, order, planned.symbol, open);
+    } catch (err) {
+      log.error({ err, orderId: order.orderId }, 'failed to reconcile order');
+    }
   }
 }
+
+type ResolvedClosedStatus =
+  | { type: LimitOrderStatus.Filled }
+  | { type: LimitOrderStatus.Canceled; reason: string };
 
 async function resolveClosedStatus(
   log: FastifyBaseLogger,
   order: GroupedOrder,
   symbol: string,
-): Promise<'filled' | 'canceled' | null> {
+): Promise<ResolvedClosedStatus | null> {
   const orderId = Number(order.orderId);
   if (!Number.isFinite(orderId)) {
     log.error(
@@ -146,16 +175,29 @@ async function resolveClosedStatus(
       return null;
     }
     const status = res.status.toUpperCase();
-    if (status === 'FILLED') return 'filled';
-    if (CLOSED_ORDER_STATUSES.has(status)) return 'canceled';
+    if (status === 'FILLED') return { type: LimitOrderStatus.Filled };
+    if (CLOSED_ORDER_STATUSES.has(status)) {
+      return {
+        type: LimitOrderStatus.Canceled,
+        reason: resolveExternalCancellationReason(status),
+      };
+    }
     log.error(
       { orderId: order.orderId, status },
       'unexpected Binance order status while reconciling',
     );
     return null;
   } catch (err) {
-    const { code } = parseBinanceError(err);
-    if (code === -2013) return 'canceled';
+    const { code, msg } = parseBinanceError(err);
+    if (code === -2013) {
+      const message = typeof msg === 'string' ? msg.trim() : '';
+      return {
+        type: LimitOrderStatus.Canceled,
+        reason: message
+          ? `Binance: ${message}`
+          : 'Binance could not find the order (code -2013)',
+      };
+    }
     log.error(
       { err, orderId: order.orderId },
       'failed to fetch Binance order while reconciling',
@@ -173,10 +215,19 @@ async function reconcileOrder(
   const exists = open.some((entry) => String(entry.orderId) === order.orderId);
   if (!exists) {
     const status = await resolveClosedStatus(log, order, symbol);
-    if (status === 'filled') {
-      await updateLimitOrderStatus(order.userId, order.orderId, 'filled');
-    } else if (status === 'canceled') {
-      await updateLimitOrderStatus(order.userId, order.orderId, 'canceled');
+    if (status?.type === LimitOrderStatus.Filled) {
+      await updateLimitOrderStatus(
+        order.userId,
+        order.orderId,
+        LimitOrderStatus.Filled,
+      );
+    } else if (status?.type === LimitOrderStatus.Canceled) {
+      await updateLimitOrderStatus(
+        order.userId,
+        order.orderId,
+        LimitOrderStatus.Canceled,
+        status.reason,
+      );
     }
     return;
   }

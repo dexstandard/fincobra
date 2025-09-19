@@ -6,6 +6,7 @@ import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewRawLog } from './repos/review-raw-log.js';
 import { insertLimitOrder, getLimitOrder, getLimitOrdersByReviewResult } from './repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { db } from '../src/db/index.js';
 import * as binance from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
@@ -35,7 +36,7 @@ describe('agent exec log routes', () => {
     await insertLimitOrder({
       userId: user1Id,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '1',
     });
@@ -53,7 +54,7 @@ describe('agent exec log routes', () => {
           quantity: 1,
           price: 100,
           symbol: 'BTCETH',
-          status: 'open',
+          status: LimitOrderStatus.Open,
           createdAt: expect.any(Number),
         },
       ],
@@ -91,7 +92,7 @@ describe('agent exec log routes', () => {
     await insertLimitOrder({
       userId: user1Id,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '2',
     });
@@ -107,7 +108,7 @@ describe('agent exec log routes', () => {
       orderId: 2,
     });
     let row = await getLimitOrder('2');
-    expect(row?.status).toBe('canceled');
+    expect(row?.status).toBe(LimitOrderStatus.Canceled);
     expect(row?.cancellation_reason).toBe('Canceled by user');
     res = await app.inject({
       method: 'POST',
@@ -116,7 +117,7 @@ describe('agent exec log routes', () => {
     });
     expect(res.statusCode).toBe(403);
     row = await getLimitOrder('2');
-    expect(row?.status).toBe('canceled');
+    expect(row?.status).toBe(LimitOrderStatus.Canceled);
     expect(row?.cancellation_reason).toBe('Canceled by user');
     spy.mockRestore();
     await app.close();
@@ -145,7 +146,7 @@ describe('agent exec log routes', () => {
     await insertLimitOrder({
       userId,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '3',
     });
@@ -157,7 +158,7 @@ describe('agent exec log routes', () => {
     });
     expect(res.statusCode).toBe(200);
     const row = await getLimitOrder('3');
-    expect(row?.status).toBe('filled');
+    expect(row?.status).toBe(LimitOrderStatus.Filled);
     expect(row?.cancellation_reason).toBeNull();
     spy.mockRestore();
     await app.close();
@@ -519,7 +520,7 @@ describe('agent exec log routes', () => {
     expect(res.json()).toEqual({ error: 'order below min notional' });
     const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
     expect(rows[0].cancellation_reason).toBe('order below min notional');
     vi.restoreAllMocks();
     await app.close();
@@ -646,7 +647,7 @@ describe('agent exec log routes', () => {
     });
     const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
     expect(rows[0].cancellation_reason).toBe(
       'Invalid API-key, IP, or permissions for action.',
     );

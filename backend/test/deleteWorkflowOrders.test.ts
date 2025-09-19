@@ -5,6 +5,7 @@ import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { getLimitOrdersByReviewResult } from '../src/repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 
@@ -55,14 +56,14 @@ describe('delete workflow cancels all orders', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '1',
     });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'ETHSOL' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '2',
     });
@@ -90,7 +91,7 @@ describe('delete workflow cancels all orders', () => {
       }),
     );
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders.map((o) => o.status)).toEqual(['canceled', 'canceled']);
+    expect(orders.map((o) => o.status)).toEqual([LimitOrderStatus.Canceled, LimitOrderStatus.Canceled]);
     await app.close();
   });
 });

@@ -1,11 +1,11 @@
 import { db } from '../db/index.js';
 import { convertKeysToCamelCase } from '../util/objectCase.js';
-import type {
-  LimitOrderByReviewResult,
-  LimitOrderInsert,
-  LimitOrderOpen,
-  LimitOrderOpenWorkflow,
+import {
   LimitOrderStatus,
+  type LimitOrderByReviewResult,
+  type LimitOrderInsert,
+  type LimitOrderOpen,
+  type LimitOrderOpenWorkflow,
 } from './limit-orders.types.js';
 
 export async function insertLimitOrder(entry: LimitOrderInsert): Promise<void> {
@@ -43,8 +43,8 @@ export async function getOpenLimitOrdersForWorkflow(
     `SELECT e.user_id, e.order_id, e.planned_json
        FROM limit_order e
        JOIN review_result r ON e.review_result_id = r.id
-      WHERE r.portfolio_workflow_id = $1 AND e.status = 'open'`,
-    [portfolioWorkflowId],
+      WHERE r.portfolio_workflow_id = $1 AND e.status = $2`,
+    [portfolioWorkflowId, LimitOrderStatus.Open],
   );
   return convertKeysToCamelCase(rows) as LimitOrderOpenWorkflow[];
 }
@@ -55,7 +55,8 @@ export async function getAllOpenLimitOrders(): Promise<LimitOrderOpen[]> {
        FROM limit_order e
        JOIN review_result r ON e.review_result_id = r.id
        JOIN portfolio_workflow pw ON r.portfolio_workflow_id = pw.id
-      WHERE e.status = 'open'`,
+      WHERE e.status = $1`,
+    [LimitOrderStatus.Open],
   );
   return convertKeysToCamelCase(rows) as LimitOrderOpen[];
 }

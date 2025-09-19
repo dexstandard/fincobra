@@ -1,9 +1,10 @@
 import { db } from '../../src/db/index.js';
+import { LimitOrderStatus } from '../../src/repos/limit-orders.types.js';
 
 export async function insertLimitOrder(args: {
   userId: string;
   planned: unknown;
-  status: string;
+  status: LimitOrderStatus;
   reviewResultId: string;
   orderId: string;
 }) {
@@ -25,7 +26,7 @@ export async function getLimitOrder(orderId: string) {
     [orderId],
   );
   return rows[0] as
-    | { status: string; cancellation_reason: string | null }
+    | { status: LimitOrderStatus; cancellation_reason: string | null }
     | undefined;
 }
 
@@ -48,7 +49,7 @@ export async function getLimitOrders() {
   return rows as {
     user_id: string;
     planned_json: string;
-    status: string;
+    status: LimitOrderStatus;
     review_result_id: string;
     order_id: string;
     cancellation_reason: string | null;

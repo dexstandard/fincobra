@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getLimitOrders, clearLimitOrders } from './repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
@@ -271,7 +272,7 @@ describe('createDecisionLimitOrders', () => {
     expect(planned.limitPrice).toBeCloseTo(251.251, 6);
     expect(planned.basePrice).toBe(249);
     expect(planned.observedPrice).toBe(251);
-    expect(row.status).toBe('open');
+    expect(row.status).toBe(LimitOrderStatus.Open);
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'SELL',
@@ -383,7 +384,7 @@ describe('createDecisionLimitOrders', () => {
       log,
     });
     const row = (await getLimitOrders())[0];
-    expect(row.status).toBe('canceled');
+    expect(row.status).toBe(LimitOrderStatus.Canceled);
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
 
@@ -434,7 +435,7 @@ describe('createDecisionLimitOrders', () => {
     });
     const rows = await getLimitOrders();
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
     expect(rows[0].cancellation_reason).toBe('Malformed limitPrice: NaN');
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
@@ -486,7 +487,7 @@ describe('createDecisionLimitOrders', () => {
     });
     const rows = await getLimitOrders();
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
     expect(rows[0].cancellation_reason).toBe('Malformed maxPriceDivergencePct: 0');
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
@@ -537,7 +538,7 @@ describe('createDecisionLimitOrders', () => {
     });
     const rows = await getLimitOrders();
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('canceled');
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
     expect(rows[0].cancellation_reason).toBe('order below min notional');
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
@@ -589,7 +590,7 @@ describe('createDecisionLimitOrders', () => {
     });
     const rows = await getLimitOrders();
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('open');
+    expect(rows[0].status).toBe(LimitOrderStatus.Open);
     const planned = JSON.parse(rows[0].planned_json);
     expect(planned.quantity).toBe(1.1);
     expect(planned.price).toBe(0.02);
