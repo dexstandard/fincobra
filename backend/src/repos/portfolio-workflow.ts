@@ -48,17 +48,18 @@ const baseSelect = `
          COALESCE(json_agg(json_build_object('token', t.token, 'min_allocation', t.min_allocation) ORDER BY t.position)
                   FILTER (WHERE t.token IS NOT NULL), '[]') AS tokens,
          pw.risk, pw.review_interval, pw.agent_instructions, pw.manual_rebalance, pw.use_earn,
-         COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id, pw.exchange_key_id AS exchange_api_key_id
+         COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id, COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id
     FROM portfolio_workflow pw
     LEFT JOIN portfolio_workflow_tokens t ON t.portfolio_workflow_id = pw.id
     LEFT JOIN ai_api_keys ak ON ak.user_id = pw.user_id AND ak.provider = 'openai'
     LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
     LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+    LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
 `;
 
 export async function getAgent(id: string): Promise<PortfolioWorkflow | undefined> {
   const { rows } = await db.query(
-    `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id`,
+    `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id`,
     [id, AgentStatus.Retired],
   );
   if (!rows[0]) return undefined;
@@ -79,7 +80,7 @@ export async function getAgentsPaginated(
       [userId, status],
     );
     const { rows } = await db.query(
-      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id LIMIT $3 OFFSET $4`,
+      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $3 OFFSET $4`,
       [userId, status, limit, offset],
     );
     return {
@@ -93,7 +94,7 @@ export async function getAgentsPaginated(
     [userId, AgentStatus.Retired],
   );
   const { rows } = await db.query(
-    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id LIMIT $3 OFFSET $4`,
+    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $3 OFFSET $4`,
     [userId, AgentStatus.Retired, limit, offset],
   );
   return {
@@ -284,7 +285,7 @@ export async function getActivePortfolioWorkflowById(
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
-                      pw.exchange_key_id AS exchange_api_key_id,
+                      COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
                       pw.manual_rebalance,
                       pw.use_earn,
                       pw.start_balance,
@@ -295,6 +296,7 @@ export async function getActivePortfolioWorkflowById(
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
                  LEFT JOIN ai_api_keys wak ON wak.id = pw.ai_api_key_id
+                 LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -318,7 +320,7 @@ export async function getActivePortfolioWorkflowsByInterval(
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
-                      pw.exchange_key_id AS exchange_api_key_id,
+                      COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
                       pw.manual_rebalance,
                       pw.use_earn,
                       pw.start_balance,
@@ -329,6 +331,7 @@ export async function getActivePortfolioWorkflowsByInterval(
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
                  LEFT JOIN ai_api_keys wak ON wak.id = pw.ai_api_key_id
+                 LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -348,7 +351,7 @@ const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model,
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
-                      pw.exchange_key_id AS exchange_api_key_id,
+                      COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
                       pw.manual_rebalance,
                       pw.use_earn,
                       pw.start_balance,
@@ -359,6 +362,7 @@ const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model,
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
                  LEFT JOIN ai_api_keys wak ON wak.id = pw.ai_api_key_id
+                 LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -408,7 +412,7 @@ function buildActiveWorkflowQuery({
   if (exchangeKeyId) {
     params.push(exchangeKeyId);
     const placeholder = `$${params.length}`;
-    conditions.push(`pw.exchange_key_id = ${placeholder}`);
+    conditions.push(`COALESCE(pw.exchange_key_id, ek.id) = ${placeholder}`);
   }
 
   const sql = `${activePortfolioWorkflowSelect}

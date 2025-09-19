@@ -75,8 +75,6 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key, secret } = body;
       const existingKey = await getBinanceKey(userId);
-      if (existingKey === undefined)
-        return reply.code(404).send(errorResponse('user not found'));
       if (existingKey)
         return reply.code(400).send(errorResponse('key exists'));
       const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
@@ -106,8 +104,6 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const userId = getValidatedUserId(req);
       const binanceKey = await getBinanceKey(userId);
-      if (binanceKey === undefined)
-        return reply.code(404).send(errorResponse('user not found'));
       if (!binanceKey)
         return reply
           .code(404)
@@ -130,8 +126,6 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key, secret } = body;
       const existingKey = await getBinanceKey(userId);
-      if (existingKey === undefined)
-        return reply.code(404).send(errorResponse('user not found'));
       if (!existingKey)
         return reply
           .code(404)
@@ -163,8 +157,6 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const userId = getValidatedUserId(req);
       const existingKey = await getBinanceKey(userId);
-      if (existingKey === undefined)
-        return reply.code(404).send(errorResponse('user not found'));
       if (!existingKey)
         return reply
           .code(404)

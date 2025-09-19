@@ -7,7 +7,7 @@ import type {
 
 export async function getBinanceKey(
   userId: string,
-): Promise<BinanceApiKeyDetails | null | undefined> {
+): Promise<BinanceApiKeyDetails | null> {
   const { rows } = await db.query(
     `SELECT ek.id AS binance_api_key_id,
             ek.api_key_enc AS binance_api_key_enc,
@@ -18,7 +18,7 @@ export async function getBinanceKey(
     [userId],
   );
   const row = rows[0];
-  if (!row) return undefined;
+  if (!row) return null;
   const entity = convertKeysToCamelCase(row) as {
     binanceApiKeyId: string | null;
     binanceApiKeyEnc: string | null;
