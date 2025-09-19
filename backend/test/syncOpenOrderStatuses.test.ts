@@ -77,6 +77,9 @@ describe('syncOpenOrderStatuses', () => {
 
     const order = await getLimitOrder(orderId);
     expect(order?.status).toBe('canceled');
+    expect(order?.cancellation_reason).toBe(
+      'Binance canceled the order (status CANCELED)',
+    );
   });
 
   it('marks missing orders as filled when Binance reports filled status', async () => {
@@ -92,11 +95,29 @@ describe('syncOpenOrderStatuses', () => {
   it('marks missing orders as canceled when Binance returns unknown order error', async () => {
     const { orderId } = await setupOrder('789');
     fetchOrder.mockRejectedValueOnce(new Error('err'));
+    parseBinanceError.mockReturnValueOnce({
+      code: -2013,
+      msg: 'Order does not exist.',
+    });
+
+    await syncOpenOrderStatuses(mockLogger());
+
+    const order = await getLimitOrder(orderId);
+    expect(order?.status).toBe('canceled');
+    expect(order?.cancellation_reason).toBe('Binance: Order does not exist.');
+  });
+
+  it('falls back to a generic message when Binance omits the unknown order error message', async () => {
+    const { orderId } = await setupOrder('101112');
+    fetchOrder.mockRejectedValueOnce(new Error('err'));
     parseBinanceError.mockReturnValueOnce({ code: -2013 });
 
     await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
     expect(order?.status).toBe('canceled');
+    expect(order?.cancellation_reason).toBe(
+      'Binance could not find the order (code -2013)',
+    );
   });
 });

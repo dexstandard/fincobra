@@ -36,13 +36,23 @@ interface GroupedOrder extends LimitOrderOpen {
   planned: PlannedOrder;
 }
 
-const CLOSED_ORDER_STATUSES = new Set([
-  'CANCELED',
-  'PENDING_CANCEL',
-  'EXPIRED',
-  'REJECTED',
-  'EXPIRED_IN_MATCH',
-]);
+const CLOSED_ORDER_STATUS_DESCRIPTIONS: Record<string, string> = {
+  CANCELED: 'canceled the order',
+  PENDING_CANCEL: 'marked the order as pending cancellation',
+  EXPIRED: 'expired the order before it could fill',
+  REJECTED: 'rejected the order',
+  EXPIRED_IN_MATCH: 'expired the order while matching',
+};
+
+const CLOSED_ORDER_STATUSES = new Set<string>(
+  Object.keys(CLOSED_ORDER_STATUS_DESCRIPTIONS),
+);
+
+function resolveExternalCancellationReason(status: string): string {
+  const description =
+    CLOSED_ORDER_STATUS_DESCRIPTIONS[status] ?? 'closed the order';
+  return `Binance ${description} (status ${status})`;
+}
 
 export async function syncOpenOrderStatuses(
   log: FastifyBaseLogger,
@@ -122,11 +132,15 @@ async function reconcileGroup(log: FastifyBaseLogger, list: GroupedOrder[]) {
   }
 }
 
+type ResolvedClosedStatus =
+  | { type: 'filled' }
+  | { type: 'canceled'; reason: string };
+
 async function resolveClosedStatus(
   log: FastifyBaseLogger,
   order: GroupedOrder,
   symbol: string,
-): Promise<'filled' | 'canceled' | null> {
+): Promise<ResolvedClosedStatus | null> {
   const orderId = Number(order.orderId);
   if (!Number.isFinite(orderId)) {
     log.error(
@@ -146,16 +160,29 @@ async function resolveClosedStatus(
       return null;
     }
     const status = res.status.toUpperCase();
-    if (status === 'FILLED') return 'filled';
-    if (CLOSED_ORDER_STATUSES.has(status)) return 'canceled';
+    if (status === 'FILLED') return { type: 'filled' };
+    if (CLOSED_ORDER_STATUSES.has(status)) {
+      return {
+        type: 'canceled',
+        reason: resolveExternalCancellationReason(status),
+      };
+    }
     log.error(
       { orderId: order.orderId, status },
       'unexpected Binance order status while reconciling',
     );
     return null;
   } catch (err) {
-    const { code } = parseBinanceError(err);
-    if (code === -2013) return 'canceled';
+    const { code, msg } = parseBinanceError(err);
+    if (code === -2013) {
+      const message = typeof msg === 'string' ? msg.trim() : '';
+      return {
+        type: 'canceled',
+        reason: message
+          ? `Binance: ${message}`
+          : 'Binance could not find the order (code -2013)',
+      };
+    }
     log.error(
       { err, orderId: order.orderId },
       'failed to fetch Binance order while reconciling',
@@ -173,10 +200,15 @@ async function reconcileOrder(
   const exists = open.some((entry) => String(entry.orderId) === order.orderId);
   if (!exists) {
     const status = await resolveClosedStatus(log, order, symbol);
-    if (status === 'filled') {
+    if (status?.type === 'filled') {
       await updateLimitOrderStatus(order.userId, order.orderId, 'filled');
-    } else if (status === 'canceled') {
-      await updateLimitOrderStatus(order.userId, order.orderId, 'canceled');
+    } else if (status?.type === 'canceled') {
+      await updateLimitOrderStatus(
+        order.userId,
+        order.orderId,
+        'canceled',
+        status.reason,
+      );
     }
     return;
   }
