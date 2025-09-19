@@ -15,8 +15,10 @@ import {
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { REDACTED_KEY } from './_shared/constants.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
-import { disableUserWorkflows } from '../workflows/disable.js';
-import type { DisableWorkflowsSummary } from '../workflows/disable.js';
+import {
+  disableUserWorkflowsByExchangeKey,
+  type DisableWorkflowsSummary,
+} from '../workflows/disable.js';
 
 interface ExchangeKeyBody {
   key: string;
@@ -161,11 +163,11 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
         return reply
           .code(404)
           .send(errorResponse(ERROR_MESSAGES.notFound));
-      const disableSummary = await disableUserWorkflows({
-        log: req.log,
+      const disableSummary = await disableUserWorkflowsByExchangeKey(
+        req.log,
         userId,
-        exchangeKeyId: existingKey.id,
-      });
+        existingKey.id,
+      );
       logDisabledWorkflows(req, userId, disableSummary);
       await clearBinanceKey(userId);
       return { ok: true };

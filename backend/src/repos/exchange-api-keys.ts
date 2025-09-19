@@ -9,27 +9,15 @@ export async function getBinanceKey(
   userId: string,
 ): Promise<BinanceApiKeyDetails | null> {
   const { rows } = await db.query(
-    `SELECT ek.id AS binance_api_key_id,
-            ek.api_key_enc AS binance_api_key_enc,
-            ek.api_secret_enc AS binance_api_secret_enc
-       FROM users u
-       LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance'
-      WHERE u.id = $1`,
+    `SELECT id, api_key_enc, api_secret_enc
+       FROM exchange_keys
+      WHERE user_id = $1 AND provider = 'binance'
+      LIMIT 1`,
     [userId],
   );
   const row = rows[0];
   if (!row) return null;
-  const entity = convertKeysToCamelCase(row) as {
-    binanceApiKeyId: string | null;
-    binanceApiKeyEnc: string | null;
-    binanceApiSecretEnc: string | null;
-  };
-  if (!entity.binanceApiKeyId) return null;
-  return {
-    id: entity.binanceApiKeyId,
-    apiKeyEnc: entity.binanceApiKeyEnc ?? '',
-    apiSecretEnc: entity.binanceApiSecretEnc ?? '',
-  };
+  return convertKeysToCamelCase(row) as BinanceApiKeyDetails;
 }
 
 export async function setBinanceKey(entry: BinanceApiKeyUpsert): Promise<void> {
