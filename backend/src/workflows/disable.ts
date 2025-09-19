@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import {
   getActivePortfolioWorkflowsByUser,
   deactivateWorkflowsByUser,
+  deactivateWorkflowsByIds,
 } from '../repos/portfolio-workflow.js';
 import {
   CANCEL_ORDER_REASONS,
@@ -13,6 +14,7 @@ interface DisableUserWorkflowsParams {
   log: FastifyBaseLogger;
   userId: string;
   aiKeyId?: string | null;
+  exchangeKeyId?: string | null;
 }
 
 export interface DisableWorkflowsSummary {
@@ -24,11 +26,18 @@ export async function disableUserWorkflows({
   log,
   userId,
   aiKeyId,
+  exchangeKeyId,
 }: DisableUserWorkflowsParams): Promise<DisableWorkflowsSummary> {
   const workflows = await getActivePortfolioWorkflowsByUser(userId);
-  const relevant = aiKeyId
-    ? workflows.filter((wf) => wf.aiApiKeyId === aiKeyId)
-    : workflows;
+  let relevant = workflows;
+
+  if (aiKeyId) {
+    relevant = relevant.filter((wf) => wf.aiApiKeyId === aiKeyId);
+  }
+
+  if (exchangeKeyId) {
+    relevant = relevant.filter((wf) => wf.exchangeApiKeyId === exchangeKeyId);
+  }
 
   if (!relevant.length) {
     return { disabledWorkflowIds: [], unscheduledWorkflowIds: [] };
@@ -46,9 +55,15 @@ export async function disableUserWorkflows({
     }
   }
 
-  await deactivateWorkflowsByUser(userId, aiKeyId);
-
   const disabledWorkflowIds = relevant.map((workflow) => workflow.id);
+  if (aiKeyId && !exchangeKeyId) {
+    await deactivateWorkflowsByUser(userId, aiKeyId);
+  } else if (!aiKeyId && !exchangeKeyId) {
+    await deactivateWorkflowsByUser(userId);
+  } else {
+    await deactivateWorkflowsByIds(disabledWorkflowIds);
+  }
+
   const unscheduledWorkflowIds: string[] = [];
   for (const workflowId of disabledWorkflowIds) {
     if (removeWorkflowFromSchedule(workflowId)) {

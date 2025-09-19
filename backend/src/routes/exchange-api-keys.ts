@@ -7,26 +7,17 @@ import {
   clearBinanceKey,
 } from '../repos/exchange-api-keys.js';
 import {
-  getActivePortfolioWorkflowsByUser,
-  deactivateWorkflowsByUser,
-} from '../repos/portfolio-workflow.js';
-import { removeWorkflowFromSchedule } from '../workflows/portfolio-review.js';
-import {
   ApiKeyType,
   verifyApiKey,
   encryptKey,
-  ensureUser,
-  ensureKeyAbsent,
   ensureKeyPresent,
   decryptKey,
 } from '../util/api-keys.js';
 import { errorResponse } from '../util/errorMessages.js';
-import {
-  CANCEL_ORDER_REASONS,
-  cancelOrdersForWorkflow,
-} from '../services/order-orchestrator.js';
 import { REDACTED_KEY } from './_shared/constants.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
+import { disableUserWorkflows } from '../workflows/disable.js';
+import type { DisableWorkflowsSummary } from '../workflows/disable.js';
 
 interface ExchangeKeyBody {
   key: string;
@@ -59,6 +50,19 @@ function formatVerificationError(result: boolean | string): string {
   }`;
 }
 
+function logDisabledWorkflows(
+  req: FastifyRequest,
+  userId: string,
+  summary: DisableWorkflowsSummary,
+) {
+  const { disabledWorkflowIds, unscheduledWorkflowIds } = summary;
+  if (!disabledWorkflowIds.length && !unscheduledWorkflowIds.length) return;
+  req.log.info(
+    { userId, disabledWorkflowIds, unscheduledWorkflowIds },
+    'disabled workflows after exchange key update',
+  );
+}
+
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
   app.post(
     '/users/:id/binance-key',
@@ -72,10 +76,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key, secret } = body;
       const row = await getBinanceKeyRow(userId);
-      let err = ensureUser(row);
-      if (err) return reply.code(err.code).send(err.body);
-      err = ensureKeyAbsent(row, ['binanceApiKeyEnc', 'binanceApiSecretEnc']);
-      if (err) return reply.code(err.code).send(err.body);
+      if (row?.id)
+        return reply.code(400).send(errorResponse('key exists'));
       const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
       if (verRes !== true)
         return reply
@@ -163,20 +165,12 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
         'binanceApiSecretEnc',
       ]);
       if (err) return reply.code(err.code).send(err.body);
-      const agents = await getActivePortfolioWorkflowsByUser(userId);
-      for (const agent of agents) {
-        removeWorkflowFromSchedule(agent.id);
-        try {
-          await cancelOrdersForWorkflow({
-            workflowId: agent.id,
-            reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
-            log: req.log,
-          });
-        } catch (err) {
-          req.log.error({ err, workflowId: agent.id }, 'failed to cancel orders');
-        }
-      }
-      await deactivateWorkflowsByUser(userId);
+      const disableSummary = await disableUserWorkflows({
+        log: req.log,
+        userId,
+        exchangeKeyId: row?.id ?? null,
+      });
+      logDisabledWorkflows(req, userId, disableSummary);
       await clearBinanceKey(userId);
       return { ok: true };
     },

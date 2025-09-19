@@ -285,6 +285,7 @@ export async function getActivePortfolioWorkflowById(
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
+                      ek.id AS exchange_api_key_id,
                       a.manual_rebalance,
                       a.use_earn,
                       a.start_balance,
@@ -295,6 +296,7 @@ export async function getActivePortfolioWorkflowById(
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = a.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
                  LEFT JOIN ai_api_keys wak ON wak.id = a.ai_api_key_id
+                 LEFT JOIN exchange_keys ek ON ek.user_id = a.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -318,6 +320,7 @@ export async function getActivePortfolioWorkflowsByInterval(
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
+                      ek.id AS exchange_api_key_id,
                       a.manual_rebalance,
                       a.use_earn,
                       a.start_balance,
@@ -328,6 +331,7 @@ export async function getActivePortfolioWorkflowsByInterval(
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = a.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
                  LEFT JOIN ai_api_keys wak ON wak.id = a.ai_api_key_id
+                 LEFT JOIN exchange_keys ek ON ek.user_id = a.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -350,6 +354,7 @@ export async function getActivePortfolioWorkflowsByUser(
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
+                      ek.id AS exchange_api_key_id,
                       a.manual_rebalance,
                       a.use_earn,
                       a.start_balance,
@@ -360,6 +365,7 @@ export async function getActivePortfolioWorkflowsByUser(
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = a.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
                  LEFT JOIN ai_api_keys wak ON wak.id = a.ai_api_key_id
+                 LEFT JOIN exchange_keys ek ON ek.user_id = a.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
@@ -410,5 +416,20 @@ export async function deactivateWorkflowsByUser(
               )
             ) = $4`,
     [AgentStatus.Inactive, userId, AgentStatus.Active, aiKeyId],
+  );
+}
+
+export async function deactivateWorkflowsByIds(
+  workflowIds: string[],
+): Promise<void> {
+  if (!workflowIds.length) return;
+  const ids = workflowIds.map((id) => Number(id));
+  await db.query(
+    `UPDATE portfolio_workflow
+        SET status = $1,
+            start_balance = NULL
+      WHERE id = ANY($2::bigint[])
+        AND status = $3`,
+    [AgentStatus.Inactive, ids, AgentStatus.Active],
   );
 }
