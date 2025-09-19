@@ -13,6 +13,7 @@ import {
   insertLimitOrder,
   getLimitOrdersByReviewResult,
 } from './repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { cancelOrder } from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
@@ -169,7 +170,7 @@ describe('agent routes', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: execId,
       orderId: '123',
     });
@@ -189,7 +190,7 @@ describe('agent routes', () => {
       orderId: 123,
     });
     const execOrders = await getLimitOrdersByReviewResult(execId);
-    expect(execOrders[0].status).toBe('canceled');
+    expect(execOrders[0].status).toBe(LimitOrderStatus.Canceled);
 
     res = await app.inject({
       method: 'GET',

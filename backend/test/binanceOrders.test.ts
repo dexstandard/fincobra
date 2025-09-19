@@ -7,6 +7,7 @@ import {
   createLimitOrder,
   cancelOrder,
 } from '../src/services/binance.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 
 describe('binance order helpers', () => {
   afterEach(() => {
@@ -65,7 +66,7 @@ describe('binance order helpers', () => {
 
     const fetchMock = vi
       .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ status: 'canceled' }) });
+      .mockResolvedValue({ ok: true, json: async () => ({ status: LimitOrderStatus.Canceled }) });
     vi.stubGlobal('fetch', fetchMock as any);
 
     await cancelOrder(id2, { symbol: 'BTCUSDT', orderId: 42 });

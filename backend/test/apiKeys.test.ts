@@ -18,6 +18,7 @@ import { insertAgent, getPortfolioWorkflow } from './repos/portfolio-workflow.js
 import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { encrypt } from '../src/util/crypto.js';
 import * as portfolioReview from '../src/workflows/portfolio-review.js';
 import { cancelOrder } from '../src/services/binance.js';
@@ -401,7 +402,7 @@ describe('key deletion effects on agents', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '1',
     });
@@ -462,7 +463,7 @@ describe('key deletion effects on agents', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '2',
     });
@@ -535,7 +536,7 @@ describe('key deletion effects on agents', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '3',
     });
@@ -609,7 +610,7 @@ describe('key deletion effects on agents', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '4',
     });

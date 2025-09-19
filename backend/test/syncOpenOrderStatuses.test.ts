@@ -7,6 +7,7 @@ import {
   insertLimitOrder,
   getLimitOrder,
 } from './repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { mockLogger } from './helpers.js';
 
 const { fetchOpenOrders, fetchOrder, parseBinanceError } = vi.hoisted(() => ({
@@ -62,7 +63,7 @@ describe('syncOpenOrderStatuses', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'SOLUSDT', side: 'BUY', quantity: 0.1, price: 10 },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId,
       orderId,
     });
@@ -76,7 +77,7 @@ describe('syncOpenOrderStatuses', () => {
     await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
-    expect(order?.status).toBe('canceled');
+    expect(order?.status).toBe(LimitOrderStatus.Canceled);
     expect(order?.cancellation_reason).toBe(
       'Binance canceled the order (status CANCELED)',
     );
@@ -89,7 +90,7 @@ describe('syncOpenOrderStatuses', () => {
     await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
-    expect(order?.status).toBe('filled');
+    expect(order?.status).toBe(LimitOrderStatus.Filled);
   });
 
   it('marks missing orders as canceled when Binance returns unknown order error', async () => {
@@ -103,7 +104,7 @@ describe('syncOpenOrderStatuses', () => {
     await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
-    expect(order?.status).toBe('canceled');
+    expect(order?.status).toBe(LimitOrderStatus.Canceled);
     expect(order?.cancellation_reason).toBe('Binance: Order does not exist.');
   });
 
@@ -115,7 +116,7 @@ describe('syncOpenOrderStatuses', () => {
     await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
-    expect(order?.status).toBe('canceled');
+    expect(order?.status).toBe(LimitOrderStatus.Canceled);
     expect(order?.cancellation_reason).toBe(
       'Binance could not find the order (code -2013)',
     );

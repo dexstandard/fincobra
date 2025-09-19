@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { callAi } from '../src/util/ai.js';
 import { developerInstructions, rebalanceResponseSchema } from '../src/agents/main-trader.js';
 import { type RebalancePrompt } from '../src/agents/main-trader.types.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 
 describe('callAi structured output', () => {
   it('includes json schema in request', async () => {
@@ -31,7 +32,7 @@ describe('callAi structured output', () => {
               symbol: 'BTCUSDT',
               side: 'BUY',
               quantity: 1,
-              status: 'filled',
+              status: LimitOrderStatus.Filled,
               datetime: '2025-01-02T00:00:00.000Z',
             },
           ],
@@ -57,7 +58,7 @@ describe('callAi structured output', () => {
             symbol: 'BTCUSDT',
             side: 'BUY',
             quantity: 1,
-            status: 'filled',
+            status: LimitOrderStatus.Filled,
             datetime: '2025-01-02T00:00:00.000Z',
           },
         ],

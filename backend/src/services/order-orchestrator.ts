@@ -4,7 +4,10 @@ import {
   getOpenLimitOrdersForWorkflow,
   updateLimitOrderStatus,
 } from '../repos/limit-orders.js';
-import type { LimitOrderOpen } from '../repos/limit-orders.types.js';
+import {
+  LimitOrderStatus,
+  type LimitOrderOpen,
+} from '../repos/limit-orders.types.js';
 import {
   fetchOpenOrders,
   fetchOrder,
@@ -91,7 +94,12 @@ export async function cancelOrdersForWorkflow({
   for (const order of openOrders) {
     const symbol = parsePlannedOrderSymbol(order.plannedJson, log, order.orderId);
     if (!symbol) {
-      await updateLimitOrderStatus(order.userId, order.orderId, 'canceled', reason);
+      await updateLimitOrderStatus(
+        order.userId,
+        order.orderId,
+        LimitOrderStatus.Canceled,
+        reason,
+      );
       continue;
     }
     try {
@@ -124,17 +132,24 @@ async function reconcileGroup(log: FastifyBaseLogger, list: GroupedOrder[]) {
     const res = await fetchOpenOrders(userId, { symbol: planned.symbol });
     open = Array.isArray(res) ? res : [];
   } catch (err) {
-    log.error({ err }, 'failed to fetch open orders');
+    log.error(
+      { err, userId, symbol: planned.symbol },
+      'failed to fetch open orders',
+    );
     return;
   }
   for (const order of list) {
-    await reconcileOrder(log, order, planned.symbol, open);
+    try {
+      await reconcileOrder(log, order, planned.symbol, open);
+    } catch (err) {
+      log.error({ err, orderId: order.orderId }, 'failed to reconcile order');
+    }
   }
 }
 
 type ResolvedClosedStatus =
-  | { type: 'filled' }
-  | { type: 'canceled'; reason: string };
+  | { type: LimitOrderStatus.Filled }
+  | { type: LimitOrderStatus.Canceled; reason: string };
 
 async function resolveClosedStatus(
   log: FastifyBaseLogger,
@@ -160,10 +175,10 @@ async function resolveClosedStatus(
       return null;
     }
     const status = res.status.toUpperCase();
-    if (status === 'FILLED') return { type: 'filled' };
+    if (status === 'FILLED') return { type: LimitOrderStatus.Filled };
     if (CLOSED_ORDER_STATUSES.has(status)) {
       return {
-        type: 'canceled',
+        type: LimitOrderStatus.Canceled,
         reason: resolveExternalCancellationReason(status),
       };
     }
@@ -177,7 +192,7 @@ async function resolveClosedStatus(
     if (code === -2013) {
       const message = typeof msg === 'string' ? msg.trim() : '';
       return {
-        type: 'canceled',
+        type: LimitOrderStatus.Canceled,
         reason: message
           ? `Binance: ${message}`
           : 'Binance could not find the order (code -2013)',
@@ -200,13 +215,17 @@ async function reconcileOrder(
   const exists = open.some((entry) => String(entry.orderId) === order.orderId);
   if (!exists) {
     const status = await resolveClosedStatus(log, order, symbol);
-    if (status?.type === 'filled') {
-      await updateLimitOrderStatus(order.userId, order.orderId, 'filled');
-    } else if (status?.type === 'canceled') {
+    if (status?.type === LimitOrderStatus.Filled) {
       await updateLimitOrderStatus(
         order.userId,
         order.orderId,
-        'canceled',
+        LimitOrderStatus.Filled,
+      );
+    } else if (status?.type === LimitOrderStatus.Canceled) {
+      await updateLimitOrderStatus(
+        order.userId,
+        order.orderId,
+        LimitOrderStatus.Canceled,
         status.reason,
       );
     }

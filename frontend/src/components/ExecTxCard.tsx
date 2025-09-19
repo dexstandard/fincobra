@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import type { LimitOrder } from '../lib/types';
+import { LimitOrderStatus, type LimitOrder } from '../lib/types';
 import api from '../lib/axios';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
@@ -63,7 +63,7 @@ export default function ExecTxCard({ workflowId, logId, orders, onCancel }: Prop
                 )}
               </td>
               <td>
-                {o.status === 'open' && (
+                {o.status === LimitOrderStatus.Open && (
                   <Button
                     variant="danger"
                     onClick={() => handleCancel(o.id)}

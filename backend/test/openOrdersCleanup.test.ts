@@ -7,6 +7,7 @@ import {
   insertLimitOrder,
   getLimitOrdersByReviewResult,
 } from '../src/repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { setAiKey } from '../src/repos/ai-api-key.js';
 import { reviewAgentPortfolio } from '../src/workflows/portfolio-review.js';
 
@@ -115,7 +116,7 @@ describe('cleanup open orders', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
     });
@@ -123,7 +124,7 @@ describe('cleanup open orders', () => {
     await reviewAgentPortfolio(log, agent.id);
     expect(cancelOrder).toHaveBeenCalledTimes(1);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders[0].status).toBe('canceled');
+    expect(orders[0].status).toBe(LimitOrderStatus.Canceled);
   });
 
   it('cancels multiple open orders in parallel', async () => {
@@ -162,14 +163,14 @@ describe('cleanup open orders', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
     });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '456',
     });
@@ -181,8 +182,8 @@ describe('cleanup open orders', () => {
     await runPromise;
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders.map((o) => ({ orderId: o.orderId, status: o.status }))).toEqual([
-      { orderId: '123', status: 'canceled' },
-      { orderId: '456', status: 'canceled' },
+      { orderId: '123', status: LimitOrderStatus.Canceled },
+      { orderId: '456', status: LimitOrderStatus.Canceled },
     ]);
   });
 
@@ -217,14 +218,14 @@ describe('cleanup open orders', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
     });
     const log = mockLogger();
     await reviewAgentPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders[0].status).toBe('filled');
+    expect(orders[0].status).toBe(LimitOrderStatus.Filled);
     expect(orders[0].cancellationReason).toBeNull();
   });
 
@@ -259,14 +260,14 @@ describe('cleanup open orders', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
     });
     const log = mockLogger();
     await reviewAgentPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders[0].status).toBe('canceled');
+    expect(orders[0].status).toBe(LimitOrderStatus.Canceled);
     expect(orders[0].cancellationReason).toBe('Could not fill within interval');
   });
 
@@ -299,14 +300,14 @@ describe('cleanup open orders', () => {
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
-      status: 'open',
+      status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '789',
     });
     const log = mockLogger();
     await reviewAgentPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders[0].status).toBe('filled');
+    expect(orders[0].status).toBe(LimitOrderStatus.Filled);
     expect(orders[0].cancellationReason).toBeNull();
   });
 });

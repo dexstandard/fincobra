@@ -1,4 +1,8 @@
-export type LimitOrderStatus = 'open' | 'filled' | 'canceled';
+export enum LimitOrderStatus {
+  Open = 'open',
+  Filled = 'filled',
+  Canceled = 'canceled',
+}
 
 export interface LimitOrder {
   id: string;
