@@ -1,34 +1,23 @@
 import { db } from '../db/index.js';
 import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
-  BinanceApiKey,
+  BinanceApiKeyDetails,
   BinanceApiKeyUpsert,
 } from './exchange-api-keys.types.js';
 
-export async function getBinanceKeyRow(
-  id: string,
-): Promise<BinanceApiKey | undefined> {
+export async function getBinanceKey(
+  userId: string,
+): Promise<BinanceApiKeyDetails | null> {
   const { rows } = await db.query(
-    `SELECT ek.id,
-            ek.api_key_enc AS binance_api_key_enc,
-            ek.api_secret_enc AS binance_api_secret_enc
-       FROM users u
-       LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance'
-      WHERE u.id = $1`,
-    [id],
+    `SELECT id, api_key_enc, api_secret_enc
+       FROM exchange_keys
+      WHERE user_id = $1 AND provider = 'binance'
+      LIMIT 1`,
+    [userId],
   );
   const row = rows[0];
-  if (!row) return undefined;
-  const entity = convertKeysToCamelCase(row) as {
-    id: string | null;
-    binanceApiKeyEnc: string | null;
-    binanceApiSecretEnc: string | null;
-  };
-  return {
-    id: entity.id ?? null,
-    binanceApiKeyEnc: entity.binanceApiKeyEnc ?? null,
-    binanceApiSecretEnc: entity.binanceApiSecretEnc ?? null,
-  };
+  if (!row) return null;
+  return convertKeysToCamelCase(row) as BinanceApiKeyDetails;
 }
 
 export async function setBinanceKey(entry: BinanceApiKeyUpsert): Promise<void> {

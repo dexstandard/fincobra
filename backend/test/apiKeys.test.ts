@@ -10,10 +10,7 @@ vi.mock('../src/services/binance.js', async () => {
 import buildServer from '../src/server.js';
 import { insertUser, insertAdminUser } from './repos/users.js';
 import { getAiKey, setAiKey, shareAiKey, hasAiKeyShare } from '../src/repos/ai-api-key.js';
-import {
-  getBinanceKeyRow,
-  setBinanceKey,
-} from '../src/repos/exchange-api-keys.js';
+import { getBinanceKey, setBinanceKey } from '../src/repos/exchange-api-keys.js';
 import { insertAgent, getPortfolioWorkflow } from './repos/portfolio-workflow.js';
 import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
@@ -260,9 +257,8 @@ describe('Binance API key routes', () => {
     expect(res.json()).toMatchObject({
       error: 'verification failed: Invalid API-key',
     });
-    let row = await getBinanceKeyRow(userId);
-    expect(row!.binanceApiKeyEnc).toBeNull();
-    expect(row!.binanceApiSecretEnc).toBeNull();
+    let binanceKey = await getBinanceKey(userId);
+    expect(binanceKey).toBeNull();
 
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
@@ -277,9 +273,11 @@ describe('Binance API key routes', () => {
       key: '<REDACTED>',
       secret: '<REDACTED>',
     });
-    row = await getBinanceKeyRow(userId);
-    expect(row!.binanceApiKeyEnc).not.toBe(key1);
-    expect(row!.binanceApiSecretEnc).not.toBe(secret1);
+    binanceKey = await getBinanceKey(userId);
+    expect(binanceKey).not.toBeNull();
+    if (!binanceKey) throw new Error('binance key missing');
+    expect(binanceKey.apiKeyEnc).not.toBe(key1);
+    expect(binanceKey.apiSecretEnc).not.toBe(secret1);
 
     res = await app.inject({
       method: 'GET',

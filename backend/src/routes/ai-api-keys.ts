@@ -18,14 +18,16 @@ import {
 } from '../util/api-keys.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
-import type { DisableWorkflowsSummary } from '../workflows/disable.js';
-import { disableUserWorkflows } from '../workflows/disable.js';
+import {
+  disableUserWorkflowsByAiKey,
+  type DisableWorkflowsSummary,
+} from '../workflows/disable.js';
 import {
   adminPreHandlers,
   getValidatedUserId,
   userPreHandlers,
 } from './_shared/guards.js';
-import {REDACTED_KEY} from "./_shared/constants.js";
+import { REDACTED_KEY } from './_shared/constants.js';
 
 interface AiKeyBody {
   key: string;
@@ -167,11 +169,11 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       const aiKey = await getAiKey(id);
       if (!aiKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
 
-      const disableSummary = await disableUserWorkflows({
-        log: req.log,
-        userId: id,
-        aiKeyId: aiKey.id,
-      });
+      const disableSummary = await disableUserWorkflowsByAiKey(
+        req.log,
+        id,
+        aiKey.id,
+      );
       logDisabledWorkflows(req, id, disableSummary, 'owner-ai-key-removed');
 
       const targets = await getAiKeyShareTargets(id);
@@ -181,11 +183,11 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
           getSharedAiKey(targetId),
         ]);
         if (!targetOwnKey && targetSharedKey) {
-          const targetSummary = await disableUserWorkflows({
-            log: req.log,
-            userId: targetId,
-            aiKeyId: targetSharedKey.id,
-          });
+          const targetSummary = await disableUserWorkflowsByAiKey(
+            req.log,
+            targetId,
+            targetSharedKey.id,
+          );
           logDisabledWorkflows(
             req,
             targetId,
@@ -240,11 +242,11 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
         getSharedAiKey(target.id),
       ]);
       if (!targetOwnKey && targetSharedKey) {
-        const disableSummary = await disableUserWorkflows({
-          log: req.log,
-          userId: target.id,
-          aiKeyId: targetSharedKey.id,
-        });
+        const disableSummary = await disableUserWorkflowsByAiKey(
+          req.log,
+          target.id,
+          targetSharedKey.id,
+        );
         logDisabledWorkflows(
           req,
           target.id,

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 
-import { getBinanceKeyRow } from '../repos/exchange-api-keys.js';
+import { getBinanceKey } from '../repos/exchange-api-keys.js';
 import { decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
 
@@ -140,10 +140,10 @@ export async function fetchPairInfo(
 }
 
 async function getUserCreds(id: string): Promise<UserCreds | null> {
-  const row = await getBinanceKeyRow(id);
-  if (!row?.binanceApiKeyEnc || !row.binanceApiSecretEnc) return null;
-  const key = decrypt(row.binanceApiKeyEnc, env.KEY_PASSWORD);
-  const secret = decrypt(row.binanceApiSecretEnc, env.KEY_PASSWORD);
+  const binanceKey = await getBinanceKey(id);
+  if (!binanceKey) return null;
+  const key = decrypt(binanceKey.apiKeyEnc, env.KEY_PASSWORD);
+  const secret = decrypt(binanceKey.apiSecretEnc, env.KEY_PASSWORD);
   return { key, secret };
 }
 

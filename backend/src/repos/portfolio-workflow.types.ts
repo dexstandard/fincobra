@@ -82,6 +82,7 @@ export interface ActivePortfolioWorkflow {
   agentInstructions: string;
   aiApiKeyId: string | null;
   aiApiKeyEnc: string | null;
+  exchangeApiKeyId: string | null;
   manualRebalance: boolean;
   useEarn: boolean;
   startBalance: number | null;
