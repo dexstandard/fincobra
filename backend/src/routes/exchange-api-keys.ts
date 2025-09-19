@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { RATE_LIMITS } from '../rate-limit.js';
 import {
-  getBinanceKeyRow,
+  getBinanceKey,
   setBinanceKey,
   clearBinanceKey,
 } from '../repos/exchange-api-keys.js';
@@ -12,7 +12,7 @@ import {
   encryptKey,
   decryptKey,
 } from '../util/api-keys.js';
-import { errorResponse } from '../util/errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { REDACTED_KEY } from './_shared/constants.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 import { disableUserWorkflows } from '../workflows/disable.js';
@@ -74,10 +74,10 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       const body = parseBody(exchangeKeyBodySchema, req, reply);
       if (!body) return;
       const { key, secret } = body;
-      const row = await getBinanceKeyRow(userId);
-      if (!row)
+      const existingKey = await getBinanceKey(userId);
+      if (existingKey === undefined)
         return reply.code(404).send(errorResponse('user not found'));
-      if (row.id)
+      if (existingKey)
         return reply.code(400).send(errorResponse('key exists'));
       const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
       if (verRes !== true)
@@ -105,13 +105,15 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);
-      const row = await getBinanceKeyRow(userId);
-      if (!row)
+      const binanceKey = await getBinanceKey(userId);
+      if (binanceKey === undefined)
         return reply.code(404).send(errorResponse('user not found'));
-      if (!row.binanceApiKeyEnc || !row.binanceApiSecretEnc)
-        return reply.code(404).send(errorResponse('not found'));
-      decryptKey(row.binanceApiKeyEnc);
-      decryptKey(row.binanceApiSecretEnc);
+      if (!binanceKey)
+        return reply
+          .code(404)
+          .send(errorResponse(ERROR_MESSAGES.notFound));
+      decryptKey(binanceKey.apiKeyEnc);
+      decryptKey(binanceKey.apiSecretEnc);
       return { key: REDACTED_KEY, secret: REDACTED_KEY };
     },
   );
@@ -127,11 +129,13 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       const body = parseBody(exchangeKeyBodySchema, req, reply);
       if (!body) return;
       const { key, secret } = body;
-      const row = await getBinanceKeyRow(userId);
-      if (!row)
+      const existingKey = await getBinanceKey(userId);
+      if (existingKey === undefined)
         return reply.code(404).send(errorResponse('user not found'));
-      if (!row.binanceApiKeyEnc || !row.binanceApiSecretEnc)
-        return reply.code(404).send(errorResponse('not found'));
+      if (!existingKey)
+        return reply
+          .code(404)
+          .send(errorResponse(ERROR_MESSAGES.notFound));
       const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
       if (verRes !== true)
         return reply
@@ -158,15 +162,17 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);
-      const row = await getBinanceKeyRow(userId);
-      if (!row)
+      const existingKey = await getBinanceKey(userId);
+      if (existingKey === undefined)
         return reply.code(404).send(errorResponse('user not found'));
-      if (!row.binanceApiKeyEnc || !row.binanceApiSecretEnc)
-        return reply.code(404).send(errorResponse('not found'));
+      if (!existingKey)
+        return reply
+          .code(404)
+          .send(errorResponse(ERROR_MESSAGES.notFound));
       const disableSummary = await disableUserWorkflows({
         log: req.log,
         userId,
-        exchangeKeyId: row.id ?? null,
+        exchangeKeyId: existingKey.id,
       });
       logDisabledWorkflows(req, userId, disableSummary);
       await clearBinanceKey(userId);

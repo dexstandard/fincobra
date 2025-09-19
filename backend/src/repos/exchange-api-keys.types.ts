@@ -1,7 +1,7 @@
-export interface BinanceApiKey {
-  id: string | null;
-  binanceApiKeyEnc: string | null;
-  binanceApiSecretEnc: string | null;
+export interface BinanceApiKeyDetails {
+  id: string;
+  apiKeyEnc: string;
+  apiSecretEnc: string;
 }
 
 export interface BinanceApiKeyUpsert {

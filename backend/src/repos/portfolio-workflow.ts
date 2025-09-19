@@ -339,10 +339,7 @@ export async function getActivePortfolioWorkflowsByInterval(
   return convertKeysToCamelCase(rows) as ActivePortfolioWorkflow[];
 }
 
-export async function getActivePortfolioWorkflowsByUser(
-  userId: string,
-): Promise<ActivePortfolioWorkflow[]> {
-  const sql = `SELECT pw.id, pw.user_id, pw.model,
+const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model,
                       pw.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       pw.risk, pw.review_interval, pw.agent_instructions,
                       COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id,
@@ -366,10 +363,87 @@ export async function getActivePortfolioWorkflowsByUser(
                    SELECT json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
                      FROM portfolio_workflow_tokens
                     WHERE portfolio_workflow_id = pw.id
-                 ) t ON true
-                WHERE pw.status = 'active' AND pw.user_id = $1`;
-  const { rows } = await db.query(sql, [userId]);
+                 ) t ON true`;
+
+function buildActiveWorkflowQuery({
+  userId,
+  aiKeyId,
+  exchangeKeyId,
+}: {
+  userId: string;
+  aiKeyId?: string;
+  exchangeKeyId?: string;
+}) {
+  const params: unknown[] = [userId];
+  const conditions = ["pw.status = 'active'", 'pw.user_id = $1'];
+
+  if (aiKeyId) {
+    params.push(aiKeyId);
+    const placeholder = `$${params.length}`;
+    conditions.push(
+      `COALESCE(
+              pw.ai_api_key_id,
+              (
+                SELECT ak.id
+                  FROM ai_api_keys ak
+                 WHERE ak.user_id = pw.user_id
+                   AND ak.provider = 'openai'
+                   AND ak.id = ${placeholder}
+                 LIMIT 1
+              ),
+              (
+                SELECT oak.id
+                  FROM ai_api_key_shares s
+                  JOIN ai_api_keys oak
+                    ON oak.user_id = s.owner_user_id
+                   AND oak.provider = 'openai'
+                 WHERE s.target_user_id = pw.user_id
+                   AND oak.id = ${placeholder}
+                 LIMIT 1
+              )
+            ) = ${placeholder}`,
+    );
+  }
+
+  if (exchangeKeyId) {
+    params.push(exchangeKeyId);
+    const placeholder = `$${params.length}`;
+    conditions.push(`pw.exchange_key_id = ${placeholder}`);
+  }
+
+  const sql = `${activePortfolioWorkflowSelect}
+                WHERE ${conditions.join(' AND ')}`;
+  return { sql, params };
+}
+
+async function getActiveWorkflows(filters: {
+  userId: string;
+  aiKeyId?: string;
+  exchangeKeyId?: string;
+}): Promise<ActivePortfolioWorkflow[]> {
+  const { sql, params } = buildActiveWorkflowQuery(filters);
+  const { rows } = await db.query(sql, params);
   return convertKeysToCamelCase(rows) as ActivePortfolioWorkflow[];
+}
+
+export async function getActivePortfolioWorkflowsByUser(
+  userId: string,
+): Promise<ActivePortfolioWorkflow[]> {
+  return getActiveWorkflows({ userId });
+}
+
+export async function getActivePortfolioWorkflowsByUserAndAiKey(
+  userId: string,
+  aiKeyId: string,
+): Promise<ActivePortfolioWorkflow[]> {
+  return getActiveWorkflows({ userId, aiKeyId });
+}
+
+export async function getActivePortfolioWorkflowsByUserAndExchangeKey(
+  userId: string,
+  exchangeKeyId: string,
+): Promise<ActivePortfolioWorkflow[]> {
+  return getActiveWorkflows({ userId, exchangeKeyId });
 }
 
 export async function deactivateWorkflowsByUser(
