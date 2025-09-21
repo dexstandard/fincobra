@@ -18,6 +18,7 @@ import {
   disableUserWorkflowsByExchangeKey,
   type DisableWorkflowsSummary,
 } from '../workflows/disable.js';
+import {parseBody} from "./_shared/validation.js";
 
 interface ExchangeKeyBody {
   key: string;
@@ -30,19 +31,6 @@ const exchangeKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
     secret: z.string().trim().min(64).max(128),
   })
   .strict();
-
-function parseBody<S extends z.ZodTypeAny>(
-  schema: S,
-  req: FastifyRequest,
-  reply: FastifyReply,
-): z.infer<S> | undefined {
-  const result = schema.safeParse(req.body);
-  if (!result.success) {
-    reply.code(400).send(errorResponse('invalid request body'));
-    return undefined;
-  }
-  return result.data;
-}
 
 function formatVerificationError(result: boolean | string): string {
   return `verification failed${

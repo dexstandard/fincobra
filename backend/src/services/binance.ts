@@ -6,6 +6,16 @@ import { env } from '../util/env.js';
 
 type UserCreds = { key: string; secret: string };
 
+export interface BinanceBalance {
+  asset: string;
+  free: string;
+  locked: string;
+}
+
+export interface BinanceAccount {
+  balances: BinanceBalance[];
+}
+
 interface LotSizeFilter {
   filterType: 'LOT_SIZE';
   stepSize: string;
@@ -192,18 +202,16 @@ export function parseBinanceError(
   return {};
 }
 
-export async function fetchAccount(id: string) {
+export async function fetchAccount(id: string): Promise<BinanceAccount | null> {
   return withUserCreds(id, async (creds) => {
     const params = createTimestampedParams();
     appendSignature(creds.secret, params);
     const accountRes = await fetch(
-      `https://api.binance.com/api/v3/account?${params.toString()}`,
-      { headers: { 'X-MBX-APIKEY': creds.key } },
+        `https://api.binance.com/api/v3/account?${params.toString()}`,
+        { headers: { 'X-MBX-APIKEY': creds.key } },
     );
     if (!accountRes.ok) throw new Error('failed to fetch account');
-    return (await accountRes.json()) as {
-      balances: { asset: string; free: string; locked: string }[];
-    };
+    return (await accountRes.json()) as BinanceAccount;
   });
 }
 

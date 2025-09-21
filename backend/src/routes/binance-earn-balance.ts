@@ -1,36 +1,43 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { fetchEarnFlexibleBalance } from '../services/binance.js';
-import { requireUserIdMatch } from '../util/auth.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { parseParams } from '../util/validation.js';
+import { fetchEarnFlexibleBalance } from '../services/binance.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
+import {parseRequestParams, userTokenParamsSchema} from './_shared/validation.js';
 
-const idTokenParams = z.object({
-  id: z.string().regex(/^\d+$/),
-  token: z.string(),
-});
+async function loadEarnFlexibleBalance(
+  userId: string,
+  token: string,
+  reply: FastifyReply,
+): Promise<number | undefined> {
+  try {
+    const amount = await fetchEarnFlexibleBalance(userId, token);
+    if (amount === null) {
+      reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      return undefined;
+    }
+    return amount;
+  } catch {
+    reply.code(500).send(errorResponse('failed to fetch earn balance'));
+    return undefined;
+  }
+}
 
 export default async function binanceEarnBalanceRoutes(app: FastifyInstance) {
   app.get(
     '/users/:id/binance-earn-balance/:token',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: userPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(idTokenParams, req.params, reply);
+      const userId = getValidatedUserId(req);
+      const params = parseRequestParams(userTokenParamsSchema, req, reply);
       if (!params) return;
-      const { id, token } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
-      let amount: number | null;
-      try {
-        amount = await fetchEarnFlexibleBalance(id, token);
-      } catch {
-        return reply
-          .code(500)
-          .send(errorResponse('failed to fetch earn balance'));
-      }
-      if (amount === null)
-        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
-      return { asset: token.toUpperCase(), total: amount };
-    }
+      const amount = await loadEarnFlexibleBalance(userId, params.token, reply);
+      if (amount === undefined) return;
+      return { asset: params.token.toUpperCase(), total: amount };
+    },
   );
 }

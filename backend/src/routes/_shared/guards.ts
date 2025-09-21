@@ -1,14 +1,13 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { requireAdmin, requireUserIdMatch } from '../../util/auth.js';
-import { parseParams } from '../../util/validation.js';
 import { errorResponse, ERROR_MESSAGES } from '../../util/errorMessages.js';
-import { userIdParams } from './validation.js';
+import { parseRequestParams, userIdParams } from './validation.js';
 
 export async function parseUserIdParam(
     req: FastifyRequest,
     reply: FastifyReply,
 ): Promise<void | FastifyReply> {
-  const params = parseParams(userIdParams, req.params, reply);
+  const params = parseRequestParams(userIdParams, req, reply);
   if (!params) return reply;
   req.validatedUserId = params.id;
 }
