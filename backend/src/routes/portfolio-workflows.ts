@@ -69,7 +69,7 @@ interface ManualRebalanceBody {
   orderIndex?: number;
 }
 
-const manualRebalanceBodySchema: z.ZodType<ManualRebalanceBody> = z
+const manualRebalanceBodySchema = z
   .object({
     price: z.number().optional(),
     quantity: z.number().optional(),
@@ -77,7 +77,8 @@ const manualRebalanceBodySchema: z.ZodType<ManualRebalanceBody> = z
     orderIndex: z.number().int().nonnegative().optional(),
   })
   .strip()
-  .default({});
+  .optional()
+  .transform((body): ManualRebalanceBody => body ?? {});
 
 async function requireAuthenticatedUser(
   req: FastifyRequest,
