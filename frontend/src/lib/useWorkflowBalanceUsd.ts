@@ -1,7 +1,13 @@
 import axios from 'axios';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import api from './axios';
+import { parseBalanceAmount } from './parseBalanceAmount';
 import { useUser } from './useUser';
+
+interface BinanceBalanceResponse {
+  free?: unknown;
+  locked?: unknown;
+}
 
 export function useWorkflowBalanceUsd(tokens: string[]) {
   const { user } = useUser();
@@ -32,8 +38,9 @@ export function useWorkflowBalanceUsd(tokens: string[]) {
             const res = await api.get(
               `/users/${user!.id}/binance-balance/${token.toUpperCase()}`
             );
-            const bal = res.data as { free: number; locked: number };
-            const amount = (bal.free ?? 0) + (bal.locked ?? 0);
+            const bal = res.data as BinanceBalanceResponse;
+            const amount =
+              parseBalanceAmount(bal.free) + parseBalanceAmount(bal.locked);
             if (!amount) return 0;
             if (['USDT', 'USDC'].includes(token.toUpperCase())) return amount;
             const priceRes = await fetch(
