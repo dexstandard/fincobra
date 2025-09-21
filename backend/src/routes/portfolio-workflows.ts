@@ -32,7 +32,6 @@ import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { getRebalanceInfo } from '../repos/review-result.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
-import { parseParams } from '../util/validation.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import {
   CANCEL_ORDER_REASONS,
@@ -40,10 +39,57 @@ import {
 } from '../services/order-orchestrator.js';
 import { parseBinanceError } from '../services/binance.js';
 import type { MainTraderDecision, MainTraderOrder } from '../agents/main-trader.js';
+import { getValidatedUserId } from './_shared/guards.js';
+import { parseBody, parseRequestParams } from './_shared/validation.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
+const orderIdParams = z.object({ logId: z.string().regex(/^\d+$/), orderId: z.string() });
 
+const paginationQuerySchema = z.object({
+  page: z.string().regex(/^\d+$/).optional(),
+  pageSize: z.string().regex(/^\d+$/).optional(),
+  status: z.nativeEnum(AgentStatus).optional(),
+});
+
+const execLogQuerySchema = z.object({
+  page: z.string().regex(/^\d+$/).optional(),
+  pageSize: z.string().regex(/^\d+$/).optional(),
+  rebalanceOnly: z.string().optional(),
+});
+
+const manualPreviewQuerySchema = z.object({
+  orderIndex: z.string().optional(),
+});
+
+interface ManualRebalanceBody {
+  price?: number;
+  quantity?: number;
+  manuallyEdited?: boolean;
+  orderIndex?: number;
+}
+
+const manualRebalanceBodySchema = z
+  .object({
+    price: z.number().optional(),
+    quantity: z.number().optional(),
+    manuallyEdited: z.boolean().optional(),
+    orderIndex: z.number().int().nonnegative().optional(),
+  })
+  .strip()
+  .optional()
+  .transform((body): ManualRebalanceBody => body ?? {});
+
+async function requireAuthenticatedUser(
+  req: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void | FastifyReply> {
+  const userId = requireUserId(req, reply);
+  if (!userId) return reply;
+  req.validatedUserId = userId;
+}
+
+const sessionPreHandlers = [requireAuthenticatedUser];
 
 type WorkflowRequestContext = {
   userId: string;
@@ -56,9 +102,8 @@ async function getWorkflowForRequest(
   req: FastifyRequest,
   reply: FastifyReply,
 ): Promise<WorkflowRequestContext | undefined> {
-  const userId = requireUserId(req, reply);
-  if (!userId) return;
-  const params = parseParams(idParams, req.params, reply);
+  const userId = getValidatedUserId(req);
+  const params = parseRequestParams(idParams, req, reply);
   if (!params) return;
   const { id } = params;
   const log = req.log.child({ userId, workflowId: id });
@@ -133,85 +178,132 @@ function isValidManualOrder(value: unknown): value is MainTraderOrder {
   );
 }
 
+function parsePaginationQuery(
+  req: FastifyRequest,
+  reply: FastifyReply,
+): { page: number; pageSize: number; status?: AgentStatus } | undefined {
+  const result = paginationQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    reply.code(400).send(errorResponse('invalid query parameter'));
+    return undefined;
+  }
+  const { page = '1', pageSize = '10', status } = result.data;
+  const pageNumber = Math.max(Number.parseInt(page, 10), 1);
+  const pageSizeNumber = Math.max(Number.parseInt(pageSize, 10), 1);
+  return { page: pageNumber, pageSize: pageSizeNumber, status };
+}
+
+function parseExecLogQuery(
+  req: FastifyRequest,
+  reply: FastifyReply,
+): { page: number; pageSize: number; rebalanceOnly: boolean } | undefined {
+  const result = execLogQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    reply.code(400).send(errorResponse('invalid query parameter'));
+    return undefined;
+  }
+  const { page = '1', pageSize = '10', rebalanceOnly } = result.data;
+  const pageNumber = Math.max(Number.parseInt(page, 10), 1);
+  const pageSizeNumber = Math.max(Number.parseInt(pageSize, 10), 1);
+  return { page: pageNumber, pageSize: pageSizeNumber, rebalanceOnly: rebalanceOnly === 'true' };
+}
+
+function parseManualPreviewQuery(
+  req: FastifyRequest,
+  reply: FastifyReply,
+): { orderIndex: number } | undefined {
+  const result = manualPreviewQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    reply.code(400).send(errorResponse('invalid query parameter'));
+    return undefined;
+  }
+  const { orderIndex } = result.data;
+  if (orderIndex === undefined) return { orderIndex: 0 };
+  return { orderIndex: Number.parseInt(orderIndex, 10) };
+}
+
 export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
   app.get(
     '/portfolio-workflows/paginated',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
-      const userId = requireUserId(req, reply);
-      if (!userId) return;
+      const userId = getValidatedUserId(req);
+      const pagination = parsePaginationQuery(req, reply);
+      if (!pagination) return;
+      const { page, pageSize, status } = pagination;
+      const offset = (page - 1) * pageSize;
       const log = req.log.child({ userId });
-      const { page = '1', pageSize = '10', status } = req.query as {
-        page?: string;
-        pageSize?: string;
-        status?: AgentStatus;
-      };
-      const p = Math.max(parseInt(page, 10), 1);
-      const ps = Math.max(parseInt(pageSize, 10), 1);
-      const offset = (p - 1) * ps;
-      const { rows, total } = await getAgentsPaginated(userId, status, ps, offset);
+      const { rows, total } = await getAgentsPaginated(userId, status, pageSize, offset);
       log.info('listed workflows');
       return {
         items: rows.map(toApi),
         total,
-        page: p,
-        pageSize: ps,
+        page,
+        pageSize,
       };
     }
   );
 
-    app.post(
-      '/portfolio-workflows',
-      { config: { rateLimit: RATE_LIMITS.TIGHT } },
-      async (req, reply) => {
-        const body = req.body as AgentInput;
-        const userId = requireUserId(req, reply);
-        if (!userId) return;
-        const log = req.log.child({ userId });
-        const res = await prepareAgentForUpsert(log, userId, body);
-        if ('code' in res) return reply.code(res.code).send(res.body);
-        const { body: validated, startBalance } = res;
-        const status = validated.status;
-        const row = await insertAgent({
-          userId,
-          model: validated.model,
-          status,
-          startBalance,
-          name: validated.name,
-          cashToken: validated.cash,
-          tokens: validated.tokens,
-          risk: validated.risk,
-          reviewInterval: validated.reviewInterval,
-          agentInstructions: validated.agentInstructions,
-          manualRebalance: validated.manualRebalance,
-          useEarn: validated.useEarn,
-        });
-        if (status === AgentStatus.Active)
-          reviewAgentPortfolio(req.log, row.id).catch((err) =>
-            log.error({ err, workflowId: row.id }, 'initial review failed'),
-          );
-        log.info({ workflowId: row.id }, 'created workflow');
-        return toApi(row);
-      }
-    );
+  app.post(
+    '/portfolio-workflows',
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: sessionPreHandlers,
+    },
+    async (req, reply) => {
+      const body = req.body as AgentInput;
+      const userId = getValidatedUserId(req);
+      const log = req.log.child({ userId });
+      const res = await prepareAgentForUpsert(log, userId, body);
+      if ('code' in res) return reply.code(res.code).send(res.body);
+      const { body: validated, startBalance } = res;
+      const status = validated.status;
+      const row = await insertAgent({
+        userId,
+        model: validated.model,
+        status,
+        startBalance,
+        name: validated.name,
+        cashToken: validated.cash,
+        tokens: validated.tokens,
+        risk: validated.risk,
+        reviewInterval: validated.reviewInterval,
+        agentInstructions: validated.agentInstructions,
+        manualRebalance: validated.manualRebalance,
+        useEarn: validated.useEarn,
+      });
+      if (status === AgentStatus.Active)
+        reviewAgentPortfolio(req.log, row.id).catch((err) =>
+          log.error({ err, workflowId: row.id }, 'initial review failed'),
+        );
+      log.info({ workflowId: row.id }, 'created workflow');
+      return toApi(row);
+    }
+  );
 
   app.get(
     '/portfolio-workflows/:id/exec-log',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
-      const { page = '1', pageSize = '10', rebalanceOnly } = req.query as {
-        page?: string;
-        pageSize?: string;
-        rebalanceOnly?: string;
-      };
-      const p = Math.max(parseInt(page, 10), 1);
-      const ps = Math.max(parseInt(pageSize, 10), 1);
-      const offset = (p - 1) * ps;
-      const ro = rebalanceOnly === 'true';
-      const { rows, total } = await getPortfolioReviewResults(id, ps, offset, ro);
+      const query = parseExecLogQuery(req, reply);
+      if (!query) return;
+      const { page, pageSize, rebalanceOnly } = query;
+      const offset = (page - 1) * pageSize;
+      const { rows, total } = await getPortfolioReviewResults(
+        id,
+        pageSize,
+        offset,
+        rebalanceOnly,
+      );
       log.info('fetched exec log');
       return {
         items: rows.map((r) => {
@@ -241,20 +333,23 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           };
         }),
         total,
-        page: p,
-        pageSize: ps,
+        page,
+        pageSize,
       };
     }
   );
 
   app.get(
     '/portfolio-workflows/:id/exec-log/:logId/prompt',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
-      const lp = parseParams(logIdParams, req.params, reply);
+      const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
       const prompt = await getPromptForReviewResult(id, lp.logId);
       if (!prompt) {
@@ -270,12 +365,15 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.get(
     '/portfolio-workflows/:id/exec-log/:logId/orders',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
-      const lp = parseParams(logIdParams, req.params, reply);
+      const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
       const { logId } = lp;
       const rows = await getLimitOrdersByReviewResult(id, logId);
@@ -300,7 +398,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.post(
     '/portfolio-workflows/:id/exec-log/:logId/rebalance',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
@@ -311,32 +412,24 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           .code(400)
           .send(errorResponse('manual rebalance disabled'));
       }
-      const lp = parseParams(logIdParams, req.params, reply);
+      const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
       const { logId } = lp;
       const decisionResult = await loadManualDecision(log, id, logId);
       if ('code' in decisionResult)
         return reply.code(decisionResult.code).send(decisionResult.body);
-      const body = req.body as
-        | {
-            price?: number;
-            quantity?: number;
-            manuallyEdited?: boolean;
-            orderIndex?: number;
-          }
-        | undefined;
+      const body = parseBody(manualRebalanceBodySchema, req, reply);
+      if (!body) return;
       const { decision } = decisionResult;
-      const orderIndex = body?.orderIndex ?? 0;
+      const orderIndex = body.orderIndex ?? 0;
       if (!Number.isInteger(orderIndex) || orderIndex < 0 || orderIndex >= decision.orders.length) {
         log.error({ execLogId: logId, orderIndex }, 'invalid order index');
         return reply.code(400).send(errorResponse('invalid order index'));
       }
       const baseOrder = decision.orders[orderIndex];
-      const updatedOrder = { ...baseOrder } as MainTraderOrder & {
-        manuallyEdited?: boolean;
-      };
-      let manuallyEdited = body?.manuallyEdited ?? false;
-      if (body?.price !== undefined) {
+      const updatedOrder = { ...baseOrder } as MainTraderOrder & { manuallyEdited?: boolean };
+      let manuallyEdited = body.manuallyEdited ?? false;
+      if (body.price !== undefined) {
         if (!Number.isFinite(body.price) || body.price <= 0) {
           log.error({ execLogId: logId }, 'invalid manual price');
           return reply.code(400).send(errorResponse('invalid price'));
@@ -345,7 +438,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         updatedOrder.basePrice = body.price;
         manuallyEdited = true;
       }
-      if (body?.quantity !== undefined) {
+      if (body.quantity !== undefined) {
         if (!Number.isFinite(body.quantity) || body.quantity <= 0) {
           log.error({ execLogId: logId }, 'invalid manual quantity');
           return reply.code(400).send(errorResponse('invalid quantity'));
@@ -382,16 +475,17 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     },
   );
 
-  const orderIdParams = z.object({ logId: z.string(), orderId: z.string() });
-
   app.post(
     '/portfolio-workflows/:id/exec-log/:logId/orders/:orderId/cancel',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, userId, log } = ctx;
-      const lp = parseParams(orderIdParams, req.params, reply);
+      const lp = parseRequestParams(orderIdParams, req, reply);
       if (!lp) return;
       const { logId, orderId } = lp;
       const rows = await getLimitOrdersByReviewResult(id, logId);
@@ -423,7 +517,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.get(
     '/portfolio-workflows/:id/exec-log/:logId/rebalance/preview',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
@@ -434,15 +531,16 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           .code(400)
           .send(errorResponse('manual rebalance disabled'));
       }
-      const lp = parseParams(logIdParams, req.params, reply);
+      const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
       const { logId } = lp;
       const decisionResult = await loadManualDecision(log, id, logId);
       if ('code' in decisionResult)
         return reply.code(decisionResult.code).send(decisionResult.body);
       const { decision } = decisionResult;
-      const { orderIndex: rawOrderIndex } = req.query as { orderIndex?: string };
-      const orderIndex = rawOrderIndex ? Number.parseInt(rawOrderIndex, 10) : 0;
+      const previewQuery = parseManualPreviewQuery(req, reply);
+      if (!previewQuery) return;
+      const { orderIndex } = previewQuery;
       if (!Number.isInteger(orderIndex) || orderIndex < 0 || orderIndex >= decision.orders.length) {
         log.error({ execLogId: logId, orderIndex }, 'invalid order index');
         return reply.code(400).send(errorResponse('invalid order index'));
@@ -461,7 +559,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.get(
     '/portfolio-workflows/:id',
-    { config: { rateLimit: RATE_LIMITS.RELAXED } },
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
@@ -471,43 +572,49 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     }
   );
 
-    app.put(
-      '/portfolio-workflows/:id',
-      { config: { rateLimit: RATE_LIMITS.TIGHT } },
-      async (req, reply) => {
-        const ctx = await getWorkflowForRequest(req, reply);
-        if (!ctx) return;
-        const { userId, id, log } = ctx;
-        const body = req.body as AgentInput;
-        const res = await prepareAgentForUpsert(log, userId, body, id);
-        if ('code' in res) return reply.code(res.code).send(res.body);
-        const { body: validated, startBalance } = res;
-        const status = validated.status;
-        await updateAgent({
-          id,
-          model: validated.model,
-          status,
-          name: validated.name,
-          cashToken: validated.cash,
-          tokens: validated.tokens,
-          risk: validated.risk,
-          reviewInterval: validated.reviewInterval,
-          agentInstructions: validated.agentInstructions,
-          startBalance,
-          manualRebalance: validated.manualRebalance,
-          useEarn: validated.useEarn,
-        });
-        const row = (await getAgent(id))!;
-        if (status === AgentStatus.Active)
-          await reviewAgentPortfolio(req.log, id);
-        log.info('updated workflow');
-        return toApi(row);
-      }
-    );
+  app.put(
+    '/portfolio-workflows/:id',
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: sessionPreHandlers,
+    },
+    async (req, reply) => {
+      const ctx = await getWorkflowForRequest(req, reply);
+      if (!ctx) return;
+      const { userId, id, log } = ctx;
+      const body = req.body as AgentInput;
+      const res = await prepareAgentForUpsert(log, userId, body, id);
+      if ('code' in res) return reply.code(res.code).send(res.body);
+      const { body: validated, startBalance } = res;
+      const status = validated.status;
+      await updateAgent({
+        id,
+        model: validated.model,
+        status,
+        name: validated.name,
+        cashToken: validated.cash,
+        tokens: validated.tokens,
+        risk: validated.risk,
+        reviewInterval: validated.reviewInterval,
+        agentInstructions: validated.agentInstructions,
+        startBalance,
+        manualRebalance: validated.manualRebalance,
+        useEarn: validated.useEarn,
+      });
+      const row = (await getAgent(id))!;
+      if (status === AgentStatus.Active)
+        await reviewAgentPortfolio(req.log, id);
+      log.info('updated workflow');
+      return toApi(row);
+    }
+  );
 
   app.delete(
     '/portfolio-workflows/:id',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.TIGHT },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
@@ -526,7 +633,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.post(
     '/portfolio-workflows/:id/start',
-    { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.VERY_TIGHT },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
@@ -559,7 +669,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.post(
     '/portfolio-workflows/:id/stop',
-    { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.VERY_TIGHT },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
@@ -582,7 +695,10 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
 
   app.post(
     '/portfolio-workflows/:id/review',
-    { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
+    {
+      config: { rateLimit: RATE_LIMITS.VERY_TIGHT },
+      preHandler: sessionPreHandlers,
+    },
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
