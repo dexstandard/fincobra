@@ -83,8 +83,8 @@ describe('binance balance route', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       balances: [
-        { asset: 'BTC', free: 1, locked: 0 },
-        { asset: 'USDT', free: 100, locked: 0 },
+        { asset: 'BTC', free: '1', locked: '0' },
+        { asset: 'USDT', free: '100', locked: '0' },
       ],
     });
 
@@ -121,7 +121,7 @@ describe('binance balance route', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ asset: 'BTC', free: 1.5, locked: 0.5 });
+    expect(res.json()).toEqual({ asset: 'BTC', free: '1.5', locked: '0.5' });
 
     await app.close();
     (globalThis as any).fetch = originalFetch;
