@@ -9,7 +9,7 @@ export default function Terms() {
       <p>
         {t('terms_p2')}
         <a
-          href="https://github.com/dexstandard/prompt-swap"
+          href="https://github.com/dexstandard/fincobra"
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 underline"

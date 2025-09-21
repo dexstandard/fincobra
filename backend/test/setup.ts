@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, afterAll } from 'vitest';
 
 process.env.DATABASE_URL ??=
-  'postgres://postgres:postgres@localhost:5432/promptswap_test';
+  'postgres://postgres:postgres@localhost:5432/fincobra_test';
 
 import { db, migrate } from '../src/db/index.js';
 

@@ -1,5 +1,5 @@
 {
-  "name": "prompt-swap",
+  "name": "fincobra",
   "private": true,
   "scripts": {
     "dev": "./scripts/dev.sh",

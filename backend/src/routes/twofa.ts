@@ -29,7 +29,7 @@ export default async function twofaRoutes(app: FastifyInstance) {
       const userId = requireUserId(req, reply);
       if (!userId) return;
       const secret = authenticator.generateSecret();
-      const otpauthUrl = authenticator.keyuri(String(userId), 'PromptSwap', secret);
+      const otpauthUrl = authenticator.keyuri(String(userId), 'FinCobra', secret);
       const qr = await QRCode.toDataURL(otpauthUrl);
       return { secret, otpauthUrl, qr };
     }
