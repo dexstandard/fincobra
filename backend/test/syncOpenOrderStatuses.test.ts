@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { syncOpenOrderStatuses } from '../src/services/order-orchestrator.js';
+import {
+  syncOpenOrderStatuses,
+  CANCEL_ORDER_REASONS,
+} from '../src/services/order-orchestrator.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
@@ -8,6 +11,7 @@ import {
   getLimitOrder,
 } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
+import { updateLimitOrderStatus } from '../src/repos/limit-orders.js';
 import { mockLogger } from './helpers.js';
 
 const { fetchOpenOrders, fetchOrder, parseBinanceError } = vi.hoisted(() => ({
@@ -67,7 +71,7 @@ describe('syncOpenOrderStatuses', () => {
       reviewResultId,
       orderId,
     });
-    return { orderId };
+    return { orderId, userId };
   }
 
   it('marks missing orders as canceled when Binance reports cancellation', async () => {
@@ -119,6 +123,27 @@ describe('syncOpenOrderStatuses', () => {
     expect(order?.status).toBe(LimitOrderStatus.Canceled);
     expect(order?.cancellation_reason).toBe(
       'Binance could not find the order (code -2013)',
+    );
+  });
+
+  it('does not overwrite local cancellation reasons during reconciliation', async () => {
+    const { orderId, userId } = await setupOrder('131415');
+    fetchOrder.mockImplementationOnce(async () => {
+      await updateLimitOrderStatus(
+        userId,
+        orderId,
+        LimitOrderStatus.Canceled,
+        CANCEL_ORDER_REASONS.WORKFLOW_STOPPED,
+      );
+      return { status: 'CANCELED' };
+    });
+
+    await syncOpenOrderStatuses(mockLogger());
+
+    const order = await getLimitOrder(orderId);
+    expect(order?.status).toBe(LimitOrderStatus.Canceled);
+    expect(order?.cancellation_reason).toBe(
+      CANCEL_ORDER_REASONS.WORKFLOW_STOPPED,
     );
   });
 });
