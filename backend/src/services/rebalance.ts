@@ -29,34 +29,28 @@ interface NominalAdjustmentOptions {
   targetNominal: number;
 }
 
-function countDecimalPlaces(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  const str = value.toString().toLowerCase();
-  if (str.includes('e')) {
-    const [base, expStr] = str.split('e');
-    const exponent = Number(expStr);
-    if (!Number.isFinite(exponent)) return 0;
-    const fractional = base.includes('.') ? base.split('.')[1] ?? '' : '';
-    if (exponent >= 0) {
-      return Math.max(fractional.length - exponent, 0);
-    }
-    return fractional.length + Math.abs(exponent);
-  }
-  const dot = str.indexOf('.');
-  if (dot === -1) return 0;
-  return str.length - dot - 1;
+function extractLeadingDigit(value: number): { exponent: number; digit: number } | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const scientific = value.toExponential();
+  const [coeff, exponentPart] = scientific.split('e');
+  if (coeff === undefined || exponentPart === undefined) return null;
+  const exponent = Number(exponentPart);
+  if (!Number.isFinite(exponent)) return null;
+  const normalizedCoeff = coeff.replace('.', '').replace('-', '');
+  if (!normalizedCoeff) return null;
+  const digit = Number(normalizedCoeff[0]);
+  if (!Number.isFinite(digit)) return null;
+  return { exponent, digit };
 }
 
 function matchesTruncatedPrefix(requested: number, target: number): boolean {
-  if (!Number.isFinite(requested) || requested <= 0) return false;
-  if (!Number.isFinite(target) || target <= 0) return false;
-  const decimals = Math.min(countDecimalPlaces(requested), 12);
-  const scale = 10 ** decimals;
-  if (!Number.isFinite(scale) || scale <= 0) return false;
-  const truncated = Math.floor(target * scale + Number.EPSILON) / scale;
-  const tolerance =
-    Math.max(Math.abs(requested), Math.abs(truncated), 1) * Number.EPSILON * 10;
-  return Math.abs(truncated - requested) <= tolerance;
+  const requestedLeading = extractLeadingDigit(requested);
+  const targetLeading = extractLeadingDigit(target);
+  if (!requestedLeading || !targetLeading) return false;
+  return (
+    requestedLeading.digit === targetLeading.digit &&
+    requestedLeading.exponent === targetLeading.exponent
+  );
 }
 
 function adjustLimitPrice(requested: number, current: number, side: 'BUY' | 'SELL'): number {
