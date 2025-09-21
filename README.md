@@ -1,6 +1,6 @@
-# prompt-swap
+# FinCobra
 
-Prompt Swap is a playground for experimenting with AI‑assisted crypto trading
+FinCobra is a playground for experimenting with AI‑assisted crypto trading
 agents. Users write natural‑language prompts that describe a strategy, and an
 OpenAI model plans token swaps accordingly. Trades execute on Binance using the
 user's encrypted API keys. A Fastify backend schedules agents and records

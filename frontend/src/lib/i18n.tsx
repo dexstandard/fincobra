@@ -15,7 +15,7 @@ const translations: Record<Lang, Record<string, string>> = {
     privacy: 'Privacy',
     terms_title: 'Terms of Use',
     terms_p1:
-      'PromptSwap is open source software provided "as is" without warranties or guarantees of any kind. Use it at your own risk.',
+      'FinCobra is open source software provided "as is" without warranties or guarantees of any kind. Use it at your own risk.',
     terms_p2:
       'You are free to review the source code and run your own instance on your infrastructure. The code is available at ',
     terms_link: 'this GitHub repository',
@@ -183,7 +183,7 @@ const translations: Record<Lang, Record<string, string>> = {
     privacy: 'Конфиденциальность',
     terms_title: 'Условия использования',
     terms_p1:
-      'PromptSwap — программное обеспечение с открытым исходным кодом, предоставляется «как есть» без каких-либо гарантий. Используйте на свой страх и риск.',
+      'FinCobra — программное обеспечение с открытым исходным кодом, предоставляется «как есть» без каких-либо гарантий. Используйте на свой страх и риск.',
     terms_p2:
       'Вы можете изучать исходный код и запускать собственный экземпляр на своей инфраструктуре. Код доступен в ',
     terms_link: 'этом репозитории GitHub',
