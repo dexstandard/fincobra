@@ -37,9 +37,20 @@ export async function requireAdminOwner(
   req.adminUserId = adminId;
 }
 
+export async function requireAdminAccess(
+    req: FastifyRequest,
+    reply: FastifyReply,
+): Promise<void | FastifyReply> {
+  const adminId = await requireAdmin(req, reply);
+  if (!adminId) return reply;
+  req.adminUserId = adminId;
+}
+
 export function getValidatedUserId(req: FastifyRequest): string {
   return req.validatedUserId!;
 }
 
 export const userPreHandlers = [parseUserIdParam, requireUserOwner];
 export const adminPreHandlers = [parseUserIdParam, requireAdminOwner];
+export const adminOnlyPreHandlers = [requireAdminAccess];
+export const adminManagedUserPreHandlers = [parseUserIdParam, requireAdminAccess];
