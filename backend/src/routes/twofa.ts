@@ -15,103 +15,65 @@ import { errorResponse } from '../util/errorMessages.js';
 
 const OTP_ISSUER = 'FinCobra' as const;
 
-interface EnableTwofaBody {
-  token: string;
-  secret: string;
-}
+const tokenSchema = z.string().trim().regex(/^\d{6}$/);
+const base32 = /^[A-Z2-7]+=*$/i;
 
-interface DisableTwofaBody {
-  token: string;
-}
-
-const tokenSchema = z
-  .string()
-  .trim()
-  .regex(/^\d{6}$/);
-
-const enableTwofaBodySchema: z.ZodType<EnableTwofaBody> = z
-  .object({
+const enableTwofaBodySchema = z.object({
     token: tokenSchema,
-    secret: z.string().trim().min(1),
-  })
-  .strict();
+    secret: z.string().trim().min(16).regex(base32),
+}).strict();
 
-const disableTwofaBodySchema: z.ZodType<DisableTwofaBody> = z
-  .object({ token: tokenSchema })
-  .strict();
+const disableTwofaBodySchema = z.object({ token: tokenSchema }).strict();
 
-function getAuthenticatedUserId(
-  req: FastifyRequest,
-  reply: FastifyReply,
-): string | undefined {
-  const userId = requireUserId(req, reply);
-  if (!userId) return undefined;
-  return userId;
+function getAuthenticatedUserId(req: FastifyRequest, reply: FastifyReply): string | undefined {
+    const userId = requireUserId(req, reply);
+    if (!userId) return undefined;
+    return userId;
 }
 
-function invalidTokenResponse(reply: FastifyReply) {
-  return reply.code(400).send(errorResponse('invalid token'));
+function invalidToken(reply: FastifyReply): undefined {
+    reply.code(400).send(errorResponse('invalid token'));
+    return undefined;
 }
 
 export default async function twofaRoutes(app: FastifyInstance) {
-  app.get(
-    '/2fa/status',
-    { config: { rateLimit: RATE_LIMITS.MODERATE } },
-    async (req, reply) => {
-      const userId = getAuthenticatedUserId(req, reply);
-      if (!userId) return;
-      const enabled = await getUserTotpStatus(userId);
-      return { enabled };
-    },
-  );
+    app.get('/2fa/status', { config: { rateLimit: RATE_LIMITS.MODERATE } }, async (req, reply) => {
+        const userId = getAuthenticatedUserId(req, reply);
+        if (!userId) return;
+        const enabled = await getUserTotpStatus(userId);
+        return { enabled };
+    });
 
-  app.get(
-    '/2fa/setup',
-    { config: { rateLimit: RATE_LIMITS.TIGHT } },
-    async (req, reply) => {
-      const userId = getAuthenticatedUserId(req, reply);
-      if (!userId) return;
-      const secret = authenticator.generateSecret();
-      const otpauthUrl = authenticator.keyuri(String(userId), OTP_ISSUER, secret);
-      const qr = await QRCode.toDataURL(otpauthUrl);
-      return { secret, otpauthUrl, qr };
-    },
-  );
+    app.get('/2fa/setup', { config: { rateLimit: RATE_LIMITS.TIGHT } }, async (req, reply) => {
+        const userId = getAuthenticatedUserId(req, reply);
+        if (!userId) return;
+        const secret = authenticator.generateSecret();
+        const label = String(userId); // replace with email if available
+        const otpauthUrl = authenticator.keyuri(label, OTP_ISSUER, secret);
+        const qr = await QRCode.toDataURL(otpauthUrl);
+        return { secret, otpauthUrl, qr };
+    });
 
-  app.post(
-    '/2fa/enable',
-    { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
-    async (req, reply) => {
-      const userId = getAuthenticatedUserId(req, reply);
-      if (!userId) return;
-      const body = parseBody(enableTwofaBodySchema, req, reply);
-      if (!body) return;
-      const { token, secret } = body;
-      if (!authenticator.verify({ token, secret })) {
-        return invalidTokenResponse(reply);
-      }
-      await setUserTotpSecret(userId, secret);
-      return { enabled: true };
-    },
-  );
+    app.post('/2fa/enable', { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } }, async (req, reply) => {
+        const userId = getAuthenticatedUserId(req, reply);
+        if (!userId) return;
+        const body = parseBody(enableTwofaBodySchema, req, reply);
+        if (!body) return;
+        const { token, secret } = body;
+        if (!authenticator.verify({ token, secret })) return invalidToken(reply);
+        await setUserTotpSecret(userId, secret);
+        return { enabled: true };
+    });
 
-  app.post(
-    '/2fa/disable',
-    { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } },
-    async (req, reply) => {
-      const userId = getAuthenticatedUserId(req, reply);
-      if (!userId) return;
-      const body = parseBody(disableTwofaBodySchema, req, reply);
-      if (!body) return;
-      const secret = await getUserTotpSecret(userId);
-      if (!secret) {
-        return reply.code(400).send(errorResponse('not enabled'));
-      }
-      if (!authenticator.verify({ token: body.token, secret })) {
-        return invalidTokenResponse(reply);
-      }
-      await clearUserTotp(userId);
-      return { enabled: false };
-    },
-  );
+    app.post('/2fa/disable', { config: { rateLimit: RATE_LIMITS.VERY_TIGHT } }, async (req, reply) => {
+        const userId = getAuthenticatedUserId(req, reply);
+        if (!userId) return;
+        const body = parseBody(disableTwofaBodySchema, req, reply);
+        if (!body) return;
+        const secret = await getUserTotpSecret(userId);
+        if (!secret) return reply.code(400).send(errorResponse('not enabled'));
+        if (!authenticator.verify({ token: body.token, secret })) return invalidToken(reply);
+        await clearUserTotp(userId);
+        return { enabled: false };
+    });
 }
