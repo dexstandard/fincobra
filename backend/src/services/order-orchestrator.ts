@@ -3,6 +3,7 @@ import {
   getAllOpenLimitOrders,
   getOpenLimitOrdersForWorkflow,
   updateLimitOrderStatus,
+  updateLimitOrderStatusIfCurrent,
 } from '../repos/limit-orders.js';
 import {
   LimitOrderStatus,
@@ -222,9 +223,10 @@ async function reconcileOrder(
         LimitOrderStatus.Filled,
       );
     } else if (status?.type === LimitOrderStatus.Canceled) {
-      await updateLimitOrderStatus(
+      await updateLimitOrderStatusIfCurrent(
         order.userId,
         order.orderId,
+        LimitOrderStatus.Open,
         LimitOrderStatus.Canceled,
         status.reason,
       );

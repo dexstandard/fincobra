@@ -72,3 +72,19 @@ export async function updateLimitOrderStatus(
     [userId, orderId, status, cancellationReason ?? null],
   );
 }
+
+export async function updateLimitOrderStatusIfCurrent(
+  userId: string,
+  orderId: string,
+  currentStatus: LimitOrderStatus,
+  nextStatus: LimitOrderStatus,
+  cancellationReason?: string,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `UPDATE limit_order
+        SET status = $4, cancellation_reason = $5
+      WHERE user_id = $1 AND order_id = $2 AND status = $3`,
+    [userId, orderId, currentStatus, nextStatus, cancellationReason ?? null],
+  );
+  return rowCount > 0;
+}
