@@ -1,20 +1,14 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { fetchAccount, fetchTotalBalanceUsd } from '../services/binance.js';
+import { BinanceAccount, fetchAccount, fetchTotalBalanceUsd } from '../services/binance.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 import { parseRequestParams } from './_shared/validation.js';
 
-interface TokenParams {
-  token: string;
-}
-
-const tokenParamsSchema: z.ZodType<TokenParams> = z.object({
-  token: z.string(),
+const tokenParamsSchema = z.object({
+    token: z.string().trim().min(1).regex(/^[A-Za-z0-9]{1,20}$/),
 });
-
-type BinanceAccount = NonNullable<Awaited<ReturnType<typeof fetchAccount>>>;
 
 async function loadAccount(
   userId: string,
@@ -27,7 +21,8 @@ async function loadAccount(
       return undefined;
     }
     return account;
-  } catch {
+  } catch (err) {
+    reply.log.error({ err, userId }, 'failed to fetch account');
     reply.code(500).send(errorResponse('failed to fetch account'));
     return undefined;
   }
@@ -45,17 +40,9 @@ async function loadTotalBalanceUsd(
     }
     return total;
   } catch {
-    reply.code(500).send(errorResponse('failed to fetch account'));
+    reply.code(500).send(errorResponse('failed to fetch balance'));
     return undefined;
   }
-}
-
-function normalizeBalances(account: BinanceAccount) {
-  return account.balances.map((balance) => ({
-    asset: balance.asset,
-    free: Number(balance.free),
-    locked: Number(balance.locked),
-  }));
 }
 
 export default async function binanceBalanceRoutes(app: FastifyInstance) {
@@ -69,7 +56,7 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
       const userId = getValidatedUserId(req);
       const account = await loadAccount(userId, reply);
       if (!account) return;
-      return { balances: normalizeBalances(account) };
+      return { balances: account.balances };
     },
   );
 
@@ -101,11 +88,11 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
       if (!account) return;
       const symbol = params.token.toUpperCase();
       const balance = account.balances.find((entry) => entry.asset === symbol);
-      if (!balance) return { asset: symbol, free: 0, locked: 0 };
+      if (!balance) return { asset: symbol, free: '0', locked: '0' };
       return {
         asset: symbol,
-        free: Number(balance.free),
-        locked: Number(balance.locked),
+        free: balance.free,
+        locked: balance.locked,
       };
     },
   );
