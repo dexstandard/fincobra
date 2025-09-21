@@ -4,15 +4,7 @@ import { RATE_LIMITS } from '../rate-limit.js';
 import { fetchEarnFlexibleBalance } from '../services/binance.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
-import { parseRequestParams } from './_shared/validation.js';
-
-interface TokenParams {
-  token: string;
-}
-
-const tokenParamsSchema: z.ZodType<TokenParams> = z.object({
-  token: z.string(),
-});
+import {parseRequestParams, userTokenParamsSchema} from './_shared/validation.js';
 
 async function loadEarnFlexibleBalance(
   userId: string,
@@ -41,7 +33,7 @@ export default async function binanceEarnBalanceRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);
-      const params = parseRequestParams(tokenParamsSchema, req, reply);
+      const params = parseRequestParams(userTokenParamsSchema, req, reply);
       if (!params) return;
       const amount = await loadEarnFlexibleBalance(userId, params.token, reply);
       if (amount === undefined) return;

@@ -4,6 +4,11 @@ import { errorResponse } from '../../util/errorMessages.js';
 
 export const userIdParams = z.object({ id: z.string().regex(/^\d+$/) });
 
+export const userTokenParamsSchema = z.object({
+  id: z.string(),
+  token: z.string().trim().min(1).regex(/^[A-Za-z0-9]{1,20}$/),
+}).strict();
+
 export function parseRequestParams<S extends z.ZodTypeAny>(
   schema: S,
   req: FastifyRequest,
