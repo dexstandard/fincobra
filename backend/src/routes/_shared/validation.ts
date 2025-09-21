@@ -9,6 +9,19 @@ export const userTokenParamsSchema = z.object({
   token: z.string().trim().min(1).regex(/^[A-Za-z0-9]{1,20}$/),
 }).strict();
 
+export function parseBody<S extends z.ZodTypeAny>(
+  schema: S,
+  body: unknown,
+  reply: FastifyReply,
+): z.infer<S> | undefined {
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    reply.code(400).send(errorResponse('invalid request body'));
+    return undefined;
+  }
+  return result.data;
+}
+
 export function parseRequestParams<S extends z.ZodTypeAny>(
   schema: S,
   req: FastifyRequest,
