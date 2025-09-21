@@ -29,6 +29,36 @@ interface NominalAdjustmentOptions {
   targetNominal: number;
 }
 
+function countDecimalPlaces(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const str = value.toString().toLowerCase();
+  if (str.includes('e')) {
+    const [base, expStr] = str.split('e');
+    const exponent = Number(expStr);
+    if (!Number.isFinite(exponent)) return 0;
+    const fractional = base.includes('.') ? base.split('.')[1] ?? '' : '';
+    if (exponent >= 0) {
+      return Math.max(fractional.length - exponent, 0);
+    }
+    return fractional.length + Math.abs(exponent);
+  }
+  const dot = str.indexOf('.');
+  if (dot === -1) return 0;
+  return str.length - dot - 1;
+}
+
+function matchesTruncatedPrefix(requested: number, target: number): boolean {
+  if (!Number.isFinite(requested) || requested <= 0) return false;
+  if (!Number.isFinite(target) || target <= 0) return false;
+  const decimals = Math.min(countDecimalPlaces(requested), 12);
+  const scale = 10 ** decimals;
+  if (!Number.isFinite(scale) || scale <= 0) return false;
+  const truncated = Math.floor(target * scale + Number.EPSILON) / scale;
+  const tolerance =
+    Math.max(Math.abs(requested), Math.abs(truncated), 1) * Number.EPSILON * 10;
+  return Math.abs(truncated - requested) <= tolerance;
+}
+
 function adjustLimitPrice(requested: number, current: number, side: 'BUY' | 'SELL'): number {
   const anchor = side === 'BUY' ? current * 0.999 : current * 1.001;
   return side === 'BUY' ? Math.min(requested, anchor) : Math.max(requested, anchor);
@@ -200,18 +230,34 @@ export async function createDecisionLimitOrders(opts: {
     const rawQuantity = quantity;
     let qty = Number(rawQuantity.toFixed(info.quantityPrecision));
     const freshNominal = rawQuantity * roundedLimit;
-    const meetsFreshNominal = meetsMinNotional(freshNominal, info.minNotional);
     const roundedNominal = qty * roundedLimit;
-    if (side === 'BUY' && meetsFreshNominal && !meetsMinNotional(roundedNominal, info.minNotional)) {
-      const targetNominal =
-        Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;
-      const adjustedQty = increaseQuantityToMeetNominal({
-        price: roundedLimit,
-        precision: info.quantityPrecision,
-        targetNominal,
-      });
-      if (adjustedQty !== null && adjustedQty > qty) {
-        qty = adjustedQty;
+    const meetsRoundedNominal = meetsMinNotional(roundedNominal, info.minNotional);
+    if (!meetsRoundedNominal && info.minNotional > 0) {
+      let minForRequestedToken: number | null = null;
+      if (o.token === info.baseAsset) {
+        minForRequestedToken =
+          Number.isFinite(roundedLimit) && roundedLimit > 0
+            ? info.minNotional / roundedLimit
+            : null;
+      } else if (o.token === info.quoteAsset) {
+        minForRequestedToken = info.minNotional;
+      }
+
+      if (
+        minForRequestedToken !== null &&
+        minForRequestedToken > 0 &&
+        matchesTruncatedPrefix(o.quantity, minForRequestedToken)
+      ) {
+        const targetNominal =
+          Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;
+        const adjustedQty = increaseQuantityToMeetNominal({
+          price: roundedLimit,
+          precision: info.quantityPrecision,
+          targetNominal,
+        });
+        if (adjustedQty !== null && adjustedQty > qty) {
+          qty = adjustedQty;
+        }
       }
     }
     const nominalValue = qty * roundedLimit;
