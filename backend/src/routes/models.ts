@@ -1,78 +1,113 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
-import { env } from '../util/env.js';
-import { decrypt } from '../util/crypto.js';
-import { requireUserIdMatch } from '../util/auth.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { RATE_LIMITS } from '../rate-limit.js';
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
-import { parseParams } from '../util/validation.js';
+import type {
+  AiApiKeyDetails,
+  SharedAiApiKeyDetails,
+} from '../repos/ai-api-key.types.js';
+import { decryptKey } from '../util/api-keys.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 
-const idParams = z.object({ id: z.string().regex(/^\d+$/) });
+const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const MODEL_FETCH_ERROR = 'failed to fetch models';
 
-const SIX_HOURS = 6 * 60 * 60 * 1000;
-const modelsCache = new Map<string, { models: string[]; expires: number }>();
+interface OpenAiModel {
+  id: string;
+}
 
-function getCachedModels(key: string) {
+interface ModelsCacheEntry {
+  models: string[];
+  expiresAt: number;
+}
+
+const modelsCache = new Map<string, ModelsCacheEntry>();
+
+function getCachedModels(key: string): string[] | undefined {
   const entry = modelsCache.get(key);
-  if (!entry) return null;
-  if (entry.expires < Date.now()) {
+  if (!entry) return undefined;
+  if (entry.expiresAt < Date.now()) {
     modelsCache.delete(key);
-    return null;
+    return undefined;
   }
   return entry.models;
 }
 
-function setCachedModels(key: string, models: string[]) {
-  modelsCache.set(key, { models, expires: Date.now() + SIX_HOURS });
+function setCachedModels(key: string, models: string[]): void {
+  modelsCache.set(key, { models, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+function getRestrictedSharedModels(
+  ownKey: AiApiKeyDetails | null | undefined,
+  sharedKey: SharedAiApiKeyDetails | null | undefined,
+): string[] | null {
+  if (!ownKey && sharedKey?.model) return [sharedKey.model];
+  return null;
+}
+
+function getEncryptedKey(
+  ownKey: AiApiKeyDetails | null | undefined,
+  sharedKey: SharedAiApiKeyDetails | null | undefined,
+): string | null {
+  return ownKey?.aiApiKeyEnc ?? sharedKey?.aiApiKeyEnc ?? null;
+}
+
+function filterSupportedModels(models: OpenAiModel[]): string[] {
+  return models
+    .map((model) => model.id)
+    .filter(
+      (id) =>
+        id.startsWith('gpt-5') || id.startsWith('o3') || id.includes('search'),
+    );
+}
+
+async function fetchSupportedModels(apiKey: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(OPENAI_MODELS_URL, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: OpenAiModel[] };
+    return filterSupportedModels(body.data ?? []);
+  } catch {
+    return null;
+  }
 }
 
 export default async function modelsRoutes(app: FastifyInstance) {
   app.get(
     '/users/:id/models',
-    { config: { rateLimit: RATE_LIMITS.MODERATE } },
+    {
+      config: { rateLimit: RATE_LIMITS.MODERATE },
+      preHandler: userPreHandlers,
+    },
     async (req, reply) => {
-      const params = parseParams(idParams, req.params, reply);
-      if (!params) return;
-      const { id } = params;
-      if (!requireUserIdMatch(req, reply, id)) return;
+      const userId = getValidatedUserId(req);
       const [ownKey, sharedKey] = await Promise.all([
-        getAiKey(id),
-        getSharedAiKey(id),
+        getAiKey(userId),
+        getSharedAiKey(userId),
       ]);
-      if (!ownKey && sharedKey?.model) {
-        return { models: [sharedKey.model] };
-      }
-      const enc = ownKey?.aiApiKeyEnc ?? sharedKey?.aiApiKeyEnc;
-      if (!enc)
+
+      const restrictedModels = getRestrictedSharedModels(ownKey, sharedKey);
+      if (restrictedModels) return { models: restrictedModels };
+
+      const encryptedKey = getEncryptedKey(ownKey, sharedKey);
+      if (!encryptedKey)
         return reply
           .code(404)
           .send(errorResponse(ERROR_MESSAGES.notFound));
-      const key = decrypt(enc, env.KEY_PASSWORD);
-      const cached = getCachedModels(key);
-      if (cached) return { models: cached };
-      try {
-        const res = await fetch('https://api.openai.com/v1/models', {
-          headers: { Authorization: `Bearer ${key}` },
-        });
-        if (!res.ok)
-          return reply
-            .code(500)
-            .send(errorResponse('failed to fetch models'));
-        const json = await res.json();
-        const models = (json.data as { id: string }[])
-          .map((m) => m.id)
-          .filter(
-            (id: string) =>
-              id.startsWith('gpt-5') || id.startsWith('o3') || id.includes('search'),
-          );
-        setCachedModels(key, models);
-        return { models };
-      } catch {
-        return reply
-          .code(500)
-          .send(errorResponse('failed to fetch models'));
-      }
-    }
+
+      const apiKey = decryptKey(encryptedKey);
+      const cachedModels = getCachedModels(apiKey);
+      if (cachedModels !== undefined) return { models: cachedModels };
+
+      const models = await fetchSupportedModels(apiKey);
+      if (models === null)
+        return reply.code(500).send(errorResponse(MODEL_FETCH_ERROR));
+
+      setCachedModels(apiKey, models);
+      return { models };
+    },
   );
 }
