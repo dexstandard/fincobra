@@ -8,6 +8,13 @@ import { insertReviewResult } from './repos/review-result.js';
 import { db } from '../src/db/index.js';
 
 vi.mock('../src/services/binance.js', () => ({
+  fetchAccount: vi.fn().mockResolvedValue({
+    balances: [
+      { asset: 'USDT', free: '1000', locked: '0' },
+      { asset: 'BTC', free: '1', locked: '0' },
+      { asset: 'DOGE', free: '1000', locked: '0' },
+    ],
+  }),
   fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
@@ -22,12 +29,18 @@ vi.mock('../src/services/binance.js', () => ({
 }));
 
 import { createDecisionLimitOrders } from '../src/services/rebalance.js';
-import { createLimitOrder, fetchPairData, fetchPairInfo } from '../src/services/binance.js';
+import {
+  createLimitOrder,
+  fetchAccount,
+  fetchPairData,
+  fetchPairInfo,
+} from '../src/services/binance.js';
 
 describe('createDecisionLimitOrders', () => {
   beforeEach(async () => {
     await clearLimitOrders();
     vi.mocked(createLimitOrder).mockClear();
+    vi.mocked(fetchAccount).mockClear();
   });
 
   it('keeps side when quantity is given in quote asset', async () => {
@@ -601,6 +614,182 @@ describe('createDecisionLimitOrders', () => {
       quantity: 1.1,
       price: 0.02,
     });
+  });
+
+  it('bumps buy orders below min when prefix matches prompt requirement', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('27');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 2,
+      minNotional: 5,
+    });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.000043,
+          limitPrice: 110000,
+          basePrice: 115000,
+          maxPriceDivergencePct: 0.05,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const rows = await getLimitOrders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe(LimitOrderStatus.Open);
+    const planned = JSON.parse(rows[0].planned_json);
+    expect(planned.quantity).toBeCloseTo(0.00004546, 12);
+    expect(planned.price).toBe(110000);
+    expect(planned.quantity * planned.price).toBeGreaterThan(5);
+    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      quantity: planned.quantity,
+      price: 110000,
+    });
+    expect(fetchAccount).not.toHaveBeenCalled();
+  });
+
+  it('rejects undersized buy orders when leading digit differs', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('27A');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 2,
+      minNotional: 5,
+    });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.00003,
+          limitPrice: 110000,
+          basePrice: 115000,
+          maxPriceDivergencePct: 0.05,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const rows = await getLimitOrders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
+    expect(rows[0].cancellation_reason).toBe('order below min notional');
+    expect(createLimitOrder).not.toHaveBeenCalled();
+  });
+
+  it('bumps sell orders below min when prefix matches prompt requirement', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('28');
+    const agent = await insertAgent({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    vi.mocked(fetchPairInfo).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      baseAsset: 'BTC',
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 2,
+      minNotional: 5,
+    });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'SELL',
+          quantity: 0.00004,
+          limitPrice: 110000,
+          basePrice: 115000,
+          maxPriceDivergencePct: 0.05,
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+    const rows = await getLimitOrders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe(LimitOrderStatus.Open);
+    const planned = JSON.parse(rows[0].planned_json);
+    // Sell-side limits are anchored to the live price (currentPrice * 1.001) before rounding,
+    // which raises the final notional slightly above the agent's requested value.
+    expect(planned.quantity).toBeCloseTo(0.00004344, 12);
+    expect(planned.price).toBe(115115);
+    expect(planned.quantity * planned.price).toBeGreaterThan(5);
+    expect(createLimitOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      side: 'SELL',
+      quantity: planned.quantity,
+      price: 115115,
+    });
+    expect(fetchAccount).not.toHaveBeenCalled();
   });
 
   it('preserves manuallyEdited flag when provided', async () => {

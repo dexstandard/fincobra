@@ -29,6 +29,30 @@ interface NominalAdjustmentOptions {
   targetNominal: number;
 }
 
+function extractLeadingDigit(value: number): { exponent: number; digit: number } | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const scientific = value.toExponential();
+  const [coeff, exponentPart] = scientific.split('e');
+  if (coeff === undefined || exponentPart === undefined) return null;
+  const exponent = Number(exponentPart);
+  if (!Number.isFinite(exponent)) return null;
+  const normalizedCoeff = coeff.replace('.', '').replace('-', '');
+  if (!normalizedCoeff) return null;
+  const digit = Number(normalizedCoeff[0]);
+  if (!Number.isFinite(digit)) return null;
+  return { exponent, digit };
+}
+
+function matchesTruncatedPrefix(requested: number, target: number): boolean {
+  const requestedLeading = extractLeadingDigit(requested);
+  const targetLeading = extractLeadingDigit(target);
+  if (!requestedLeading || !targetLeading) return false;
+  return (
+    requestedLeading.digit === targetLeading.digit &&
+    requestedLeading.exponent === targetLeading.exponent
+  );
+}
+
 function adjustLimitPrice(requested: number, current: number, side: 'BUY' | 'SELL'): number {
   const anchor = side === 'BUY' ? current * 0.999 : current * 1.001;
   return side === 'BUY' ? Math.min(requested, anchor) : Math.max(requested, anchor);
@@ -200,18 +224,34 @@ export async function createDecisionLimitOrders(opts: {
     const rawQuantity = quantity;
     let qty = Number(rawQuantity.toFixed(info.quantityPrecision));
     const freshNominal = rawQuantity * roundedLimit;
-    const meetsFreshNominal = meetsMinNotional(freshNominal, info.minNotional);
     const roundedNominal = qty * roundedLimit;
-    if (side === 'BUY' && meetsFreshNominal && !meetsMinNotional(roundedNominal, info.minNotional)) {
-      const targetNominal =
-        Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;
-      const adjustedQty = increaseQuantityToMeetNominal({
-        price: roundedLimit,
-        precision: info.quantityPrecision,
-        targetNominal,
-      });
-      if (adjustedQty !== null && adjustedQty > qty) {
-        qty = adjustedQty;
+    const meetsRoundedNominal = meetsMinNotional(roundedNominal, info.minNotional);
+    if (!meetsRoundedNominal && info.minNotional > 0) {
+      let minForRequestedToken: number | null = null;
+      if (o.token === info.baseAsset) {
+        minForRequestedToken =
+          Number.isFinite(roundedLimit) && roundedLimit > 0
+            ? info.minNotional / roundedLimit
+            : null;
+      } else if (o.token === info.quoteAsset) {
+        minForRequestedToken = info.minNotional;
+      }
+
+      if (
+        minForRequestedToken !== null &&
+        minForRequestedToken > 0 &&
+        matchesTruncatedPrefix(o.quantity, minForRequestedToken)
+      ) {
+        const targetNominal =
+          Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;
+        const adjustedQty = increaseQuantityToMeetNominal({
+          price: roundedLimit,
+          precision: info.quantityPrecision,
+          targetNominal,
+        });
+        if (adjustedQty !== null && adjustedQty > qty) {
+          qty = adjustedQty;
+        }
       }
     }
     const nominalValue = qty * roundedLimit;
