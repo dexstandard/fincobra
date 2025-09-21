@@ -238,30 +238,41 @@ describe('Binance API key routes', () => {
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
 
-    const key1 = 'bkey1234567890';
-    const key2 = 'bkeyabcdefghij';
-    const secret1 = 'bsec1234567890';
-    const secret2 = 'bsecabcdefghij';
+    // Helpers: valid-length (64) placeholders
+    const k = (c: string) => c.repeat(64);
+    const validBadKey = k('A');          // passes Zod, will fail verification
+    const validBadSecret = k('b');       // passes Zod, will fail verification
+    const key1 = k('C');
+    const secret1 = k('d');
+    const key2 = k('E');
+    const secret2 = k('f');
+    const dupKey = k('G');
+    const dupSecret = k('h');
 
+    // ---- Create: verification fails (body passes schema) ----
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({ msg: 'Invalid API-key' }),
     } as any);
+
     let res = await app.inject({
       method: 'POST',
       url: `/api/users/${userId}/binance-key`,
       cookies: authCookies(userId),
-      payload: { key: 'bad', secret: 'bad' },
+      payload: { key: validBadKey, secret: validBadSecret },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({
       error: 'verification failed: Invalid API-key',
     });
+
     let binanceKey = await getBinanceKey(userId);
     expect(binanceKey).toBeNull();
 
+    // ---- Create: success ----
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
+
     res = await app.inject({
       method: 'POST',
       url: `/api/users/${userId}/binance-key`,
@@ -273,12 +284,14 @@ describe('Binance API key routes', () => {
       key: '<REDACTED>',
       secret: '<REDACTED>',
     });
+
     binanceKey = await getBinanceKey(userId);
     expect(binanceKey).not.toBeNull();
     if (!binanceKey) throw new Error('binance key missing');
     expect(binanceKey.apiKeyEnc).not.toBe(key1);
     expect(binanceKey.apiSecretEnc).not.toBe(secret1);
 
+    // ---- Read ----
     res = await app.inject({
       method: 'GET',
       url: `/api/users/${userId}/binance-key`,
@@ -290,23 +303,28 @@ describe('Binance API key routes', () => {
       secret: '<REDACTED>',
     });
 
+    // ---- Create duplicate: should be 409 ----
     res = await app.inject({
       method: 'POST',
       url: `/api/users/${userId}/binance-key`,
       cookies: authCookies(userId),
-      payload: { key: 'dup', secret: 'dup' },
+      payload: { key: dupKey, secret: dupSecret },
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(409);
 
+    // ---- Update: verification fails (generic message) ----
     fetchMock.mockResolvedValueOnce({ ok: false } as any);
+
     res = await app.inject({
       method: 'PUT',
       url: `/api/users/${userId}/binance-key`,
       cookies: authCookies(userId),
-      payload: { key: 'bad2', secret: 'bad2' },
+      payload: { key: validBadKey, secret: validBadSecret },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({ error: 'verification failed' });
+
+    // Ensure GET still returns masked values
     res = await app.inject({
       method: 'GET',
       url: `/api/users/${userId}/binance-key`,
@@ -317,8 +335,10 @@ describe('Binance API key routes', () => {
       secret: '<REDACTED>',
     });
 
+    // ---- Update: success ----
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
     fetchMock.mockResolvedValueOnce({ ok: true } as any);
+
     res = await app.inject({
       method: 'PUT',
       url: `/api/users/${userId}/binance-key`,
@@ -331,6 +351,7 @@ describe('Binance API key routes', () => {
       secret: '<REDACTED>',
     });
 
+    // ---- Delete ----
     res = await app.inject({
       method: 'DELETE',
       url: `/api/users/${userId}/binance-key`,
@@ -338,6 +359,7 @@ describe('Binance API key routes', () => {
     });
     expect(res.statusCode).toBe(200);
 
+    // ---- Read after delete ----
     res = await app.inject({
       method: 'GET',
       url: `/api/users/${userId}/binance-key`,
