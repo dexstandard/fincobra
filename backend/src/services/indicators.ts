@@ -1,4 +1,5 @@
-import { fetchPairData } from './binance.js';
+import { fetchPairData, type Kline } from './binance.js';
+import type { TokenIndicators } from './indicators.types.js';
 
 function pctChange(current: number, past: number) {
   return ((current - past) / past) * 100;
@@ -165,7 +166,7 @@ function calcStoch(
   return { k, d };
 }
 
-export async function fetchTokenIndicators(token: string) {
+export async function fetchTokenIndicators(token: string): Promise<TokenIndicators> {
   const pair = await fetchPairData(token, 'USDT');
   const symbol = `${token}USDT`.toUpperCase();
   const hourRes = await fetch(
@@ -175,67 +176,60 @@ export async function fetchTokenIndicators(token: string) {
     const body = await hourRes.text();
     throw new Error(`failed to fetch hourly data: ${hourRes.status} ${body}`);
   }
-  const hourJson = (await hourRes.json()) as unknown[];
-  const hourCloses = hourJson.map((k: any) => Number(k[4]));
-  const hourVolumes = hourJson.map((k: any) => Number(k[5]));
+  const hourJson = (await hourRes.json()) as Kline[];
+  const hourCloses = hourJson.map((k) => Number(k[4]));
+  const hourVolumes = hourJson.map((k) => Number(k[5]));
 
-  const dayCloses = pair.year.map((k: any) => Number(k[4]));
-  const dayHighs = pair.year.map((k: any) => Number(k[2]));
-  const dayLows = pair.year.map((k: any) => Number(k[3]));
-  const dayVolumes = pair.year.map((k: any) => Number(k[5]));
+  const dayCloses = pair.year.map((k) => Number(k[4]));
+  const dayHighs = pair.year.map((k) => Number(k[2]));
+  const dayLows = pair.year.map((k) => Number(k[3]));
+  const dayVolumes = pair.year.map((k) => Number(k[5]));
   const current = pair.currentPrice;
 
-  const ret = {
-    '1h': calcRet(hourCloses, 1, current),
-    '4h': calcRet(hourCloses, 4, current),
-    '24h': calcRet(dayCloses, 1, current),
-    '7d': calcRet(dayCloses, 7, current),
-    '30d': calcRet(dayCloses, 30, current),
-  } as const;
-
-  const sma_dist = {
-    '20': calcSmaDist(dayCloses, 20, current),
-    '50': calcSmaDist(dayCloses, 50, current),
-    '200': calcSmaDist(dayCloses, 200, current),
-  } as const;
-
-  const macd_hist = calcMacdHist(dayCloses);
-
-  const vol = {
-    rv_7d: realizedVol(dayCloses, 7),
-    rv_30d: realizedVol(dayCloses, 30),
-    atr_pct: (calcAtr(dayHighs, dayLows, dayCloses) / current) * 100,
-  } as const;
-
-  const range = {
-    bb_bw: bollingerBandwidth(dayCloses, 20),
-    donchian20: donchian(dayHighs, dayLows, current, 20),
-  } as const;
-
-  const volume = {
-    z_1h: volumeZ(hourVolumes, 24),
-    z_24h: volumeZ(dayVolumes, 30),
-  } as const;
-
-  const rsi_14 = calcRsi(dayCloses);
-  const { k: stoch_k, d: stoch_d } = calcStoch(dayHighs, dayLows, dayCloses);
-  const osc = { rsi_14, stoch_k, stoch_d } as const;
-
   const btc = await fetchPairData('BTC', 'USDT');
-  const btcCloses = btc.year.map((k: any) => Number(k[4]));
-  const corr = {
-    BTC_30d: correlation(
-      dailyReturns(dayCloses, 30),
-      dailyReturns(btcCloses, 30),
-    ),
-  } as const;
+  const btcCloses = btc.year.map((k) => Number(k[4]));
 
-  const regime = {
-    BTC: bollingerBandwidth(btcCloses, 20) < 10 ? 'range' : 'trend',
-  } as const;
+  const macdHist = calcMacdHist(dayCloses);
+  const volAtrPct = (calcAtr(dayHighs, dayLows, dayCloses) / current) * 100;
+  const volRv7d = realizedVol(dayCloses, 7);
+  const volRv30d = realizedVol(dayCloses, 30);
+  const rangeBbBw = bollingerBandwidth(dayCloses, 20);
+  const rangeDonchian20 = donchian(dayHighs, dayLows, current, 20);
+  const volumeZ1h = volumeZ(hourVolumes, 24);
+  const volumeZ24h = volumeZ(dayVolumes, 30);
+  const oscRsi14 = calcRsi(dayCloses);
+  const { k: oscStochK, d: oscStochD } = calcStoch(dayHighs, dayLows, dayCloses);
+  const corrBtc30d = correlation(
+    dailyReturns(dayCloses, 30),
+    dailyReturns(btcCloses, 30),
+  );
+  const regimeBtc = bollingerBandwidth(btcCloses, 20) < 10 ? 'range' : 'trend';
 
-  return { ret, sma_dist, macd_hist, vol, range, volume, corr, regime, osc };
+  const indicators: TokenIndicators = {
+    ret1h: calcRet(hourCloses, 1, current),
+    ret4h: calcRet(hourCloses, 4, current),
+    ret24h: calcRet(dayCloses, 1, current),
+    ret7d: calcRet(dayCloses, 7, current),
+    ret30d: calcRet(dayCloses, 30, current),
+    smaDist20: calcSmaDist(dayCloses, 20, current),
+    smaDist50: calcSmaDist(dayCloses, 50, current),
+    smaDist200: calcSmaDist(dayCloses, 200, current),
+    macdHist,
+    volRv7d,
+    volRv30d,
+    volAtrPct,
+    rangeBbBw,
+    rangeDonchian20,
+    volumeZ1h,
+    volumeZ24h,
+    corrBtc30d,
+    regimeBtc,
+    oscRsi14,
+    oscStochK,
+    oscStochD,
+  };
+
+  return indicators;
 }
 
-export type TokenIndicators = Awaited<ReturnType<typeof fetchTokenIndicators>>;
-
+export type { TokenIndicators } from './indicators.types.js';

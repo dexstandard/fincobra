@@ -27,8 +27,16 @@ export interface ExecLog {
   log: string;
   response?: {
     rebalance: boolean;
-    newAllocation?: number;
     shortReport: string;
+    orders?: {
+      pair: string;
+      token: string;
+      side: string;
+      quantity: number;
+      limitPrice: number;
+      basePrice: number;
+      maxPriceDivergencePct: number;
+    }[];
   };
   error?: Record<string, unknown>;
   createdAt: number;
@@ -36,12 +44,17 @@ export interface ExecLog {
 
 interface Props {
   log: ExecLog;
-  agentId: string;
+  workflowId: string;
   manualRebalance: boolean;
   tokens: string[];
 }
 
-export default function ExecLogItem({ log, agentId, manualRebalance, tokens }: Props) {
+export default function ExecLogItem({
+  log,
+  workflowId,
+  manualRebalance,
+  tokens,
+}: Props) {
   const [showJson, setShowJson] = useState(false);
   const [showTx, setShowTx] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -54,9 +67,11 @@ export default function ExecLogItem({ log, agentId, manualRebalance, tokens }: P
     data: orders,
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ['exec-orders', agentId, log.id],
+    queryKey: ['exec-orders', workflowId, log.id],
     queryFn: async () => {
-      const res = await api.get(`/agents/${agentId}/exec-log/${log.id}/orders`);
+      const res = await api.get(
+        `/portfolio-workflows/${workflowId}/exec-log/${log.id}/orders`,
+      );
       return res.data.orders as LimitOrder[];
     },
     enabled: showTx || (!!response?.rebalance && manualRebalance),
@@ -74,7 +89,9 @@ export default function ExecLogItem({ log, agentId, manualRebalance, tokens }: P
   async function handleShowPrompt() {
     if (!showPrompt) {
       try {
-        const res = await api.get(`/agents/${agentId}/exec-log/${log.id}/prompt`);
+        const res = await api.get(
+          `/portfolio-workflows/${workflowId}/exec-log/${log.id}/prompt`,
+        );
         setPromptText(JSON.stringify(res.data.prompt, null, 2));
       } catch {
         setPromptText(t('failed_load_prompt'));
@@ -93,7 +110,9 @@ export default function ExecLogItem({ log, agentId, manualRebalance, tokens }: P
   async function handleRebalance() {
     setCreating(true);
     try {
-      const res = await api.get(`/agents/${agentId}/exec-log/${log.id}/rebalance/preview`);
+      const res = await api.get(
+        `/portfolio-workflows/${workflowId}/exec-log/${log.id}/rebalance/preview`,
+      );
       const ord = res.data.order as { quantity: number; price: number; side: string };
       setOrder(ord);
       setManuallyEdited(false);
@@ -112,7 +131,7 @@ export default function ExecLogItem({ log, agentId, manualRebalance, tokens }: P
   async function confirmRebalance() {
     setCreating(true);
     try {
-      await api.post(`/agents/${agentId}/exec-log/${log.id}/rebalance`, {
+      await api.post(`/portfolio-workflows/${workflowId}/exec-log/${log.id}/rebalance`, {
         quantity: Number(quantity),
         price: Number(price),
         ...(manuallyEdited ? { manuallyEdited: true } : {}),
@@ -211,7 +230,7 @@ export default function ExecLogItem({ log, agentId, manualRebalance, tokens }: P
       </Modal>
       {showTx && orders && (
         <ExecTxCard
-          agentId={agentId}
+          workflowId={workflowId}
           logId={log.id}
           orders={orders}
           onCancel={refetchOrders}

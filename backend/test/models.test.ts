@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
 import { insertUser } from './repos/users.js';
-import { setAiKey, shareAiKey } from '../src/repos/api-keys.js';
+import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import { authCookies } from './helpers.js';
 
 describe('model routes', () => {
@@ -11,7 +11,7 @@ describe('model routes', () => {
     const key = 'aikey1234567890';
     const enc = encrypt(key, process.env.KEY_PASSWORD!);
     const userId = await insertUser('1', null);
-    await setAiKey(userId, enc);
+    await setAiKey({ userId, apiKeyEnc: enc });
 
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;
@@ -57,7 +57,7 @@ describe('model routes', () => {
     const key = 'aikey9999999999';
     const enc = encrypt(key, process.env.KEY_PASSWORD!);
     const userId3 = await insertUser('3', null);
-    await setAiKey(userId3, enc);
+    await setAiKey({ userId: userId3, apiKeyEnc: enc });
 
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;
@@ -105,8 +105,15 @@ describe('model routes', () => {
     const adminId = await insertUser('5');
     const userId = await insertUser('6');
     const key = 'aikeyshared123456';
-    await setAiKey(adminId, encrypt(key, process.env.KEY_PASSWORD!));
-    await shareAiKey(adminId, userId, 'gpt-5');
+    await setAiKey({
+      userId: adminId,
+      apiKeyEnc: encrypt(key, process.env.KEY_PASSWORD!),
+    });
+    await shareAiKey({
+      ownerUserId: adminId,
+      targetUserId: userId,
+      model: 'gpt-5',
+    });
 
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;

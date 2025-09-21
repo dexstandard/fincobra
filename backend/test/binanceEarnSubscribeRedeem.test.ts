@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { encrypt } from '../src/util/crypto.js';
 import { insertUser } from './repos/users.js';
-import { setBinanceKey } from '../src/repos/api-keys.js';
+import { setBinanceKey } from '../src/repos/exchange-api-keys.js';
 import { createHmac } from 'node:crypto';
 import {
   subscribeEarnFlexible,
@@ -19,7 +19,11 @@ describe('binance earn subscribe/redeem helpers', () => {
     const encKey = encrypt(key, process.env.KEY_PASSWORD!);
     const encSecret = encrypt(secret, process.env.KEY_PASSWORD!);
     const id = await insertUser('11');
-    await setBinanceKey(id, encKey, encSecret);
+    await setBinanceKey({
+      userId: id,
+      apiKeyEnc: encKey,
+      apiSecretEnc: encSecret,
+    });
 
     const fetchMock = vi
       .fn()
@@ -51,7 +55,11 @@ describe('binance earn subscribe/redeem helpers', () => {
     const encKey = encrypt(key, process.env.KEY_PASSWORD!);
     const encSecret = encrypt(secret, process.env.KEY_PASSWORD!);
     const id = await insertUser('12');
-    await setBinanceKey(id, encKey, encSecret);
+    await setBinanceKey({
+      userId: id,
+      apiKeyEnc: encKey,
+      apiSecretEnc: encSecret,
+    });
 
     const fetchMock = vi
       .fn()

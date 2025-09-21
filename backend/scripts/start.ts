@@ -2,8 +2,8 @@ import { schedule } from 'node-cron';
 import buildServer from '../src/server.js';
 import '../src/util/env.js';
 import reviewPortfolios from '../src/workflows/portfolio-review.js';
-import checkOpenOrders from '../src/jobs/check-open-orders.js';
-import fetchNews from '../src/jobs/fetch-news.js';
+import { syncOpenOrderStatuses } from '../src/services/order-orchestrator.js';
+import { fetchAndStoreNews } from '../src/services/news.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,10 +13,10 @@ async function main() {
   const app = await buildServer(routesDir);
   const log = app.log;
 
-  schedule('*/10 * * * *', () => fetchNews(log));
+  schedule('*/10 * * * *', () => fetchAndStoreNews(log));
+  schedule('*/3 * * * *', () => syncOpenOrderStatuses(log));
 
   const schedules: Record<string, string> = {
-    openOrders: '*/3 * * * *',
     '10m': '*/10 * * * *',
     '15m': '*/15 * * * *',
     '30m': '*/30 * * * *',
@@ -29,14 +29,13 @@ async function main() {
     '1w': '0 0 * * 0',
   };
   for (const [interval, cronExp] of Object.entries(schedules)) {
-    if (interval === 'openOrders')
-      schedule(cronExp, () => checkOpenOrders(log));
-    else schedule(cronExp, () => reviewPortfolios(log, interval));
+    schedule(cronExp, () => reviewPortfolios(log, interval));
   }
 
   try {
     // Listen on all interfaces so Caddy can reach the backend in Docker
     await app.listen({ port: 3000, host: '0.0.0.0' });
+    app.isStarted = true;
     log.info('server started');
   } catch (err) {
     log.error(err);

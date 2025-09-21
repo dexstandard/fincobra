@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { RebalancePrompt } from '../src/util/ai.js';
+import { callAi } from '../src/util/ai.js';
+import { developerInstructions, rebalanceResponseSchema } from '../src/agents/main-trader.js';
+import { type RebalancePrompt } from '../src/agents/main-trader.types.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 
 describe('callAi structured output', () => {
   it('includes json schema in request', async () => {
@@ -8,20 +11,33 @@ describe('callAi structured output', () => {
       .mockResolvedValue({ ok: true, text: async () => '' });
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
-    const { callAi, developerInstructions, rebalanceResponseSchema } = await import('../src/util/ai.js');
     const prompt: RebalancePrompt = {
       instructions: 'inst',
       policy: { floor: { USDT: 20 } },
       portfolio: {
         ts: new Date().toISOString(),
         positions: [
-          { sym: 'USDT', qty: 1, price_usdt: 1, value_usdt: 1 },
+          { sym: 'USDT', qty: 1, priceUsdt: 1, valueUsdt: 1 },
         ],
       },
-      marketData: { currentPrice: 1, minNotional: 10 },
-      previous_responses: [
-        { shortReport: 'p1' },
-        { rebalance: true, newAllocation: 50 },
+      routes: [],
+      marketData: {},
+      reviewInterval: '1h',
+      previousReports: [
+        { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
+        {
+          datetime: '2025-01-02T00:00:00.000Z',
+          orders: [
+            {
+              symbol: 'BTCUSDT',
+              side: 'BUY',
+              quantity: 1,
+              status: LimitOrderStatus.Filled,
+              datetime: '2025-01-02T00:00:00.000Z',
+            },
+          ],
+          shortReport: 'p2',
+        },
       ],
     };
     await callAi('gpt-test', developerInstructions, rebalanceResponseSchema, prompt, 'key');
@@ -29,19 +45,31 @@ describe('callAi structured output', () => {
     const [, opts] = fetchMock.mock.calls[0];
     const body = JSON.parse(opts.body);
     expect(opts.body).toBe(JSON.stringify(body));
-    expect(body.instructions).toMatch(/- Decide whether to rebalance/i);
+    expect(body.instructions).toMatch(/- Decide which limit orders to place/i);
     expect(body.instructions).toMatch(/On error, return \{error:"message"\}/i);
     expect(typeof body.input).toBe('string');
     const parsed = JSON.parse(body.input);
-    expect(parsed.previous_responses).toEqual([
-      { shortReport: 'p1' },
-      { rebalance: true, newAllocation: 50 },
+    expect(parsed.previousReports).toEqual([
+      { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
+      {
+        datetime: '2025-01-02T00:00:00.000Z',
+        orders: [
+          {
+            symbol: 'BTCUSDT',
+            side: 'BUY',
+            quantity: 1,
+            status: LimitOrderStatus.Filled,
+            datetime: '2025-01-02T00:00:00.000Z',
+          },
+        ],
+        shortReport: 'p2',
+      },
     ]);
     expect(body.tools).toBeUndefined();
     expect(body.text.format.type).toBe('json_schema');
     const anyOf = body.text.format.schema.properties.result.anyOf;
     expect(Array.isArray(anyOf)).toBe(true);
-    expect(anyOf).toHaveLength(3);
+    expect(anyOf).toHaveLength(2);
     (globalThis as any).fetch = originalFetch;
   });
 
@@ -51,7 +79,6 @@ describe('callAi structured output', () => {
       .mockResolvedValue({ ok: true, text: async () => '' });
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
-    const { callAi, developerInstructions, rebalanceResponseSchema } = await import('../src/util/ai.js');
     await callAi(
       'gpt-test',
       developerInstructions,

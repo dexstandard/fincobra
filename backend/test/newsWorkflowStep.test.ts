@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
+import { mockLogger } from './helpers.js';
 
 vi.mock('../src/util/tokens.js', () => ({
   isStablecoin: (sym: string) => sym === 'USDC',
 }));
 
-const insertReviewRawLogMock = vi.fn();
-vi.mock('../src/repos/agent-review-raw-log.js', () => ({
+const insertReviewRawLogMock = vi.hoisted(() => vi.fn());
+vi.mock('../src/repos/review-raw-log.js', () => ({
   insertReviewRawLog: insertReviewRawLogMock,
 }));
 
@@ -19,22 +19,18 @@ vi.mock('../src/util/ai.js', () => ({
   extractJson: () => ({ comment: 'summary for BTC', score: 1 }),
 }));
 
-function createLogger(): FastifyBaseLogger {
-  const log = { info: () => {}, error: () => {}, child: () => log } as unknown as FastifyBaseLogger;
-  return log;
-}
+import { runNewsAnalyst } from '../src/agents/news-analyst.js';
 
 describe('news analyst step', () => {
   it('fetches news summaries', async () => {
-    const mod = await import('../src/agents/news-analyst.js');
     const prompt: any = {
       reports: [
         { token: 'BTC', news: null, tech: null },
         { token: 'USDC', news: null, tech: null },
       ],
     };
-    await mod.runNewsAnalyst(
-      { log: createLogger(), model: 'gpt', apiKey: 'key', portfolioId: 'agent1' },
+    await runNewsAnalyst(
+      { log: mockLogger(), model: 'gpt', apiKey: 'key', portfolioId: 'agent1' },
       prompt,
     );
     const report = prompt.reports?.find((r: any) => r.token === 'BTC');

@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import {
   getActivePortfolioWorkflowById,
   getActivePortfolioWorkflowsByInterval,
-  type ActivePortfolioWorkflowRow,
+  type ActivePortfolioWorkflow,
 } from '../repos/portfolio-workflow.js';
 import {
   run as runMainTrader,
@@ -11,31 +11,27 @@ import {
 } from '../agents/main-trader.js';
 import { runNewsAnalyst } from '../agents/news-analyst.js';
 import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
-import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
-import {
-  getOpenLimitOrdersForAgent,
-  updateLimitOrderStatus,
-} from '../repos/limit-orders.js';
+import { insertReviewRawLog } from '../repos/review-raw-log.js';
+import { getOpenLimitOrdersForWorkflow } from '../repos/limit-orders.js';
+import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
-import {
-  insertReviewResult,
-  type ReviewResultInsert,
-  type ReviewResultError,
-} from '../repos/agent-review-result.js';
+import { insertReviewResult } from '../repos/review-result.js';
+import type {
+  ReviewResultInsert
+} from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
-import {
-  cancelOrder,
-  parseBinanceError,
-} from '../services/binance.js';
-import { createRebalanceLimitOrder } from '../services/rebalance.js';
-import { type RebalancePrompt } from '../util/ai.js';
+import { cancelLimitOrder } from '../services/limit-order.js';
+import { createDecisionLimitOrders } from '../services/rebalance.js';
+import { type RebalancePrompt } from '../agents/main-trader.types.js';
+import pLimit from 'p-limit';
+import { randomUUID } from 'crypto';
 
 /** Workflows currently running. Used to avoid concurrent runs. */
 const runningWorkflows = new Set<string>();
 
-export function removeWorkflowFromSchedule(id: string) {
-  runningWorkflows.delete(id);
+export function removeWorkflowFromSchedule(id: string): boolean {
+  return runningWorkflows.delete(id);
 }
 
 export async function reviewPortfolio(
@@ -61,13 +57,13 @@ export default async function reviewPortfolios(
 
 async function runReviewWorkflows(
   log: FastifyBaseLogger,
-  workflowRows: ActivePortfolioWorkflowRow[],
+  workflowRows: ActivePortfolioWorkflow[],
 ) {
   await Promise.all(
     workflowRows.map((wf) =>
       executeWorkflow(
         wf,
-        log.child({ userId: wf.user_id, portfolioId: wf.id }),
+        log.child({ userId: wf.userId, portfolioId: wf.id }),
       ).finally(() => {
         runningWorkflows.delete(wf.id);
       }),
@@ -75,9 +71,9 @@ async function runReviewWorkflows(
   );
 }
 
-function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflowRow[]) {
-  const toRun: ActivePortfolioWorkflowRow[] = [];
-  const skipped: ActivePortfolioWorkflowRow[] = [];
+function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflow[]) {
+  const toRun: ActivePortfolioWorkflow[] = [];
+  const skipped: ActivePortfolioWorkflow[] = [];
   for (const row of workflowRows) {
     if (runningWorkflows.has(row.id)) skipped.push(row);
     else {
@@ -90,28 +86,31 @@ function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflowRow[]) {
 
 
 async function cleanupOpenOrders(
-  wf: ActivePortfolioWorkflowRow,
+  wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ) {
-  const orders = await getOpenLimitOrdersForAgent(wf.id);
-  for (const o of orders) {
-    const planned = JSON.parse(o.planned_json);
-    try {
-      await cancelOrder(o.user_id, {
-        symbol: planned.symbol,
-        orderId: Number(o.order_id),
-      });
-      await updateLimitOrderStatus(o.user_id, o.order_id, 'canceled');
-      log.info({ orderId: o.order_id }, 'canceled stale order');
-    } catch (err) {
-      const msg = parseBinanceError(err);
-      if (msg && /UNKNOWN_ORDER/i.test(msg)) {
-        await updateLimitOrderStatus(o.user_id, o.order_id, 'filled');
-      } else {
-        log.error({ err }, 'failed to cancel order');
-      }
-    }
-  }
+  const orders = await getOpenLimitOrdersForWorkflow(wf.id);
+  const limit = (pLimit as any)(5);
+  await Promise.all(
+    orders.map((o) =>
+      limit(async () => {
+        const planned = JSON.parse(o.plannedJson);
+        try {
+          const res = await cancelLimitOrder(o.userId, {
+            symbol: planned.symbol,
+            orderId: o.orderId,
+            reason: 'Could not fill within interval',
+          });
+          log.info(
+            { orderId: o.orderId },
+            res === LimitOrderStatus.Canceled ? 'canceled stale order' : 'order already filled',
+          );
+        } catch (err) {
+          log.error({ err }, 'failed to cancel order');
+        }
+      }),
+    ),
+  );
 }
 
 function buildReviewResultEntry({
@@ -125,118 +124,138 @@ function buildReviewResultEntry({
   logId: string;
   validationError?: string;
 }): ReviewResultInsert {
-  const entry: ReviewResultInsert = {
-    portfolioId: workflowId,
+  const ok = !!decision && !validationError;
+
+  return {
+    portfolioWorkflowId: workflowId,
     log: decision ? JSON.stringify(decision) : '',
     rawLogId: logId,
+    rebalance: ok ? decision.orders.length > 0 : false,
+    ...(ok
+      ? { shortReport: decision.shortReport }
+      : { error: { message: validationError ?? 'decision unavailable' } }),
   };
-
-  if (decision && !validationError) {
-    entry.rebalance = decision.rebalance;
-    entry.newAllocation = decision.newAllocation;
-    entry.shortReport = decision.shortReport;
-  } else {
-    entry.error = { message: validationError ?? 'decision unavailable' };
-  }
-
-  return entry;
 }
 
 export async function executeWorkflow(
-  wf: ActivePortfolioWorkflowRow,
+  wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ) {
+  const execLogId = randomUUID();
+  const runLog = log.child({ execLogId });
+  runLog.info('workflow run start');
+
+  const runStep = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+    runLog.info({ step: name }, 'step start');
+    try {
+      const res = await fn();
+      runLog.info({ step: name }, 'step success');
+      return res;
+    } catch (err) {
+      runLog.error({ err, step: name }, 'step failed');
+      throw err;
+    }
+  };
+
   let prompt: RebalancePrompt | undefined;
   try {
-    await cleanupOpenOrders(wf, log);
+    await runStep('cleanupOpenOrders', () => cleanupOpenOrders(wf, runLog));
 
-    const key = decrypt(wf.ai_api_key_enc, env.KEY_PASSWORD);
-
-    prompt = await collectPromptData(wf, log);
-    if (!prompt) {
-      await saveFailure(wf, 'failed to collect prompt data');
+    if (!wf.aiApiKeyEnc) {
+      runLog.error('workflow run failed: missing AI API key');
+      return;
+    }
+    if (!wf.model) {
+      runLog.error('workflow run failed: missing model');
       return;
     }
 
-    const params = { log, model: wf.model, apiKey: key, portfolioId: wf.id };
+    const key = decrypt(wf.aiApiKeyEnc, env.KEY_PASSWORD);
+
+    prompt = await runStep('collectPromptData', () => collectPromptData(wf, runLog));
+    if (!prompt) {
+      runLog.error('workflow run failed: could not collect prompt data');
+      return;
+    }
+
+    const params = { log: runLog, model: wf.model, apiKey: key, portfolioId: wf.id };
     await Promise.all([
-      runNewsAnalyst(params, prompt),
-      runTechnicalAnalyst(params, prompt),
+      runStep('runNewsAnalyst', () => runNewsAnalyst(params, prompt!)),
+      runStep('runTechnicalAnalyst', () => runTechnicalAnalyst(params, prompt!)),
     ]);
 
-    const decision = await runMainTrader(params, prompt);
-    const logId = await insertReviewRawLog({
-      portfolioId: wf.id,
-      prompt,
-      response: decision,
-    });
+    const decision = await runStep('runMainTrader', () => runMainTrader(params, prompt!));
+    const logId = await runStep('insertReviewRawLog', () =>
+      insertReviewRawLog({
+        portfolioWorkflowId: wf.id,
+        prompt: prompt!,
+        response: decision,
+      }),
+    );
     const validationError = validateExecResponse(
       decision ?? undefined,
-      prompt.policy,
+      prompt!.portfolio.positions.map((p) => p.sym),
     );
-    if (validationError) log.error({ err: validationError }, 'validation failed');
+    if (validationError) runLog.error({ err: validationError }, 'validation failed');
     const resultEntry = buildReviewResultEntry({
       workflowId: wf.id,
       decision,
       logId,
       validationError,
     });
-    const resultId = await insertReviewResult(resultEntry);
+    const resultId = await runStep('insertReviewResult', () => insertReviewResult(resultEntry));
     if (
       decision &&
       !validationError &&
-      !wf.manual_rebalance &&
-      decision.rebalance &&
-      decision.newAllocation !== undefined
+      !wf.manualRebalance &&
+      decision.orders.length
     ) {
-      await createRebalanceLimitOrder({
-        userId: wf.user_id,
-        tokens: wf.tokens.map((t) => t.token),
-        positions: prompt.portfolio.positions,
-        newAllocation: decision.newAllocation,
-        log,
+      await createDecisionLimitOrders({
+        userId: wf.userId,
+        orders: decision.orders,
         reviewResultId: resultId,
+        log: runLog,
       });
     }
-    log.info('workflow run complete');
+    runLog.info('workflow run complete');
   } catch (err) {
-    await saveFailure(wf, String(err), prompt);
-    log.error({ err }, 'workflow run failed');
+    await saveFailure(wf, String(err), prompt!);
+    runLog.error({ err }, 'workflow run failed');
   }
 }
 
 async function saveFailure(
-  row: ActivePortfolioWorkflowRow,
+  row: ActivePortfolioWorkflow,
   message: string,
-  prompt?: RebalancePrompt,
+  prompt: RebalancePrompt,
 ) {
-  let rawId: string | undefined;
-  if (prompt) {
-    rawId = await insertReviewRawLog({
-      portfolioId: row.id,
-      prompt,
-      response: { error: message },
-    });
-  }
+  const rawLogId = await insertReviewRawLog({
+    portfolioWorkflowId: row.id,
+    prompt,
+    response: { error: message },
+  });
+
   const parsed = parseExecLog({ error: message });
+
+  const rebalance =
+    Array.isArray(parsed.response?.orders) && parsed.response!.orders.length > 0;
+
   const entry: ReviewResultInsert = {
-    portfolioId: row.id,
+    portfolioWorkflowId: row.id,
     log: parsed.text,
+    rawLogId,
+    rebalance,
+    ...(parsed.response?.shortReport != null && {
+      shortReport: parsed.response.shortReport,
+    }),
+    error: {
+      message:
+        typeof (parsed.error as any)?.message === 'string'
+          ? String((parsed.error as any).message)
+          : message,
+    },
   };
-  if (rawId) entry.rawLogId = rawId;
-  if (parsed.response) {
-    entry.rebalance = parsed.response.rebalance;
-    entry.newAllocation = parsed.response.newAllocation;
-    entry.shortReport = parsed.response.shortReport;
-  }
-  if (
-    parsed.error &&
-    typeof (parsed.error as any).message === 'string'
-  ) {
-    entry.error = {
-      message: String((parsed.error as any).message),
-    } as ReviewResultError;
-  }
+
   await insertReviewResult(entry);
 }
 

@@ -32,7 +32,7 @@ export default function AppShell() {
     <div className="h-screen flex flex-col">
       <header className="fixed top-0 left-0 right-0 bg-gray-800 text-white p-4 flex justify-between z-10">
         <Link to="/" className="font-bold">
-          PromptSwap
+          FinCobra
         </Link>
         <div className="flex items-center gap-4">
           <span className="hidden md:inline">
@@ -55,10 +55,10 @@ export default function AppShell() {
               className={`flex items-center text-gray-700 hover:text-gray-900 ${
                 navCollapsed ? 'justify-center' : 'gap-2'
               }`}
-              title={navCollapsed ? t('agents') : undefined}
+              title={navCollapsed ? t('workflows') : undefined}
             >
               <Bot className={`${navCollapsed ? 'w-6 h-6' : 'w-4 h-4'}`} />
-              {!navCollapsed && t('agents')}
+              {!navCollapsed && t('workflows')}
             </Link>
             <Link
               to="/keys"
@@ -129,7 +129,7 @@ export default function AppShell() {
         <Link
           to="/"
           className="text-gray-700 hover:text-gray-900"
-          aria-label={t('agents')}
+          aria-label={t('workflows')}
         >
           <Bot className="w-6 h-6" />
         </Link>

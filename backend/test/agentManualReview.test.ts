@@ -30,12 +30,13 @@ describe('manual review endpoint', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
     const agentId = agent.id;
 
     const res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agentId}/review`,
+      url: `/api/portfolio-workflows/${agentId}/review`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -62,6 +63,7 @@ describe('manual review endpoint', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
     const agentId = agent.id;
     reviewAgentPortfolioMock.mockRejectedValueOnce(
@@ -69,7 +71,7 @@ describe('manual review endpoint', () => {
     );
     const res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agentId}/review`,
+      url: `/api/portfolio-workflows/${agentId}/review`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);

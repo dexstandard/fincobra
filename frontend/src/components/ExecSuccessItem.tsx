@@ -11,15 +11,23 @@ function truncate(text: string) {
 interface Props {
   response: {
     rebalance: boolean;
-    newAllocation?: number;
     shortReport: string;
+    orders?: {
+      pair: string;
+      token: string;
+      side: string;
+      quantity: number;
+      limitPrice: number;
+      basePrice: number;
+      maxPriceDivergencePct: number;
+    }[];
   };
   promptIcon?: ReactNode;
 }
 
 export default function ExecSuccessItem({ response, promptIcon }: Props) {
   const [showJson, setShowJson] = useState(false);
-  const { rebalance, newAllocation, shortReport } = response;
+  const { rebalance, shortReport } = response;
   const color = rebalance
     ? 'border-green-300 bg-green-50 text-green-800'
     : 'border-blue-300 bg-blue-50 text-blue-800';
@@ -32,9 +40,6 @@ export default function ExecSuccessItem({ response, promptIcon }: Props) {
           {rebalance ? t('rebalance') : t('hold')}
         </span>
         <span>{truncate(shortReport)}</span>
-        {rebalance && typeof newAllocation === 'number' && (
-          <span className="ml-1">({t('new_allocation')} {newAllocation})</span>
-        )}
       </div>
       {promptIcon}
       <Eye

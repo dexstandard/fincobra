@@ -1,9 +1,14 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { getNewsByToken } from '../repos/news.js';
-import { insertReviewRawLog } from '../repos/agent-review-raw-log.js';
-import { callAi, extractJson, type RebalancePrompt } from '../util/ai.js';
+import { insertReviewRawLog } from '../repos/review-raw-log.js';
+import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
-import { type AnalysisLog, type Analysis, analysisSchema, type RunParams } from './types.js';
+import type { RebalancePrompt, RunParams } from './main-trader.types.js';
+import {
+  type AnalysisLog,
+  type Analysis,
+  analysisSchema,
+} from './news-analyst.types.js';
 
 const CACHE_MS = 3 * 60 * 1000;
 const cache = new Map<
@@ -19,7 +24,11 @@ export function getTokenNewsSummaryCached(
 ): Promise<AnalysisLog> {
   const now = Date.now();
   const cached = cache.get(token);
-  if (cached && cached.expires > now) return cached.promise;
+  if (cached && cached.expires > now) {
+    log.info({ token }, 'news summary cache hit');
+    return cached.promise;
+  }
+  log.info({ token }, 'news summary cache miss');
   const promise = getTokenNewsSummary(token, model, apiKey, log);
   cache.set(token, { promise, expires: now + CACHE_MS });
   promise.catch(() => cache.delete(token));
@@ -72,7 +81,7 @@ export async function runNewsAnalyst(
       const { analysis, prompt: p, response } =
         await getTokenNewsSummaryCached(token, model, apiKey, log);
       if (p && response)
-        await insertReviewRawLog({ portfolioId, prompt: p, response });
+        await insertReviewRawLog({ portfolioWorkflowId: portfolioId, prompt: p, response });
       report.news = analysis;
     }),
   );

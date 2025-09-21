@@ -1,30 +1,53 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-import type { FastifyBaseLogger } from 'fastify';
-import { db } from '../src/db/index.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { insertUser } from './repos/users.js';
+import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertReviewResult } from './repos/review-result.js';
+import { mockLogger } from './helpers.js';
+import {
+  insertLimitOrder,
+  getLimitOrdersByReviewResult,
+} from '../src/repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
+import { setAiKey } from '../src/repos/ai-api-key.js';
+import { reviewAgentPortfolio } from '../src/workflows/portfolio-review.js';
 
-const sampleIndicators = {
-  ret: { '1h': 0, '4h': 0, '24h': 0, '7d': 0, '30d': 0 },
-  sma_dist: { '20': 0, '50': 0, '200': 0 },
-  macd_hist: 0,
-  vol: { rv_7d: 0, rv_30d: 0, atr_pct: 0 },
-  range: { bb_bw: 0, donchian20: 0 },
-  volume: { z_1h: 0, z_24h: 0 },
-  corr: { BTC_30d: 0 },
-  regime: { BTC: 'range' },
-  osc: { rsi_14: 0, stoch_k: 0, stoch_d: 0 },
-};
+const sampleIndicators = vi.hoisted(() => ({
+  ret1h: 0,
+  ret4h: 0,
+  ret24h: 0,
+  ret7d: 0,
+  ret30d: 0,
+  smaDist20: 0,
+  smaDist50: 0,
+  smaDist200: 0,
+  macdHist: 0,
+  volRv7d: 0,
+  volRv30d: 0,
+  volAtrPct: 0,
+  rangeBbBw: 0,
+  rangeDonchian20: 0,
+  volumeZ1h: 0,
+  volumeZ24h: 0,
+  corrBtc30d: 0,
+  regimeBtc: 'range',
+  oscRsi14: 0,
+  oscStochK: 0,
+  oscStochD: 0,
+}));
 
 vi.mock('../src/util/ai.js', () => ({
   callAi: vi.fn().mockResolvedValue('ok'),
-  developerInstructions: '',
-  rebalanceResponseSchema: {},
 }));
 
 vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
 }));
 
-const cancelOrder = vi.fn().mockResolvedValue(undefined);
+const { cancelOrder, parseBinanceError, fetchOrder } = vi.hoisted(() => ({
+  cancelOrder: vi.fn().mockResolvedValue(undefined),
+  parseBinanceError: vi.fn().mockReturnValue({}),
+  fetchOrder: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../src/services/binance.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
@@ -32,7 +55,7 @@ vi.mock('../src/services/binance.js', () => ({
       { asset: 'ETH', free: '1', locked: '0' },
     ],
   }),
-  fetchPairData: vi.fn().mockResolvedValue({ currentPrice: 100 }),
+  fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
   fetchMarketTimeseries: vi.fn().mockResolvedValue({ minute_60: [], hourly_24h: [], monthly_24m: [] }),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
@@ -43,7 +66,8 @@ vi.mock('../src/services/binance.js', () => ({
     minNotional: 0,
   }),
   cancelOrder,
-  parseBinanceError: vi.fn().mockReturnValue(null),
+  parseBinanceError,
+  fetchOrder,
 }));
 
 vi.mock('../src/services/indicators.js', () => ({
@@ -51,39 +75,239 @@ vi.mock('../src/services/indicators.js', () => ({
 }));
 
 vi.mock('../src/services/rebalance.js', () => ({
-  createRebalanceLimitOrder: vi.fn().mockResolvedValue(undefined),
+  createDecisionLimitOrders: vi.fn().mockResolvedValue(undefined),
 }));
 
-let reviewAgentPortfolio: (log: FastifyBaseLogger, agentId: string) => Promise<void>;
-
-beforeAll(async () => {
-  ({ reviewAgentPortfolio } = await import('../src/workflows/portfolio-review.js'));
-});
-
 describe('cleanup open orders', () => {
+  beforeEach(() => {
+    cancelOrder.mockReset();
+    cancelOrder.mockResolvedValue(undefined);
+    parseBinanceError.mockReset();
+    parseBinanceError.mockReturnValue({});
+    fetchOrder.mockReset();
+    fetchOrder.mockResolvedValue(undefined);
+  });
+
   it('cancels open orders before running agent', async () => {
-    await db.query('INSERT INTO users (id) VALUES ($1)', ['1']);
-    await db.query("INSERT INTO ai_api_keys (user_id, provider, api_key_enc) VALUES ($1, 'openai', $2)", ['1', 'enc']);
-    await db.query(
-      "INSERT INTO portfolio_workflow (id, user_id, model, status, name, risk, review_interval, agent_instructions, manual_rebalance) VALUES ($1, $2, 'gpt', 'active', 'A', 'low', '1h', 'inst', false)",
-      ['1', '1'],
-    );
-    await db.query(
-      "INSERT INTO portfolio_workflow_tokens (portfolio_workflow_id, token, min_allocation, position) VALUES ($1, 'BTC', 10, 1), ($1, 'ETH', 20, 2)",
-      ['1'],
-    );
-    const rr = await db.query(
-      "INSERT INTO agent_review_result (agent_id, log, rebalance, new_allocation, short_report) VALUES ($1, $2, true, 50, 's') RETURNING id",
-      ['1', 'log'],
-    );
-    await db.query(
-      "INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, 'open', $3, $4)",
-      ['1', JSON.stringify({ symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 }), rr.rows[0].id, '123'],
-    );
-    const log = { child: () => log, info: () => {}, error: () => {} } as unknown as FastifyBaseLogger;
-    await reviewAgentPortfolio(log, '1');
+    const userId = await insertUser('1');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: 'log',
+      rebalance: true,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: LimitOrderStatus.Open,
+      reviewResultId: rrId,
+      orderId: '123',
+    });
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent.id);
     expect(cancelOrder).toHaveBeenCalledTimes(1);
-    const { rows } = await db.query("SELECT status FROM limit_order WHERE order_id = '123'");
-    expect(rows[0].status).toBe('canceled');
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders[0].status).toBe(LimitOrderStatus.Canceled);
+  });
+
+  it('cancels multiple open orders in parallel', async () => {
+    const resolves: (() => void)[] = [];
+    cancelOrder.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolves.push(resolve);
+        }),
+    );
+
+    const userId = await insertUser('1');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: 'log',
+      rebalance: true,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: LimitOrderStatus.Open,
+      reviewResultId: rrId,
+      orderId: '123',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: LimitOrderStatus.Open,
+      reviewResultId: rrId,
+      orderId: '456',
+    });
+
+    const log = mockLogger();
+    const runPromise = reviewAgentPortfolio(log, agent.id);
+    await vi.waitUntil(() => cancelOrder.mock.calls.length === 2);
+    resolves.forEach((r) => r());
+    await runPromise;
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders.map((o) => ({ orderId: o.orderId, status: o.status }))).toEqual([
+      { orderId: '123', status: LimitOrderStatus.Canceled },
+      { orderId: '456', status: LimitOrderStatus.Canceled },
+    ]);
+  });
+
+  it('marks order filled when Binance reports unknown order with filled status', async () => {
+    cancelOrder.mockRejectedValueOnce(new Error('err'));
+    parseBinanceError.mockReturnValueOnce({ code: -2013 });
+    fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
+    const userId = await insertUser('1');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: 'log',
+      rebalance: true,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: LimitOrderStatus.Open,
+      reviewResultId: rrId,
+      orderId: '123',
+    });
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent.id);
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders[0].status).toBe(LimitOrderStatus.Filled);
+    expect(orders[0].cancellationReason).toBeNull();
+  });
+
+  it('marks order canceled when Binance reports unknown order with canceled status', async () => {
+    cancelOrder.mockRejectedValueOnce(new Error('err'));
+    parseBinanceError.mockReturnValueOnce({ code: -2013 });
+    fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
+    const userId = await insertUser('1');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: 'log',
+      rebalance: true,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: LimitOrderStatus.Open,
+      reviewResultId: rrId,
+      orderId: '123',
+    });
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent.id);
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders[0].status).toBe(LimitOrderStatus.Canceled);
+    expect(orders[0].cancellationReason).toBe('Could not fill within interval');
+  });
+
+  it('marks order filled when cancel returns FILLED', async () => {
+    cancelOrder.mockResolvedValueOnce({ status: 'FILLED' } as any);
+    const userId = await insertUser('2');
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: 'log',
+      rebalance: true,
+      shortReport: 's',
+    });
+    await insertLimitOrder({
+      userId,
+      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      status: LimitOrderStatus.Open,
+      reviewResultId: rrId,
+      orderId: '789',
+    });
+    const log = mockLogger();
+    await reviewAgentPortfolio(log, agent.id);
+    const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
+    expect(orders[0].status).toBe(LimitOrderStatus.Filled);
+    expect(orders[0].cancellationReason).toBeNull();
   });
 });

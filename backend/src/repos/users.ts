@@ -1,52 +1,56 @@
 import { db } from '../db/index.js';
 import { encrypt, decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
+import type {
+  UserAuthInfo,
+  UserDetails,
+  UserDetailsWithId,
+  UserListEntry,
+} from './users.types.js';
 
-export interface UserRow {
-  totp_secret?: string;
-  is_totp_enabled?: boolean;
-  role: string;
-  is_enabled: boolean;
-}
-
-export async function getUser(id: string) {
+export async function getUser(id: string): Promise<UserDetails | undefined> {
   const { rows } = await db.query(
     'SELECT totp_secret_enc, is_totp_enabled, role, is_enabled FROM users WHERE id = $1',
     [id],
   );
-  const row = rows[0] as {
-    totp_secret_enc?: string;
-    is_totp_enabled?: boolean;
-    role: string;
-    is_enabled: boolean;
-  } | undefined;
+  const row = rows[0];
   if (!row) return undefined;
-  return {
-    totp_secret: row.totp_secret_enc
-      ? decrypt(row.totp_secret_enc, env.KEY_PASSWORD)
-      : undefined,
-    is_totp_enabled: row.is_totp_enabled,
-    role: row.role,
-    is_enabled: row.is_enabled,
+  const entity = convertKeysToCamelCase(row) as {
+    totpSecretEnc?: string;
+    isTotpEnabled?: boolean;
+    role: string;
+    isEnabled: boolean;
   };
+  const result: UserDetails = {
+    totpSecret: entity.totpSecretEnc
+      ? decrypt(entity.totpSecretEnc, env.KEY_PASSWORD)
+      : undefined,
+    isTotpEnabled: entity.isTotpEnabled,
+    role: entity.role,
+    isEnabled: entity.isEnabled,
+  };
+  return result;
 }
 
-export async function getUserAuthInfo(id: string) {
+export async function getUserAuthInfo(id: string): Promise<UserAuthInfo | undefined> {
   const { rows } = await db.query(
     'SELECT email_enc, role, is_enabled FROM users WHERE id = $1',
     [id],
   );
-  const row = rows[0] as {
-    email_enc?: string;
-    role: string;
-    is_enabled: boolean;
-  } | undefined;
+  const row = rows[0];
   if (!row) return undefined;
-  return {
-    email: row.email_enc ? decrypt(row.email_enc, env.KEY_PASSWORD) : undefined,
-    role: row.role,
-    is_enabled: row.is_enabled,
+  const entity = convertKeysToCamelCase(row) as {
+    emailEnc?: string;
+    role: string;
+    isEnabled: boolean;
   };
+  const result: UserAuthInfo = {
+    email: entity.emailEnc ? decrypt(entity.emailEnc, env.KEY_PASSWORD) : undefined,
+    role: entity.role,
+    isEnabled: entity.isEnabled,
+  };
+  return result;
 }
 
 export async function insertUser(emailEnc: string | null): Promise<string> {
@@ -61,7 +65,7 @@ export async function setUserEmail(id: string, emailEnc: string): Promise<void> 
   await db.query('UPDATE users SET email_enc = $1 WHERE id = $2', [emailEnc, id]);
 }
 
-export async function listUsers() {
+export async function listUsers(): Promise<UserListEntry[]> {
   const { rows } = await db.query(
     "SELECT u.id, u.role, u.is_enabled, u.email_enc, u.created_at, " +
       "(ak.id IS NOT NULL OR oak.id IS NOT NULL) AS has_ai_key, " +
@@ -72,15 +76,9 @@ export async function listUsers() {
       "LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' " +
       "LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance'",
   );
-  return rows as {
-    id: string;
-    role: string;
-    is_enabled: boolean;
-    email_enc?: string;
-    created_at: string;
-    has_ai_key: boolean;
-    has_binance_key: boolean;
-  }[];
+  return rows.map((row) =>
+    convertKeysToCamelCase(row) as UserListEntry,
+  );
 }
 
 export async function setUserEnabled(id: string, enabled: boolean): Promise<void> {
@@ -92,8 +90,10 @@ export async function getUserTotpStatus(id: string) {
     'SELECT is_totp_enabled FROM users WHERE id = $1',
     [id],
   );
-  const row = rows[0] as { is_totp_enabled?: boolean } | undefined;
-  return !!row?.is_totp_enabled;
+  const row = rows[0];
+  if (!row) return false;
+  const entity = convertKeysToCamelCase(row) as { isTotpEnabled?: boolean };
+  return !!entity.isTotpEnabled;
 }
 
 export async function setUserTotpSecret(id: string, secret: string): Promise<void> {
@@ -109,9 +109,11 @@ export async function getUserTotpSecret(id: string) {
     'SELECT totp_secret_enc FROM users WHERE id = $1',
     [id],
   );
-  const row = rows[0] as { totp_secret_enc?: string } | undefined;
-  if (!row?.totp_secret_enc) return undefined;
-  return decrypt(row.totp_secret_enc, env.KEY_PASSWORD);
+  const row = rows[0];
+  if (!row) return undefined;
+  const entity = convertKeysToCamelCase(row) as { totpSecretEnc?: string };
+  if (!entity.totpSecretEnc) return undefined;
+  return decrypt(entity.totpSecretEnc, env.KEY_PASSWORD);
 }
 
 export async function clearUserTotp(id: string): Promise<void> {
@@ -121,28 +123,30 @@ export async function clearUserTotp(id: string): Promise<void> {
   );
 }
 
-export async function findUserByEmail(email: string) {
+export async function findUserByEmail(email: string): Promise<UserDetailsWithId | undefined> {
   const { rows } = await db.query(
     'SELECT id, role, is_enabled, totp_secret_enc, is_totp_enabled, email_enc FROM users',
   );
-  for (const row of rows as {
-    id: string;
-    role: string;
-    is_enabled: boolean;
-    totp_secret_enc?: string;
-    is_totp_enabled?: boolean;
-    email_enc?: string;
-  }[]) {
-    if (row.email_enc && decrypt(row.email_enc, env.KEY_PASSWORD) === email) {
-      return {
+  for (const rawRow of rows) {
+    const row = convertKeysToCamelCase(rawRow) as {
+      id: string;
+      role: string;
+      isEnabled: boolean;
+      totpSecretEnc?: string;
+      isTotpEnabled?: boolean;
+      emailEnc?: string;
+    };
+    if (row.emailEnc && decrypt(row.emailEnc, env.KEY_PASSWORD) === email) {
+      const result: UserDetailsWithId = {
         id: row.id,
         role: row.role,
-        is_enabled: row.is_enabled,
-        totp_secret: row.totp_secret_enc
-          ? decrypt(row.totp_secret_enc, env.KEY_PASSWORD)
+        isEnabled: row.isEnabled,
+        totpSecret: row.totpSecretEnc
+          ? decrypt(row.totpSecretEnc, env.KEY_PASSWORD)
           : undefined,
-        is_totp_enabled: row.is_totp_enabled,
+        isTotpEnabled: row.isTotpEnabled,
       };
+      return result;
     }
   }
   return undefined;

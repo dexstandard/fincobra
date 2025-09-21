@@ -3,6 +3,13 @@
 When a task touches only the backend or the frontend, scan only the
 relevant directory to save time.
 
+### General
+- Pin all `package.json` dependencies to exact versions. Do not use `^` or `~` ranges.
+- Typing rules:
+  - For each feature, put the shared types in a file named `[feature].types.ts` in the same directory as the main code.
+  - When a type is used only inside a single file, define the interface at the top of that file.
+  - Use `interface` declarations for object shapes instead of `type` aliases.
+
 ## Backend
 
 ### Folder overview
@@ -14,20 +21,13 @@ relevant directory to save time.
 - `/backend/src/db` keeps `schema.sql`, migrations, and DB helpers.
 - `/backend/test` contains backend tests.
 
-### Scheduler Flow
-cron → load users → plan action → simulate → execute → record result.
-
-### Security Model
-Trades execute on Binance using encrypted user API keys.
-Only allowlisted token pairs are traded.
-
 ### Data Model
 Tables:
 - `users` — accounts and encrypted API keys.
 - `limit_order` — records of performed trades.
-- `agents` — user-configured trading bots.
-- `agent_review_raw_log` — prompt/response history per agent.
-- `agent_review_result` — outcomes and rebalances.
+- `portfolio_workflow` — user-configured trading workflows.
+- `review_raw_log` — prompt/response history per workflow.
+- `review_result` — outcomes and rebalances.
 
 ### Config
 Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
@@ -36,17 +36,19 @@ Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
   - IMPORTANT: AGENT MUST RUN LOCAL PG SERVER TO BE ABLE TO RUN TEST!
   - Check `psql` or `pg_isready` to confirm PostgreSQL is installed; install it if missing.
   - Run tests with
-    `DATABASE_URL=postgres://postgres:postgres@localhost:5432/promptswap_test npm --prefix backend test`.
+    `DATABASE_URL=postgres://postgres:postgres@localhost:5432/fincobra_test npm --prefix backend test`.
   - `npm run build`
 
 ### Guidelines
-- Apply schema changes using SQL files in `/backend/src/db/migrations` and run `npm --prefix backend run migrate`.
+- Add schema changes using SQL files in `/backend/src/db/migrations`.
 - Do not modify `schema.sql` when changing the schema.
 - The server automatically applies pending migrations on startup.
 - Cover backend code, especially API endpoints, with sufficient tests.
 - New API endpoints should use the `RATE_LIMITS` presets for rate limiting.
-- Use structured logging and include `userId`, `agentId`, and `execLogId` when available.
+- Use structured logging and include `userId`, `workflowId`, and `execLogId` when available.
 - Break down complex functions into reusable utilities and check for existing helpers before adding new ones.
+- Reuse existing repository functions or test helpers before writing raw SQL. Add new
+  helpers under `backend/test/repos` when necessary.
 - All API errors must use `errorResponse` and return `{ "error": "message" }`. Parse upstream service errors (e.g. Binance) into user-friendly messages.
 - When adding a new dependency, run `npm --prefix backend audit --audit-level=high` to check for vulnerabilities.
 
@@ -58,12 +60,6 @@ Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
 - `/frontend/src/routes` defines route components.
 - `/frontend/src/lib` holds shared utilities.
 - `/frontend/public` serves static assets.
-
-### Config
-Environment variables:
-- `VITE_API_BASE` — override API base URL.
-- `VITE_USE_MOCKS` — toggle mock API responses.
-- `VITE_GOOGLE_CLIENT_ID` — OAuth client ID.
 
 ### Testing
 - `npm --prefix frontend run lint`

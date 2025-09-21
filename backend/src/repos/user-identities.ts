@@ -1,37 +1,36 @@
 import { db } from '../db/index.js';
 import { decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
+import type { UserIdentityDetails } from './user-identities.types.js';
 
-export interface UserIdentityRow {
-  id: string;
-  role: string;
-  is_enabled: boolean;
-  totp_secret?: string;
-  is_totp_enabled?: boolean;
-}
-
-export async function findUserByIdentity(provider: string, sub: string) {
+export async function findUserByIdentity(
+  provider: string,
+  sub: string,
+): Promise<UserIdentityDetails | undefined> {
   const { rows } = await db.query(
     'SELECT u.id, u.role, u.is_enabled, u.totp_secret_enc, u.is_totp_enabled FROM user_identities ui JOIN users u ON ui.user_id = u.id WHERE ui.provider = $1 AND ui.sub = $2',
     [provider, sub],
   );
-  const row = rows[0] as {
+  const row = rows[0];
+  if (!row) return undefined;
+  const entity = convertKeysToCamelCase(row) as {
     id: string;
     role: string;
-    is_enabled: boolean;
-    totp_secret_enc?: string;
-    is_totp_enabled?: boolean;
-  } | undefined;
-  if (!row) return undefined;
-  return {
-    id: row.id,
-    role: row.role,
-    is_enabled: row.is_enabled,
-    totp_secret: row.totp_secret_enc
-      ? decrypt(row.totp_secret_enc, env.KEY_PASSWORD)
+    isEnabled: boolean;
+    totpSecretEnc?: string;
+    isTotpEnabled?: boolean;
+  };
+  const identity: UserIdentityDetails = {
+    id: entity.id,
+    role: entity.role,
+    isEnabled: entity.isEnabled,
+    totpSecret: entity.totpSecretEnc
+      ? decrypt(entity.totpSecretEnc, env.KEY_PASSWORD)
       : undefined,
-    is_totp_enabled: row.is_totp_enabled,
-  } as UserIdentityRow;
+    isTotpEnabled: entity.isTotpEnabled,
+  };
+  return identity;
 }
 
 export async function insertUserIdentity(

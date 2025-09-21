@@ -5,7 +5,8 @@ import { env } from '../src/util/env.js';
 import { insertAdminUser, insertUser } from './repos/users.js';
 import { getUser } from '../src/repos/users.js';
 import { authCookies } from './helpers.js';
-import { setAiKey, setBinanceKey } from '../src/repos/api-keys.js';
+import { setAiKey } from '../src/repos/ai-api-key.js';
+import { setBinanceKey } from '../src/repos/exchange-api-keys.js';
 
 describe('admin user routes', () => {
   it('lists users for admin only', async () => {
@@ -19,12 +20,15 @@ describe('admin user routes', () => {
       encrypt('user1@example.com', env.KEY_PASSWORD),
     );
 
-    await setAiKey(userId, encrypt('openai-key', env.KEY_PASSWORD));
-    await setBinanceKey(
+    await setAiKey({
       userId,
-      encrypt('binance-key', env.KEY_PASSWORD),
-      encrypt('binance-secret', env.KEY_PASSWORD),
-    );
+      apiKeyEnc: encrypt('openai-key', env.KEY_PASSWORD),
+    });
+    await setBinanceKey({
+      userId,
+      apiKeyEnc: encrypt('binance-key', env.KEY_PASSWORD),
+      apiSecretEnc: encrypt('binance-secret', env.KEY_PASSWORD),
+    });
 
     const resForbidden = await app.inject({
       method: 'GET',
@@ -63,7 +67,7 @@ describe('admin user routes', () => {
     });
     expect(resDisable.statusCode).toBe(200);
     let row = await getUser(userId);
-    expect(row?.is_enabled).toBe(false);
+    expect(row?.isEnabled).toBe(false);
 
     const resEnable = await app.inject({
       method: 'POST',
@@ -72,7 +76,7 @@ describe('admin user routes', () => {
     });
     expect(resEnable.statusCode).toBe(200);
     row = await getUser(userId);
-    expect(row?.is_enabled).toBe(true);
+    expect(row?.isEnabled).toBe(true);
 
     await app.close();
   });

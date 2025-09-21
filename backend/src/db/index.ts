@@ -9,6 +9,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const db = new Pool({ connectionString: env.DATABASE_URL });
 
+export async function withTransaction<T>(
+  fn: (client: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function migrate() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   await db.query(schema);

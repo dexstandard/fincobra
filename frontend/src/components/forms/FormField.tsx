@@ -6,6 +6,7 @@ interface Props {
   htmlFor?: string;
   tooltip?: ReactNode;
   className?: string;
+  labelClassName?: string;
   children: ReactNode;
 }
 
@@ -14,13 +15,14 @@ export default function FormField({
   htmlFor,
   tooltip,
   className = '',
+  labelClassName,
   children,
 }: Props) {
   return (
     <div className={className}>
       {label && (
         <label
-          className="block text-xs md:text-sm font-medium mb-1"
+          className={labelClassName || 'block text-xs md:text-sm font-medium mb-1'}
           htmlFor={htmlFor}
         >
           <span className="inline-flex items-center">

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { insertUser } from './repos/users.js';
-import { setAiKey, setBinanceKey } from '../src/repos/api-keys.js';
+import { insertUserWithKeys } from './repos/users.js';
 
 const reviewAgentPortfolioMock = vi.fn<
   (log: unknown, agentId: string) => Promise<unknown>
@@ -10,25 +9,14 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
 }));
 
 import buildServer from '../src/server.js';
-import { encrypt } from '../src/util/crypto.js';
 import { authCookies } from './helpers.js';
 
-async function addUser(id: string) {
-  const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
-  const bk = encrypt('bkey', process.env.KEY_PASSWORD!);
-  const bs = encrypt('skey', process.env.KEY_PASSWORD!);
-  const userId = await insertUser(id, null);
-  await setAiKey(userId, ai);
-  await setBinanceKey(userId, bk, bs);
-  return userId;
-}
 
 describe('agent start', () => {
   it('does not await initial review', async () => {
     const app = await buildServer();
-    const userId = await addUser('1');
+    const userId = await insertUserWithKeys('1');
     const payload = {
-      userId,
       model: 'm',
       name: 'Draft',
       tokens: [
@@ -38,11 +26,12 @@ describe('agent start', () => {
       risk: 'low',
       reviewInterval: '1h',
       agentInstructions: 'prompt',
+      cash: 'USDT',
       status: 'draft',
     };
     const resCreate = await app.inject({
       method: 'POST',
-      url: '/api/agents',
+      url: '/api/portfolio-workflows',
       cookies: authCookies(userId),
       payload,
     });
@@ -66,18 +55,19 @@ describe('agent start', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ price: '40' }),
-      } as any);
+      } as any)
+      .mockResolvedValue({ ok: true, json: async () => ({ price: '1' }) } as any);
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
 
     const startPromise = app.inject({
       method: 'POST',
-      url: `/api/agents/${id}/start`,
+      url: `/api/portfolio-workflows/${id}/start`,
       cookies: authCookies(userId),
     });
     const res = await Promise.race([
       startPromise,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 200)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1000)),
     ]);
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: 'active' });

@@ -4,7 +4,7 @@ import {
   findIdenticalDraftAgent,
   findActiveTokenConflicts,
 } from '../repos/portfolio-workflow.js';
-import { getAiKeyRow } from '../repos/api-keys.js';
+import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
 import {
   errorResponse,
   lengthMessage,
@@ -22,14 +22,15 @@ export enum AgentStatus {
 }
 
 export interface AgentInput {
-  userId: string;
   model: string;
   name: string;
+  cash: string;
   tokens: { token: string; minAllocation: number }[];
   risk: string;
   reviewInterval: string;
   agentInstructions: string;
   manualRebalance: boolean;
+  useEarn: boolean;
   status: AgentStatus;
 }
 
@@ -59,13 +60,18 @@ async function validateAgentInput(
   body: AgentInput,
   id?: string,
 ): Promise<ValidationErr | null> {
-  if (body.userId !== userId) {
-    log.error('user mismatch');
-    return { code: 403, body: errorResponse(ERROR_MESSAGES.forbidden) };
+  body.cash = (body.cash ?? '').toUpperCase();
+  if (!['USDT', 'USDC'].includes(body.cash)) {
+    log.error('invalid cash token');
+    return { code: 400, body: errorResponse('invalid cash token') };
   }
-  if (body.tokens.length !== 2) {
+  if (body.tokens.length < 1 || body.tokens.length > 4) {
     log.error('invalid tokens');
-    return { code: 400, body: errorResponse('exactly two tokens required') };
+    return { code: 400, body: errorResponse('invalid tokens') };
+  }
+  if (body.tokens.some((t) => t.token === body.cash)) {
+    log.error('cash token in positions');
+    return { code: 400, body: errorResponse('cash token in positions') };
   }
   if (body.status === AgentStatus.Retired) {
     log.error('invalid status');
@@ -80,8 +86,11 @@ async function validateAgentInput(
     log.error('model too long');
     return { code: 400, body: errorResponse(lengthMessage('model', 50)) };
   } else {
-    const keyRow = await getAiKeyRow(body.userId);
-    if (!keyRow?.own && keyRow?.shared?.model && body.model !== keyRow.shared.model) {
+    const [ownKey, sharedKey] = await Promise.all([
+      getAiKey(userId),
+      getSharedAiKey(userId),
+    ]);
+    if (!ownKey && sharedKey?.model && body.model !== sharedKey.model) {
       log.error('model not allowed');
       return { code: 400, body: errorResponse('model not allowed') };
     }
@@ -89,14 +98,16 @@ async function validateAgentInput(
   if (body.status === AgentStatus.Draft) {
     const dupDraft = await findIdenticalDraftAgent(
       {
-        userId: body.userId,
+        userId,
         model: body.model,
         name: body.name,
+        cashToken: body.cash,
         tokens: body.tokens,
         risk: body.risk,
         reviewInterval: body.reviewInterval,
         agentInstructions: body.agentInstructions,
         manualRebalance: body.manualRebalance,
+        useEarn: body.useEarn,
       },
       id,
     );
@@ -112,8 +123,8 @@ async function validateAgentInput(
   } else {
     const conflict = await validateTokenConflicts(
       log,
-      body.userId,
-      body.tokens.map((t) => t.token),
+      userId,
+      [body.cash, ...body.tokens.map((t) => t.token)],
       id,
     );
     if (conflict) return conflict;
@@ -127,9 +138,9 @@ export async function ensureApiKeys(
 ): Promise<ValidationErr | null> {
   const userRow = await getUserApiKeys(userId);
   if (
-    !userRow?.ai_api_key_enc ||
-    !userRow.binance_api_key_enc ||
-    !userRow.binance_api_secret_enc
+    !userRow?.aiApiKeyEnc ||
+    !userRow.binanceApiKeyEnc ||
+    !userRow.binanceApiSecretEnc
   ) {
     log.error('missing api keys');
     return { code: 400, body: errorResponse('missing api keys') };
@@ -163,6 +174,7 @@ export async function prepareAgentForUpsert(
 ): Promise<{ body: AgentInput; startBalance: number | null } | ValidationErr> {
   try {
     body.manualRebalance = !!body.manualRebalance;
+    body.useEarn = body.useEarn !== false;
     body.tokens = validateAllocations(body.tokens);
   } catch {
     log.error('invalid allocations');
@@ -172,12 +184,12 @@ export async function prepareAgentForUpsert(
   if (err) return err;
   let startBalance: number | null = null;
   if (body.status === AgentStatus.Active) {
-    const keyErr = await ensureApiKeys(log, body.userId);
+    const keyErr = await ensureApiKeys(log, userId);
     if (keyErr) return keyErr;
     const bal = await getStartBalance(
       log,
       userId,
-      body.tokens.map((t) => t.token),
+      [body.cash, ...body.tokens.map((t) => t.token)],
     );
     if (typeof bal === 'number') startBalance = bal;
     else return bal;

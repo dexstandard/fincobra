@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import buildServer from '../src/server.js';
 import { parseExecLog } from '../src/util/parse-exec-log.js';
-import { insertReviewResult } from '../src/repos/agent-review-result.js';
+import { insertReviewResult } from '../src/repos/review-result.js';
 import { insertUser } from './repos/users.js';
 import { insertAgent } from './repos/portfolio-workflow.js';
-import { insertReviewRawLog } from './repos/agent-review-raw-log.js';
+import { insertReviewRawLog } from './repos/review-raw-log.js';
+import { insertLimitOrder, getLimitOrder, getLimitOrdersByReviewResult } from './repos/limit-orders.js';
+import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { db } from '../src/db/index.js';
 import * as binance from '../src/services/binance.js';
 import { authCookies } from './helpers.js';
@@ -30,21 +30,19 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    await db.query(
-      'INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, $3, $4, $5)',
-      [
-        user1Id,
-        JSON.stringify({ side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' }),
-        'open',
-        reviewResultId,
-        '1',
-      ],
-    );
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId: user1Id,
+      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      status: LimitOrderStatus.Open,
+      reviewResultId,
+      orderId: '1',
+    });
     let res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/orders`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders`,
       cookies: authCookies(user1Id),
     });
     expect(res.statusCode).toBe(200);
@@ -55,14 +53,15 @@ describe('agent exec log routes', () => {
           side: 'BUY',
           quantity: 1,
           price: 100,
-          status: 'open',
+          symbol: 'BTCETH',
+          status: LimitOrderStatus.Open,
           createdAt: expect.any(Number),
         },
       ],
     });
     res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/orders`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders`,
       cookies: authCookies(user2Id),
     });
     expect(res.statusCode).toBe(403);
@@ -87,22 +86,20 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioId: agent.id, log: '' });
-    await db.query(
-      'INSERT INTO limit_order (user_id, planned_json, status, review_result_id, order_id) VALUES ($1, $2, $3, $4, $5)',
-      [
-        user1Id,
-        JSON.stringify({ side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' }),
-        'open',
-        reviewResultId,
-        '2',
-      ],
-    );
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId: user1Id,
+      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      status: LimitOrderStatus.Open,
+      reviewResultId,
+      orderId: '2',
+    });
     const spy = vi.spyOn(binance, 'cancelOrder').mockResolvedValue({} as any);
     let res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/orders/2/cancel`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/2/cancel`,
       cookies: authCookies(user1Id),
     });
     expect(res.statusCode).toBe(200);
@@ -110,16 +107,59 @@ describe('agent exec log routes', () => {
       symbol: 'BTCETH',
       orderId: 2,
     });
-    let row = await db.query('SELECT status FROM limit_order WHERE order_id=$1', ['2']);
-    expect(row.rows[0].status).toBe('canceled');
+    let row = await getLimitOrder('2');
+    expect(row?.status).toBe(LimitOrderStatus.Canceled);
+    expect(row?.cancellation_reason).toBe('Canceled by user');
     res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/orders/2/cancel`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/2/cancel`,
       cookies: authCookies(user2Id),
     });
     expect(res.statusCode).toBe(403);
-    row = await db.query('SELECT status FROM limit_order WHERE order_id=$1', ['2']);
-    expect(row.rows[0].status).toBe('canceled');
+    row = await getLimitOrder('2');
+    expect(row?.status).toBe(LimitOrderStatus.Canceled);
+    expect(row?.cancellation_reason).toBe('Canceled by user');
+    spy.mockRestore();
+    await app.close();
+  });
+
+  it('marks order filled when cancel returns FILLED', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('40');
+    const agent = await insertAgent({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      name: 'A',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    await insertLimitOrder({
+      userId,
+      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      status: LimitOrderStatus.Open,
+      reviewResultId,
+      orderId: '3',
+    });
+    const spy = vi.spyOn(binance, 'cancelOrder').mockResolvedValue({ status: 'FILLED' } as any);
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/3/cancel`,
+      cookies: authCookies(userId),
+    });
+    expect(res.statusCode).toBe(200);
+    const row = await getLimitOrder('3');
+    expect(row?.status).toBe(LimitOrderStatus.Filled);
+    expect(row?.cancellation_reason).toBeNull();
     spy.mockRestore();
     await app.close();
   });
@@ -142,27 +182,28 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
     const rawId = await insertReviewRawLog({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       prompt: { a: 1 },
       response: 'resp',
     });
     const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
+      portfolioWorkflowId: agent.id,
       log: 'log',
       rawLogId: rawId,
     });
     let res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/prompt`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/prompt`,
       cookies: authCookies(user1Id),
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ prompt: { a: 1 } });
     res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/prompt`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/prompt`,
       cookies: authCookies(user2Id),
     });
     expect(res.statusCode).toBe(403);
@@ -187,19 +228,19 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
     const agentId = agent.id;
 
     for (let i = 0; i < 3; i++) {
-      await insertReviewRawLog({ portfolioId: agentId, prompt: `prompt-${i}`, response: `log-${i}` });
+      await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: `prompt-${i}`, response: `log-${i}` });
       const parsed = parseExecLog(`log-${i}`);
       await insertReviewResult({
-        portfolioId: agentId,
-        log: parsed.text,
+        portfolioWorkflowId: agentId,
+        log: parsed.response ? JSON.stringify(parsed.response) : parsed.text,
         ...(parsed.response
           ? {
-              rebalance: parsed.response.rebalance,
-              newAllocation: parsed.response.newAllocation,
+              rebalance: parsed.response.orders.length > 0,
               shortReport: parsed.response.shortReport,
             }
           : {}),
@@ -209,7 +250,7 @@ describe('agent exec log routes', () => {
 
     let res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agentId}/exec-log?page=1&pageSize=2`,
+      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=2`,
       cookies: authCookies(user1Id),
     });
     expect(res.statusCode).toBe(200);
@@ -218,7 +259,7 @@ describe('agent exec log routes', () => {
 
     res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agentId}/exec-log?page=1&pageSize=2`,
+      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=2`,
       cookies: authCookies(user2Id),
     });
     expect(res.statusCode).toBe(403);
@@ -244,32 +285,41 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
     const agentId = agent.id;
 
-    const aiLog = readFileSync(
-      join(__dirname, 'fixtures/real-openai-log.json'),
-      'utf8',
-    );
+    const aiLog = JSON.stringify({
+      object: 'response',
+      output: [
+        {
+          id: 'msg_1',
+          type: 'message',
+          status: 'completed',
+          role: 'assistant',
+          content: [
+            {
+              type: 'output_text',
+              text: '{"result":{"orders":[{"pair":"BTCUSDT","token":"BTC","side":"SELL","quantity":1}],"shortReport":"s"}}',
+            },
+          ],
+        },
+      ],
+    });
 
-      await insertReviewRawLog({ portfolioId: agentId, prompt: 'p', response: aiLog });
+    await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: 'p', response: aiLog });
     const parsedAi = parseExecLog(aiLog);
     await insertReviewResult({
-      portfolioId: agentId,
-      log: parsedAi.text,
-      ...(parsedAi.response
-        ? {
-            rebalance: parsedAi.response.rebalance,
-            newAllocation: parsedAi.response.newAllocation,
-            shortReport: parsedAi.response.shortReport,
-          }
-        : {}),
+      portfolioWorkflowId: agentId,
+      log: JSON.stringify(parsedAi.response),
+      rebalance: true,
+      shortReport: parsedAi.response?.shortReport,
       ...(parsedAi.error ? { error: parsedAi.error } : {}),
     });
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agentId}/exec-log?page=1&pageSize=10`,
+      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=10`,
       cookies: authCookies(userId),
     });
 
@@ -277,15 +327,16 @@ describe('agent exec log routes', () => {
     const body = res.json();
 
     expect(typeof body.items[0].log).toBe('string');
-    expect(body.items[0].log).toContain('"result"');
-    expect(body.items[0].log).toContain('"rebalance"');
+    expect(body.items[0].log).toContain('orders');
 
-    expect(body.items[0].response).toMatchObject({
-      rebalance: true,
-      newAllocation: 70, // matches the provided fixture
+    const parsedLog = JSON.parse(body.items[0].log);
+    expect(parsedLog).toMatchObject({
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
+      shortReport: 's',
     });
-    expect(typeof body.items[0].response.shortReport).toBe('string');
-    expect(body.items[0].response.shortReport.length).toBeGreaterThan(0);
+    expect(body.items[0].response.orders).toEqual([
+      { pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 },
+    ]);
 
     await app.close();
   });
@@ -307,18 +358,18 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
     const agentId = agent.id;
     const entry = JSON.stringify({ prompt: { instructions: 'inst' }, response: 'ok' });
-    await insertReviewRawLog({ portfolioId: agentId, prompt: 'p', response: entry });
+    await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: 'p', response: entry });
     const parsedP = parseExecLog(entry);
     await insertReviewResult({
-      portfolioId: agentId,
-      log: parsedP.text,
+      portfolioWorkflowId: agentId,
+      log: parsedP.response ? JSON.stringify(parsedP.response) : parsedP.text,
       ...(parsedP.response
         ? {
-            rebalance: parsedP.response.rebalance,
-            newAllocation: parsedP.response.newAllocation,
+            rebalance: parsedP.response.orders.length > 0,
             shortReport: parsedP.response.shortReport,
           }
         : {}),
@@ -326,7 +377,7 @@ describe('agent exec log routes', () => {
     });
     const res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agentId}/exec-log?page=1&pageSize=10`,
+      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=10`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -352,20 +403,30 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: true,
+      useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
-      log: '',
-      rebalance: true,
-      newAllocation: 60,
-    });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '1', locked: '0' },
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCETH',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.5,
+          limitPrice: 99.9,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
       ],
-    } as any);
+      shortReport: 's',
+    } as const;
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: JSON.stringify(decision),
+      rebalance: true,
+      shortReport: 's',
+    });
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+      symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
@@ -379,19 +440,19 @@ describe('agent exec log routes', () => {
     vi.spyOn(binance, 'createLimitOrder').mockResolvedValue({ orderId: 1 } as any);
     let res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/rebalance`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(201);
-    const { rows } = await db.query(
-      'SELECT * FROM limit_order WHERE review_result_id = $1',
-      [reviewResultId],
-    );
+    const rows = await getLimitOrdersByReviewResult(reviewResultId);
     expect(rows).toHaveLength(1);
-    expect(JSON.parse(rows[0].planned_json)).toMatchObject({ price: 99.9 });
+    expect(JSON.parse(rows[0].planned_json)).toMatchObject({
+      price: 99.9,
+      manuallyEdited: false,
+    });
     res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/rebalance`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);
@@ -416,80 +477,32 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: true,
+      useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
-      log: '',
-      rebalance: true,
-      newAllocation: 50,
-    });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '0.9999', locked: '0' },
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.0001,
+          limitPrice: 100,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
       ],
-    } as any);
+      shortReport: 's',
+    } as const;
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: JSON.stringify(decision),
+      rebalance: true,
+      shortReport: 's',
+    });
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+      symbol: 'BTCUSDT',
       currentPrice: 100,
     } as any);
-    vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
-      symbol: 'BTCETH',
-      baseAsset: 'BTC',
-      quoteAsset: 'ETH',
-      quantityPrecision: 8,
-      pricePrecision: 8,
-      minNotional: 0,
-    } as any);
-    const spy = vi
-      .spyOn(binance, 'createLimitOrder')
-      .mockResolvedValue({ orderId: 1 } as any);
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/rebalance`,
-      cookies: authCookies(userId),
-    });
-    expect(res.statusCode).toBe(400);
-    const { rows } = await db.query(
-      'SELECT * FROM limit_order WHERE review_result_id = $1',
-      [reviewResultId],
-    );
-    expect(rows).toHaveLength(0);
-    expect(spy).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
-    await app.close();
-  });
-
-  it('rejects manual rebalance order below exchange minimum', async () => {
-    const app = await buildServer();
-    const userId = await insertUser('61');
-    const agent = await insertAgent({
-      userId,
-      model: 'gpt',
-      status: 'active',
-      startBalance: null,
-      name: 'A',
-      tokens: [
-        { token: 'BTC', minAllocation: 10 },
-        { token: 'USDT', minAllocation: 20 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: true,
-    });
-    const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
-      log: '',
-      rebalance: true,
-      newAllocation: 50,
-    });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '0.95', locked: '0' },
-        { asset: 'USDT', free: '105', locked: '0' },
-      ],
-    } as any);
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({ currentPrice: 100 } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -498,21 +511,17 @@ describe('agent exec log routes', () => {
       pricePrecision: 8,
       minNotional: 10,
     } as any);
-    const spy = vi
-      .spyOn(binance, 'createLimitOrder')
-      .mockResolvedValue({ orderId: 1 } as any);
     const res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/rebalance`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);
-    const { rows } = await db.query(
-      'SELECT * FROM limit_order WHERE review_result_id = $1',
-      [reviewResultId],
-    );
-    expect(rows).toHaveLength(0);
-    expect(spy).not.toHaveBeenCalled();
+    expect(res.json()).toEqual({ error: 'order below min notional' });
+    const rows = await getLimitOrdersByReviewResult(reviewResultId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
+    expect(rows[0].cancellation_reason).toBe('order below min notional');
     vi.restoreAllMocks();
     await app.close();
   });
@@ -534,33 +543,31 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: true,
+      useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
-      log: '',
-      rebalance: true,
-      newAllocation: 60,
-    });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '1', locked: '0' },
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCETH',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.2,
+          limitPrice: 99.9,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
       ],
-    } as any);
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
-      currentPrice: 100,
-    } as any);
-    vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
-      symbol: 'BTCETH',
-      baseAsset: 'BTC',
-      quoteAsset: 'ETH',
-      quantityPrecision: 8,
-      pricePrecision: 8,
-      minNotional: 0,
-    } as any);
+      shortReport: 's',
+    } as const;
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: JSON.stringify(decision),
+      rebalance: true,
+      shortReport: 's',
+    });
     const res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/rebalance/preview`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance/preview`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -570,7 +577,6 @@ describe('agent exec log routes', () => {
       quantity: 0.2,
       price: 99.9,
     });
-    vi.restoreAllMocks();
     await app.close();
   });
 
@@ -591,20 +597,30 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: true,
+      useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({
-      portfolioId: agent.id,
-      log: '',
-      rebalance: true,
-      newAllocation: 60,
-    });
-    vi.spyOn(binance, 'fetchAccount').mockResolvedValue({
-      balances: [
-        { asset: 'BTC', free: '1', locked: '0' },
-        { asset: 'ETH', free: '1', locked: '0' },
+    const decision = {
+      orders: [
+        {
+          pair: 'BTCETH',
+          token: 'BTC',
+          side: 'BUY',
+          quantity: 0.5,
+          limitPrice: 99.9,
+          basePrice: 100,
+          maxPriceDivergencePct: 0.05,
+        },
       ],
-    } as any);
+      shortReport: 's',
+    } as const;
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: JSON.stringify(decision),
+      rebalance: true,
+      shortReport: 's',
+    });
     vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+      symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
     vi.spyOn(binance, 'fetchPairInfo').mockResolvedValue({
@@ -622,13 +638,30 @@ describe('agent exec log routes', () => {
     );
     const res = await app.inject({
       method: 'POST',
-      url: `/api/agents/${agent.id}/exec-log/${reviewResultId}/rebalance`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
       error: 'Invalid API-key, IP, or permissions for action.',
     });
+    const rows = await getLimitOrdersByReviewResult(reviewResultId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
+    expect(rows[0].cancellation_reason).toBe(
+      'Invalid API-key, IP, or permissions for action.',
+    );
+    const res2 = await app.inject({
+      method: 'GET',
+      url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders`,
+      cookies: authCookies(userId),
+    });
+    expect(res2.statusCode).toBe(200);
+    const body = res2.json();
+    expect(body.orders).toHaveLength(1);
+    expect(body.orders[0].cancellationReason).toBe(
+      'Invalid API-key, IP, or permissions for action.',
+    );
     vi.restoreAllMocks();
     await app.close();
   });
@@ -650,12 +683,13 @@ describe('agent exec log routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'inst',
       manualRebalance: false,
+      useEarn: true,
     });
-    await insertReviewResult({ portfolioId: agent.id, log: 'no', rebalance: false });
-    await insertReviewResult({ portfolioId: agent.id, log: 'yes', rebalance: true });
+    await insertReviewResult({ portfolioWorkflowId: agent.id, log: 'no', rebalance: false });
+    await insertReviewResult({ portfolioWorkflowId: agent.id, log: 'yes', rebalance: true });
     const res = await app.inject({
       method: 'GET',
-      url: `/api/agents/${agent.id}/exec-log?rebalanceOnly=true`,
+      url: `/api/portfolio-workflows/${agent.id}/exec-log?rebalanceOnly=true`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);

@@ -26,7 +26,7 @@ export default function WalletBalances({ balances, hasBinanceKey }: Props) {
           <span className="break-all">
             {b.isLoading
               ? t('loading')
-              : `${b.walletBalance} (${t('earn')}: ${b.earnBalance})`}
+              : `${b.walletBalance.toFixed(5)} (${t('earn')}: ${b.earnBalance.toFixed(5)})`}
           </span>
         </p>
       ))}
