@@ -7,7 +7,7 @@ user's encrypted API keys. A Fastify backend schedules agents and records
 results while a React dashboard lets users manage agents and inspect their
 activity.
 
-**Try the beta server:** [https://ps.dexstandard.com/](https://ps.dexstandard.com/)
+**Try the beta server:** [https://fincobra.com/](https://fincobra.com/)
 
 ## User flow
 
