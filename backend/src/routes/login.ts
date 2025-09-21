@@ -29,8 +29,8 @@ interface ValidationErr {
 
 const loginBodySchema: z.ZodType<LoginBody> = z
   .object({
-    token: z.string(),
-    otp: z.string().optional(),
+    token: z.string().trim().min(10),
+    otp: z.string().trim().min(6).max(10).optional(),
   })
   .strict();
 
@@ -51,6 +51,7 @@ function setSessionCookie(reply: FastifyReply, id: string) {
     secure: true,
     sameSite: 'lax',
     path: '/',
+    maxAge: 60 * 60 * 24 * 7
   });
 }
 
@@ -103,7 +104,12 @@ async function runCsrfProtection(
 function createCsrfProtectionHandler(app: FastifyInstance) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
     if (isSameSiteRequest(req)) return;
-    await runCsrfProtection(app, req, reply);
+    try {
+      await runCsrfProtection(app, req, reply);
+    } catch (err) {
+      req.log.warn({ err }, 'csrf check failed');
+      throw err;
+    }
   };
 }
 
@@ -121,12 +127,17 @@ export default async function loginRoutes(app: FastifyInstance) {
       onRequest: csrfProtection,
     },
     async (req, reply) => {
-      const body = parseBody(loginBodySchema, req.body, reply);
+      const body = parseBody(loginBodySchema, req, reply);
       if (!body) return;
 
-      const payload = await verifyToken(body.token);
-      if (!payload?.sub)
+      let payload;
+      try {
+        payload = await verifyToken(body.token);
+      } catch (err) {
+        req.log.info({ err }, 'invalid google id token');
         return reply.code(400).send(errorResponse('invalid token'));
+      }
+      if (!payload?.sub) return reply.code(400).send(errorResponse('invalid token'));
 
       const emailEnc = payload.email
         ? encrypt(payload.email, env.KEY_PASSWORD)

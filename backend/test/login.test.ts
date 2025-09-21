@@ -18,7 +18,7 @@ describe('login route', () => {
       method: 'POST',
       url: '/api/login',
       headers: { 'sec-fetch-site': 'same-origin' },
-      payload: { token: 'test-token' },
+      payload: { token: 'test-token-12345' }, // >=10 chars
     });
     expect(res.statusCode).toBe(200);
     expect(res.headers['set-cookie']).toBeDefined();
@@ -44,18 +44,18 @@ describe('login route', () => {
       method: 'POST',
       url: '/api/login',
       headers: { 'sec-fetch-site': 'same-origin' },
-      payload: { token: 't1' },
+      payload: { token: 'test-token-2aaaa' }, // >=10 chars
     });
     expect(res1.statusCode).toBe(401);
 
     const now = Date.now();
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
-    const otp = authenticator.generate(secret);
+    const otp = authenticator.generate(secret); // 6 digits
     const res2 = await app.inject({
       method: 'POST',
       url: '/api/login',
       headers: { 'sec-fetch-site': 'same-origin' },
-      payload: { token: 't1', otp },
+      payload: { token: 'test-token-2aaaa', otp },
     });
     nowSpy.mockRestore();
     expect(res2.statusCode).toBe(200);
@@ -74,7 +74,7 @@ describe('login route', () => {
       method: 'POST',
       url: '/api/login',
       headers: { 'sec-fetch-site': 'same-origin' },
-      payload: { token: 't' },
+      payload: { token: 'test-token-3zzzz' }, // >=10 chars
     });
     expect(res.statusCode).toBe(403);
     await app.close();
@@ -86,18 +86,21 @@ describe('login route', () => {
       getPayload: () => ({ sub: 'csrf', email: 'csrf@example.com' }),
     } as any);
 
+    // No CSRF -> should be rejected by CSRF guard
     const res1 = await app.inject({
       method: 'POST',
       url: '/api/login',
       headers: { 'sec-fetch-site': 'cross-site' },
-      payload: { token: 't' },
+      payload: { token: 'test-token-csrf1' }, // >=10 chars
     });
     expect(res1.statusCode).toBe(403);
 
+    // Get CSRF token & cookie
     const tokenRes = await app.inject({ method: 'GET', url: '/api/login/csrf' });
     const csrfToken = (tokenRes.json() as any).csrfToken;
     const cookieHeader = (tokenRes.headers['set-cookie'] as string).split(';')[0];
 
+    // With CSRF -> should succeed
     const res2 = await app.inject({
       method: 'POST',
       url: '/api/login',
@@ -106,7 +109,7 @@ describe('login route', () => {
         'x-csrf-token': csrfToken,
         cookie: cookieHeader,
       },
-      payload: { token: 't' },
+      payload: { token: 'test-token-csrf2' }, // >=10 chars
     });
     expect(res2.statusCode).toBe(200);
     await app.close();
@@ -122,7 +125,7 @@ describe('login route', () => {
       method: 'POST',
       url: '/api/login',
       headers: { 'sec-fetch-site': 'same-origin' },
-      payload: { token: 't' },
+      payload: { token: 'test-token-session' }, // >=10 chars
     });
     const cookie = loginRes.headers['set-cookie'] as string;
 
@@ -143,6 +146,4 @@ describe('login route', () => {
     expect(res.statusCode).toBe(403);
     await app.close();
   });
-
-  // db closed in test setup
 });

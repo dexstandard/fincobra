@@ -28,6 +28,7 @@ import {
   userPreHandlers,
 } from './_shared/guards.js';
 import { REDACTED_KEY } from './_shared/constants.js';
+import {parseBody} from "./_shared/validation.js";
 
 interface AiKeyBody {
   key: string;
@@ -71,19 +72,6 @@ function logDisabledWorkflows(
     { userId, disabledWorkflowIds, unscheduledWorkflowIds, context },
     'disabled workflows after AI key update',
   );
-}
-
-function parseBody<S extends z.ZodTypeAny>(
-  schema: S,
-  req: FastifyRequest,
-  reply: FastifyReply,
-): z.infer<S> | undefined {
-  const result = schema.safeParse(req.body);
-  if (!result.success) {
-    reply.code(400).send(errorResponse('invalid request body'));
-    return undefined;
-  }
-  return result.data;
 }
 
 export default async function aiApiKeyRoutes(app: FastifyInstance) {

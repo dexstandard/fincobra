@@ -10,11 +10,11 @@ export const userTokenParamsSchema = z.object({
 }).strict();
 
 export function parseBody<S extends z.ZodTypeAny>(
-  schema: S,
-  body: unknown,
-  reply: FastifyReply,
+    schema: S,
+    req: FastifyRequest,
+    reply: FastifyReply,
 ): z.infer<S> | undefined {
-  const result = schema.safeParse(body);
+  const result = schema.safeParse(req.body);
   if (!result.success) {
     reply.code(400).send(errorResponse('invalid request body'));
     return undefined;
