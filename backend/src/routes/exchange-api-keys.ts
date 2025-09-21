@@ -10,7 +10,6 @@ import {
   ApiKeyType,
   verifyApiKey,
   encryptKey,
-  decryptKey,
 } from '../util/api-keys.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { REDACTED_KEY } from './_shared/constants.js';
@@ -27,8 +26,8 @@ interface ExchangeKeyBody {
 
 const exchangeKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
   .object({
-    key: z.string().trim().min(1),
-    secret: z.string().trim().min(1),
+    key: z.string().trim().length(64),
+    secret: z.string().trim().min(64).max(128),
   })
   .strict();
 
@@ -64,6 +63,24 @@ function logDisabledWorkflows(
   );
 }
 
+async function verifyAndSave(
+    key: string,
+    secret: string,
+    reply: FastifyReply,
+    userId: string
+) {
+  const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
+  if (verRes !== true) return reply.code(400).send(errorResponse(formatVerificationError(verRes)));
+  const encKey = encryptKey(key);
+  const encSecret = encryptKey(secret);
+  await setBinanceKey({
+    userId,
+    apiKeyEnc: encKey,
+    apiSecretEnc: encSecret,
+  });
+  return {key: REDACTED_KEY, secret: REDACTED_KEY};
+}
+
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
   app.post(
     '/users/:id/binance-key',
@@ -77,23 +94,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key, secret } = body;
       const existingKey = await getBinanceKey(userId);
-      if (existingKey)
-        return reply.code(400).send(errorResponse('key exists'));
-      const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
-      if (verRes !== true)
-        return reply
-          .code(400)
-          .send(
-            errorResponse(formatVerificationError(verRes)),
-          );
-      const encKey = encryptKey(key);
-      const encSecret = encryptKey(secret);
-      await setBinanceKey({
-        userId,
-        apiKeyEnc: encKey,
-        apiSecretEnc: encSecret,
-      });
-      return { key: REDACTED_KEY, secret: REDACTED_KEY };
+      if (existingKey) return reply.code(409).send(errorResponse('key already exists'));
+      return await verifyAndSave(key, secret, reply, userId);
     },
   );
 
@@ -106,12 +108,7 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const userId = getValidatedUserId(req);
       const binanceKey = await getBinanceKey(userId);
-      if (!binanceKey)
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
-      decryptKey(binanceKey.apiKeyEnc);
-      decryptKey(binanceKey.apiSecretEnc);
+      if (!binanceKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
       return { key: REDACTED_KEY, secret: REDACTED_KEY };
     },
   );
@@ -129,24 +126,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       const { key, secret } = body;
       const existingKey = await getBinanceKey(userId);
       if (!existingKey)
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
-      const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
-      if (verRes !== true)
-        return reply
-          .code(400)
-          .send(
-            errorResponse(formatVerificationError(verRes)),
-          );
-      const encKey = encryptKey(key);
-      const encSecret = encryptKey(secret);
-      await setBinanceKey({
-        userId,
-        apiKeyEnc: encKey,
-        apiSecretEnc: encSecret,
-      });
-      return { key: REDACTED_KEY, secret: REDACTED_KEY };
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      return await verifyAndSave(key, secret, reply, userId);
     },
   );
 
@@ -159,10 +140,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const userId = getValidatedUserId(req);
       const existingKey = await getBinanceKey(userId);
-      if (!existingKey)
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!existingKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+
       const disableSummary = await disableUserWorkflowsByExchangeKey(
         req.log,
         userId,

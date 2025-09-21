@@ -40,7 +40,7 @@ Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
   - `npm run build`
 
 ### Guidelines
-- Apply schema changes using SQL files in `/backend/src/db/migrations` and run `npm --prefix backend run migrate`.
+- Add schema changes using SQL files in `/backend/src/db/migrations`.
 - Do not modify `schema.sql` when changing the schema.
 - The server automatically applies pending migrations on startup.
 - Cover backend code, especially API endpoints, with sufficient tests.

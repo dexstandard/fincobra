@@ -26,3 +26,23 @@ activity.
 - Allow‑listed token pairs and trade limits to reduce risk.
 - Detailed logs for plan, simulation, and execution steps.
 - Web dashboard for creating, pausing, and deleting agents.
+
+## Running tests locally
+
+The backend tests require a PostgreSQL instance. You can run one quickly with Docker:
+
+1. Start PostgreSQL:
+   ```bash
+   docker run --rm --name fincobra-pg \
+     -e POSTGRES_USER=postgres \
+     -e POSTGRES_PASSWORD=postgres \
+     -e POSTGRES_DB=fincobra_test \
+     -p 5432:5432 \
+     postgres:16
+   ```
+
+2. In another terminal, run the tests:
+   ```bash
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/fincobra_test \
+      npm --prefix backend test
+   ```
