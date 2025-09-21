@@ -778,14 +778,16 @@ describe('createDecisionLimitOrders', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe(LimitOrderStatus.Open);
     const planned = JSON.parse(rows[0].planned_json);
-    expect(planned.quantity).toBeCloseTo(0.00004546, 12);
-    expect(planned.price).toBe(110000);
+    // Sell-side limits are anchored to the live price (currentPrice * 1.001) before rounding,
+    // which raises the final notional slightly above the agent's requested value.
+    expect(planned.quantity).toBeCloseTo(0.00004344, 12);
+    expect(planned.price).toBe(115115);
     expect(planned.quantity * planned.price).toBeGreaterThan(5);
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'SELL',
       quantity: planned.quantity,
-      price: 110000,
+      price: 115115,
     });
     expect(fetchAccount).not.toHaveBeenCalled();
   });
