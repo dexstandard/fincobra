@@ -41,12 +41,16 @@ async function setUserEnabledStatus(
     reply: FastifyReply,
     userId: string,
     enabled: boolean,
-): Promise<ToggleUserResponse | FastifyReply> {
+): Promise<ToggleUserResponse | undefined> {
   const user = await getUser(userId);
-  if (!user) return reply.code(404).send(errorResponse('user not found'));
+  if (!user) {
+    reply.code(404).send(errorResponse('user not found'));
+    return;
+  }
   await setUserEnabled(userId, enabled);
   return { ok: true };
 }
+
 
 export default async function usersRoutes(app: FastifyInstance) {
   app.get(
