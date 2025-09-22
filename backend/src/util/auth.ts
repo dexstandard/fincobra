@@ -46,17 +46,3 @@ export async function requireAdmin(
   }
   return userId;
 }
-
-export function requireUserIdMatch(
-  req: FastifyRequest,
-  reply: FastifyReply,
-  id: string,
-): string | null {
-  const userId = requireUserId(req, reply);
-  if (!userId) return null;
-  if (userId !== id) {
-    reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
-    return null;
-  }
-  return userId;
-}
