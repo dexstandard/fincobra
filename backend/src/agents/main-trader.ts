@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { callAi } from '../util/ai.js';
+import { callAi } from '../services/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import { fetchAccount, fetchPairData, fetchPairInfo } from '../services/binance.js';
 import { getRecentReviewResults } from '../repos/review-result.js';

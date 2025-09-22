@@ -1,10 +1,54 @@
 import { createHmac } from 'node:crypto';
 
 import { getBinanceKey } from '../repos/exchange-api-keys.js';
-import { decrypt } from '../util/crypto.js';
-import { env } from '../util/env.js';
+import { decryptKey } from '../util/crypto.js';
 
 type UserCreds = { key: string; secret: string };
+
+export async function verifyBinanceKey(
+  key: string,
+  secret: string,
+): Promise<boolean | string> {
+  try {
+    const ts1 = Date.now();
+    const q1 = `timestamp=${ts1}`;
+    const sig1 = createHmac('sha256', secret).update(q1).digest('hex');
+    const res1 = await fetch(
+      `https://api.binance.com/api/v3/account?${q1}&signature=${sig1}`,
+      { headers: { 'X-MBX-APIKEY': key } },
+    );
+    if (!res1.ok) {
+      try {
+        const body = await res1.json();
+        return typeof body.msg === 'string' ? body.msg : false;
+      } catch {
+        return false;
+      }
+    }
+
+    const ts2 = Date.now();
+    const q2 =
+      `symbol=BTCUSDT&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=1&timestamp=${ts2}`;
+    const sig2 = createHmac('sha256', secret).update(q2).digest('hex');
+    const res2 = await fetch(
+      `https://api.binance.com/api/v3/order/test?${q2}&signature=${sig2}`,
+      {
+        method: 'POST',
+        headers: { 'X-MBX-APIKEY': key },
+      },
+    );
+    if (res2.ok) return true;
+    try {
+      const body = await res2.json();
+      if (res2.status === 400 && typeof body.code === 'number') return true;
+      return typeof body.msg === 'string' ? body.msg : false;
+    } catch {
+      return false;
+    }
+  } catch (err) {
+    return err instanceof Error ? err.message : false;
+  }
+}
 
 export interface BinanceBalance {
   asset: string;
@@ -152,8 +196,8 @@ export async function fetchPairInfo(
 async function getUserCreds(id: string): Promise<UserCreds | null> {
   const binanceKey = await getBinanceKey(id);
   if (!binanceKey) return null;
-  const key = decrypt(binanceKey.apiKeyEnc, env.KEY_PASSWORD);
-  const secret = decrypt(binanceKey.apiSecretEnc, env.KEY_PASSWORD);
+  const key = decryptKey(binanceKey.apiKeyEnc);
+  const secret = decryptKey(binanceKey.apiSecretEnc);
   return { key, secret };
 }
 

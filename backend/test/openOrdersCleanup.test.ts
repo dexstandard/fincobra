@@ -35,7 +35,7 @@ const sampleIndicators = vi.hoisted(() => ({
   oscStochD: 0,
 }));
 
-vi.mock('../src/util/ai.js', () => ({
+vi.mock('../src/services/ai.js', () => ({
   callAi: vi.fn().mockResolvedValue('ok'),
 }));
 

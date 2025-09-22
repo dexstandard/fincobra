@@ -14,7 +14,7 @@ vi.mock('../src/repos/news.js', () => ({
   getNewsByToken: vi.fn().mockResolvedValue([{ title: 't', link: 'l' }]),
 }));
 
-vi.mock('../src/util/ai.js', () => ({
+vi.mock('../src/services/ai.js', () => ({
   callAi: vi.fn().mockResolvedValue('res'),
   extractJson: () => ({ comment: 'summary for BTC', score: 1 }),
 }));

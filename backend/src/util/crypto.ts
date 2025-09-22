@@ -1,5 +1,7 @@
 import { randomBytes, scryptSync, createCipheriv, createDecipheriv } from 'node:crypto';
 
+import { env } from './env.js';
+
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // Recommended IV length for GCM
 const SALT_LENGTH = 16;
@@ -33,4 +35,12 @@ export function decrypt(payload: string, password: string): string {
   } catch {
     throw new Error('Failed to decrypt payload');
   }
+}
+
+export function encryptKey(value: string): string {
+  return encrypt(value, env.KEY_PASSWORD);
+}
+
+export function decryptKey(value: string): string {
+  return decrypt(value, env.KEY_PASSWORD);
 }
