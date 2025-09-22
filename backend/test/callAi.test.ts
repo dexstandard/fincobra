@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { callAi } from '../src/util/ai.js';
+import { callAi } from '../src/services/ai.js';
 import { developerInstructions, rebalanceResponseSchema } from '../src/agents/main-trader.js';
 import { type RebalancePrompt } from '../src/agents/main-trader.types.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';

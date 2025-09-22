@@ -54,7 +54,7 @@ vi.mock('../src/repos/review-raw-log.js', () => ({
 vi.mock('../src/services/indicators.js', () => ({
   fetchTokenIndicators: fetchTokenIndicatorsMock,
 }));
-vi.mock('../src/util/ai.js', () => ({
+vi.mock('../src/services/ai.js', () => ({
   callAi: callAiMock,
   extractJson: extractJson,
 }));

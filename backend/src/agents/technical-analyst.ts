@@ -3,7 +3,7 @@ import { fetchTokenIndicators, type TokenIndicators } from '../services/indicato
 import { fetchOrderBook } from '../services/derivatives.js';
 import { fetchFearGreedIndex, type FearGreedIndex } from '../services/binance.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
-import { callAi, extractJson } from '../util/ai.js';
+import { callAi, extractJson } from '../services/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
   type RebalancePrompt,

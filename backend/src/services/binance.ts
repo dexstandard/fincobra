@@ -1,10 +1,79 @@
 import { createHmac } from 'node:crypto';
 
 import { getBinanceKey } from '../repos/exchange-api-keys.js';
-import { decrypt } from '../util/crypto.js';
-import { env } from '../util/env.js';
+import { decryptKey } from '../util/crypto.js';
 
-type UserCreds = { key: string; secret: string };
+interface UserCreds {
+  key: string;
+  secret: string;
+}
+
+export interface BinanceKeyVerificationResult {
+  ok: boolean;
+  reason?: string;
+}
+
+export async function verifyBinanceKey(
+  key: string,
+  secret: string,
+): Promise<BinanceKeyVerificationResult> {
+  try {
+    const accountParams = createTimestampedParams();
+    appendSignature(secret, accountParams);
+    const accountRes = await fetch(
+      `https://api.binance.com/api/v3/account?${accountParams.toString()}`,
+      { headers: { 'X-MBX-APIKEY': key } },
+    );
+    if (!accountRes.ok) {
+      try {
+        const body = await accountRes.json();
+        return {
+          ok: false,
+          reason: typeof body.msg === 'string' ? body.msg : undefined,
+        };
+      } catch {
+        return { ok: false };
+      }
+    }
+
+    const orderParams = createTimestampedParams({
+      symbol: 'BTCUSDT',
+      side: 'BUY',
+      type: 'LIMIT',
+      timeInForce: 'GTC',
+      quantity: '1',
+      price: '1',
+    });
+    appendSignature(secret, orderParams);
+    const orderRes = await fetch(
+      `https://api.binance.com/api/v3/order/test?${orderParams.toString()}`,
+      {
+        method: 'POST',
+        headers: { 'X-MBX-APIKEY': key },
+      },
+    );
+
+    if (orderRes.ok) return { ok: true };
+
+    try {
+      const body = await orderRes.json();
+      if (orderRes.status === 400 && typeof body.code === 'number') {
+        return { ok: true };
+      }
+      return {
+        ok: false,
+        reason: typeof body.msg === 'string' ? body.msg : undefined,
+      };
+    } catch {
+      return { ok: false };
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : undefined,
+    };
+  }
+}
 
 export interface BinanceBalance {
   asset: string;
@@ -152,8 +221,8 @@ export async function fetchPairInfo(
 async function getUserCreds(id: string): Promise<UserCreds | null> {
   const binanceKey = await getBinanceKey(id);
   if (!binanceKey) return null;
-  const key = decrypt(binanceKey.apiKeyEnc, env.KEY_PASSWORD);
-  const secret = decrypt(binanceKey.apiSecretEnc, env.KEY_PASSWORD);
+  const key = decryptKey(binanceKey.apiKeyEnc);
+  const secret = decryptKey(binanceKey.apiSecretEnc);
   return { key, secret };
 }
 

@@ -1,3 +1,9 @@
+const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
+
+interface OpenAiModel {
+  id: string;
+}
+
 export async function callAi(
   model: string,
   developerInstructions: string,
@@ -106,6 +112,36 @@ export function extractJson<T>(res: string): T | null {
     return JSON.parse(text) as T;
   } catch (error) {
     console.error('Failed to parse OpenAI response JSON', { error, res });
+    return null;
+  }
+}
+
+function filterSupportedModels(models: OpenAiModel[]): string[] {
+  return models
+    .map((m) => m.id)
+    .filter((id) => id.startsWith('gpt-5') || id.startsWith('o3') || id.includes('search'));
+}
+
+export async function verifyAiKey(key: string): Promise<boolean> {
+  try {
+    const res = await fetch(OPENAI_MODELS_URL, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchSupportedModels(apiKey: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(OPENAI_MODELS_URL, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: OpenAiModel[] };
+    return filterSupportedModels(body.data ?? []);
+  } catch {
     return null;
   }
 }

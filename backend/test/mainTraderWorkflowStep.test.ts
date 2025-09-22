@@ -35,7 +35,7 @@ const callAiMock = vi.hoisted(() =>
   ),
 );
 
-vi.mock('../src/util/ai.js', () => ({
+vi.mock('../src/services/ai.js', () => ({
   callAi: callAiMock,
 }));
 

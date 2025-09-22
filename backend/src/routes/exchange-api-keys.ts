@@ -7,10 +7,10 @@ import {
   clearBinanceKey,
 } from '../repos/exchange-api-keys.js';
 import {
-  ApiKeyType,
-  verifyApiKey,
-  encryptKey,
-} from '../util/api-keys.js';
+  verifyBinanceKey,
+  type BinanceKeyVerificationResult,
+} from '../services/binance.js';
+import { encryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { REDACTED_KEY } from './_shared/constants.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
@@ -32,10 +32,8 @@ const exchangeKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
   })
   .strict();
 
-function formatVerificationError(result: boolean | string): string {
-  return `verification failed${
-    typeof result === 'string' ? `: ${result}` : ''
-  }`;
+function formatVerificationError(result: BinanceKeyVerificationResult): string {
+  return `verification failed${result.reason ? `: ${result.reason}` : ''}`;
 }
 
 function logDisabledWorkflows(
@@ -57,8 +55,12 @@ async function verifyAndSave(
     reply: FastifyReply,
     userId: string
 ) {
-  const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
-  if (verRes !== true) return reply.code(400).send(errorResponse(formatVerificationError(verRes)));
+  const verRes = await verifyBinanceKey(key, secret);
+  if (!verRes.ok) {
+    return reply
+      .code(400)
+      .send(errorResponse(formatVerificationError(verRes)));
+  }
   const encKey = encryptKey(key);
   const encSecret = encryptKey(secret);
   await setBinanceKey({

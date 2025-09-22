@@ -11,11 +11,8 @@ import {
   hasAiKeyShare,
   getAiKeyShareTargets,
 } from '../repos/ai-api-key.js';
-import {
-  ApiKeyType,
-  verifyApiKey,
-  encryptKey,
-} from '../util/api-keys.js';
+import { verifyAiKey } from '../services/ai.js';
+import { encryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';
 import {
@@ -88,7 +85,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       const { key } = body;
       const aiKey = await getAiKey(userId);
       if (aiKey) return reply.code(409).send(errorResponse('key already exists'));
-      if (!(await verifyApiKey(ApiKeyType.Ai, key)))
+      if (!(await verifyAiKey(key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
       await setAiKey({ userId: userId, apiKeyEnc: enc });
@@ -138,7 +135,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       const { key } = body;
       const aiKey = await getAiKey(id);
       if (!aiKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
-      if (!(await verifyApiKey(ApiKeyType.Ai, key)))
+      if (!(await verifyAiKey(key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
       await setAiKey({ userId: id, apiKeyEnc: enc });
