@@ -1,1 +1,0 @@
-ALTER TABLE portfolio_workflow ADD COLUMN use_earn BOOLEAN NOT NULL DEFAULT TRUE;
