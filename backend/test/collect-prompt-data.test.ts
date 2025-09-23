@@ -13,11 +13,15 @@ vi.mock('../src/services/binance-client.js', () => ({
       { asset: 'ETH', free: '5', locked: '0' },
     ],
   }),
-  fetchPairData: vi
+  fetchPairPrice: vi
     .fn()
     .mockImplementation((t1: string, t2: string) => {
-      if (t1 === 'USDT') return Promise.resolve({ symbol: `${t2}USDT`, currentPrice: 20000 });
-      if (t2 === 'USDT') return Promise.resolve({ symbol: `${t1}USDT`, currentPrice: 20000 });
+      if (t1 === 'USDT') {
+        return Promise.resolve({ symbol: `${t2}USDT`, currentPrice: 20000 });
+      }
+      if (t2 === 'USDT') {
+        return Promise.resolve({ symbol: `${t1}USDT`, currentPrice: 20000 });
+      }
       return Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 });
     }),
   fetchPairInfo: vi

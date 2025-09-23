@@ -486,6 +486,38 @@ export async function fetchOrderBook(symbol: string) {
   };
 }
 
+export async function fetchSymbolPrice(symbol: string) {
+  const res = await fetch(
+    `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`,
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`failed to fetch symbol price: ${res.status} ${body}`);
+  }
+  const json = (await res.json()) as { price: string };
+  return { symbol, currentPrice: Number(json.price) };
+}
+
+export async function fetchPairPrice(token1: string, token2: string) {
+  const symbols = [
+    `${token1}${token2}`.toUpperCase(),
+    `${token2}${token1}`.toUpperCase(),
+  ];
+  let lastErr: unknown;
+  for (const symbol of symbols) {
+    try {
+      return await fetchSymbolPrice(symbol);
+    } catch (err) {
+      lastErr = err;
+      if (err instanceof Error && /Invalid symbol/i.test(err.message)) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
 export async function fetchSymbolData(symbol: string) {
   const [priceRes, depthRes, dayRes, yearRes] = await Promise.all([
     fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`),

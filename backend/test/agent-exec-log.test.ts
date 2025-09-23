@@ -425,7 +425,7 @@ describe('portfolio workflow exec log routes', () => {
       rebalance: true,
       shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchSymbolData').mockResolvedValue({
+    vi.spyOn(binance, 'fetchSymbolPrice').mockResolvedValue({
       symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
@@ -499,7 +499,7 @@ describe('portfolio workflow exec log routes', () => {
       rebalance: true,
       shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchSymbolData').mockResolvedValue({
+    vi.spyOn(binance, 'fetchSymbolPrice').mockResolvedValue({
       symbol: 'BTCUSDT',
       currentPrice: 100,
     } as any);
@@ -619,7 +619,7 @@ describe('portfolio workflow exec log routes', () => {
       rebalance: true,
       shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchSymbolData').mockResolvedValue({
+    vi.spyOn(binance, 'fetchSymbolPrice').mockResolvedValue({
       symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
