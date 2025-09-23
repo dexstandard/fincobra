@@ -486,7 +486,7 @@ export async function fetchOrderBook(symbol: string) {
   };
 }
 
-async function fetchSymbolData(symbol: string) {
+export async function fetchSymbolData(symbol: string) {
   const [priceRes, depthRes, dayRes, yearRes] = await Promise.all([
     fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`),
     fetch(`https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=5`),

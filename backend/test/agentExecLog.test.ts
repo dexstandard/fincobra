@@ -425,7 +425,7 @@ describe('agent exec log routes', () => {
       rebalance: true,
       shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+    vi.spyOn(binance, 'fetchSymbolData').mockResolvedValue({
       symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
@@ -499,7 +499,7 @@ describe('agent exec log routes', () => {
       rebalance: true,
       shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+    vi.spyOn(binance, 'fetchSymbolData').mockResolvedValue({
       symbol: 'BTCUSDT',
       currentPrice: 100,
     } as any);
@@ -619,7 +619,7 @@ describe('agent exec log routes', () => {
       rebalance: true,
       shortReport: 's',
     });
-    vi.spyOn(binance, 'fetchPairData').mockResolvedValue({
+    vi.spyOn(binance, 'fetchSymbolData').mockResolvedValue({
       symbol: 'BTCETH',
       currentPrice: 100,
     } as any);
