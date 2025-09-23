@@ -486,27 +486,6 @@ export async function fetchOrder(
   });
 }
 
-export async function cancelOpenOrders(id: string, opts: { symbol: string }) {
-  return withUserCreds(id, async (creds) => {
-    const params = createTimestampedParams({
-      symbol: opts.symbol.toUpperCase(),
-    });
-    appendSignature(creds.secret, params);
-    const res = await fetch(
-      `https://api.binance.com/api/v3/openOrders?${params.toString()}`,
-      {
-        method: 'DELETE',
-        headers: { 'X-MBX-APIKEY': creds.key },
-      },
-    );
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`failed to cancel open orders: ${res.status} ${body}`);
-    }
-    return res.json();
-  });
-}
-
 export async function fetchOpenOrders(id: string, opts: { symbol?: string }) {
   return withUserCreds(id, async (creds) => {
     const params = createTimestampedParams();
@@ -520,7 +499,7 @@ export async function fetchOpenOrders(id: string, opts: { symbol?: string }) {
       const body = await res.text();
       throw new Error(`failed to fetch open orders: ${res.status} ${body}`);
     }
-    return res.json() as Promise<OpenOrder[]>;
+    return res.json();
   });
 }
 
