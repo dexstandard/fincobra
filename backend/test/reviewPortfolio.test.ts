@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { FastifyBaseLogger } from 'fastify';
 import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
-import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { setAiKey } from '../src/repos/ai-api-key.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/review-raw-log.js';
 import { getRecentReviewResults } from '../src/repos/review-result.js';
@@ -89,7 +89,7 @@ const runTechnicalAnalyst = vi.fn((_params: any, prompt: any) => {
 vi.spyOn(techAnalyst, 'runTechnicalAnalyst').mockImplementation(runTechnicalAnalyst);
 
 import {
-  reviewAgentPortfolio,
+  reviewWorkflowPortfolio,
   removeWorkflowFromSchedule,
 } from '../src/workflows/portfolio-review.js';
 
@@ -143,10 +143,10 @@ beforeEach(() => {
   ['1', '2', '3', '4', '5'].forEach((id) => removeWorkflowFromSchedule(id));
 });
 
-async function setupAgent(tokens: string[], manual = false) {
+async function setupWorkflow(tokens: string[], manual = false) {
   const userId = await insertUser();
   await setAiKey({ userId, apiKeyEnc: 'enc' });
-  const agent = await insertAgent({
+  const agent = await insertPortfolioWorkflow({
     userId,
     model: 'gpt',
     status: 'active',
@@ -160,32 +160,32 @@ async function setupAgent(tokens: string[], manual = false) {
     manualRebalance: manual,
     useEarn: false,
   });
-  return { userId, agentId: agent.id };
+  return { userId, workflowId: agent.id };
 }
 
 describe('reviewPortfolio', () => {
   it('saves decision and logs', async () => {
-    const { agentId } = await setupAgent(['BTC']);
+    const { workflowId } = await setupWorkflow(['BTC']);
     const decision = {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
       shortReport: 'ok',
     };
     runMainTrader.mockResolvedValue(decision);
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agentId);
+    await reviewWorkflowPortfolio(log, workflowId);
     expect(runMainTrader).toHaveBeenCalledTimes(1);
     expect(runNewsAnalyst).toHaveBeenCalled();
     expect(runTechnicalAnalyst).toHaveBeenCalled();
-    const rows = await getPortfolioReviewRawPromptsResponses(agentId);
+    const rows = await getPortfolioReviewRawPromptsResponses(workflowId);
     const row = rows[0];
     expect(JSON.parse(row.response!)).toEqual(decision);
-    const [res] = await getRecentReviewResults(agentId, 1);
+    const [res] = await getRecentReviewResults(workflowId, 1);
     expect(res.rebalance).toBe(true);
     expect(res.shortReport).toBe('ok');
   });
 
   it('calls createDecisionLimitOrders when orders requested', async () => {
-    const { userId: user2, agentId: agent2 } = await setupAgent(['BTC', 'ETH']);
+    const { userId: user2, workflowId: agent2 } = await setupWorkflow(['BTC', 'ETH']);
     const decision = {
       orders: [
         { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
@@ -195,7 +195,7 @@ describe('reviewPortfolio', () => {
     };
     runMainTrader.mockResolvedValue(decision);
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent2);
+    await reviewWorkflowPortfolio(log, agent2);
     expect(createDecisionLimitOrders).toHaveBeenCalledTimes(1);
     const args = createDecisionLimitOrders.mock.calls[0][0];
     expect(args.userId).toBe(user2);
@@ -203,39 +203,39 @@ describe('reviewPortfolio', () => {
   });
 
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
-    const { agentId: agent3 } = await setupAgent(['BTC'], true);
+    const { workflowId: agent3 } = await setupWorkflow(['BTC'], true);
     const decision = {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent3);
+    await reviewWorkflowPortfolio(log, agent3);
     expect(createDecisionLimitOrders).not.toHaveBeenCalled();
   });
 
   it('records error when pair is invalid', async () => {
-    const { agentId: agent4 } = await setupAgent(['BTC']);
+    const { workflowId: agent4 } = await setupWorkflow(['BTC']);
     const decision = {
       orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', quantity: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent4);
+    await reviewWorkflowPortfolio(log, agent4);
     const [row] = await getRecentReviewResults(agent4, 1);
     expect(row.error).toBeTruthy();
   });
 
   it('records error when quantity is invalid', async () => {
-    const { agentId: agent5 } = await setupAgent(['BTC']);
+    const { workflowId: agent5 } = await setupWorkflow(['BTC']);
     const decision = {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 0 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent5);
+    await reviewWorkflowPortfolio(log, agent5);
     const [row] = await getRecentReviewResults(agent5, 1);
     expect(row.error).toBeTruthy();
   });

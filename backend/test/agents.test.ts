@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
-import { getActivePortfolioWorkflowById, getAgent } from '../src/repos/portfolio-workflow.js';
+import { getActivePortfolioWorkflowById, getPortfolioWorkflow } from '../src/repos/portfolio-workflows.js';
 import { insertUser, insertUserWithKeys } from './repos/users.js';
 import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import {
-  setAgentStatus,
+  setWorkflowStatus,
   getPortfolioWorkflowStatus,
-} from './repos/portfolio-workflow.js';
+} from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import {
   insertLimitOrder,
@@ -19,7 +19,7 @@ import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 
 vi.mock('../src/workflows/portfolio-review.js', () => ({
-  reviewAgentPortfolio: vi.fn(() => Promise.resolve()),
+  reviewWorkflowPortfolio: vi.fn(() => Promise.resolve()),
   removeWorkflowFromSchedule: vi.fn(),
 }));
 
@@ -37,7 +37,7 @@ const cancelOrdersSpy = vi.spyOn(
 );
 
 
-describe('agent routes', () => {
+describe('portfolio workflow routes', () => {
   beforeEach(() => {
     cancelOrdersSpy.mockClear();
   });
@@ -183,7 +183,7 @@ describe('agent routes', () => {
     expect(res.statusCode).toBe(200);
     const deletedStatus = await getPortfolioWorkflowStatus(id);
     expect(deletedStatus).toBe('retired');
-    expect(await getAgent(id)).toBeUndefined();
+    expect(await getPortfolioWorkflow(id)).toBeUndefined();
     expect(await getActivePortfolioWorkflowById(id)).toBeUndefined();
     expect(cancelOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCETH',
@@ -422,7 +422,7 @@ describe('agent routes', () => {
       payload: updatePayload,
     });
     expect(resUpdate.statusCode).toBe(200);
-    const row = await getAgent(id);
+    const row = await getPortfolioWorkflow(id);
     expect(row?.startBalance).toBeGreaterThanOrEqual(0);
     expect(fetchMock).toHaveBeenCalledTimes(4);
 
@@ -588,7 +588,7 @@ describe('agent routes', () => {
     expect(resDup.json().error).toContain('A1');
     expect(resDup.json().error).toContain(existingId);
 
-    await setAgentStatus(existingId, 'inactive');
+    await setWorkflowStatus(existingId, 'inactive');
 
     const resOk = await app.inject({
       method: 'POST',

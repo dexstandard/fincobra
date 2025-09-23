@@ -1,7 +1,7 @@
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { describe, it, expect, vi } from 'vitest';
 import { mockLogger } from './helpers.js';
-import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflow.js';
+import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflows.js';
 import { collectPromptData } from '../src/agents/main-trader.js';
 import { fetchAccount } from '../src/services/binance-client.js';
 

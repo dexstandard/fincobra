@@ -1,22 +1,22 @@
 import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { insertUser } from './repos/users.js';
-import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { authCookies } from './helpers.js';
 
-const reviewAgentPortfolioMock = vi.fn<(
+const reviewWorkflowPortfolioMock = vi.fn<(
   log: unknown,
-  agentId: string,
+  workflowId: string,
 ) => Promise<unknown>>(() => Promise.resolve());
 vi.mock('../src/workflows/portfolio-review.js', () => ({
-  reviewAgentPortfolio: reviewAgentPortfolioMock,
+  reviewWorkflowPortfolio: reviewWorkflowPortfolioMock,
 }));
 
 describe('manual review endpoint', () => {
   it('triggers portfolio review', async () => {
     const app = await buildServer();
     const userId = await insertUser('1');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -32,24 +32,24 @@ describe('manual review endpoint', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const agentId = agent.id;
+    const workflowId = agent.id;
 
     const res = await app.inject({
       method: 'POST',
-      url: `/api/portfolio-workflows/${agentId}/review`,
+      url: `/api/portfolio-workflows/${workflowId}/review`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
-    expect(reviewAgentPortfolioMock).toHaveBeenCalledTimes(1);
-    expect(reviewAgentPortfolioMock.mock.calls[0][1]).toBe(agentId);
+    expect(reviewWorkflowPortfolioMock).toHaveBeenCalledTimes(1);
+    expect(reviewWorkflowPortfolioMock.mock.calls[0][1]).toBe(workflowId);
     await app.close();
   });
 
   it('returns error when agent is already reviewing', async () => {
     const app = await buildServer();
     const userId = await insertUser('2');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -65,13 +65,13 @@ describe('manual review endpoint', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const agentId = agent.id;
-    reviewAgentPortfolioMock.mockRejectedValueOnce(
+    const workflowId = agent.id;
+    reviewWorkflowPortfolioMock.mockRejectedValueOnce(
       new Error('Agent is already reviewing portfolio'),
     );
     const res = await app.inject({
       method: 'POST',
-      url: `/api/portfolio-workflows/${agentId}/review`,
+      url: `/api/portfolio-workflows/${workflowId}/review`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);

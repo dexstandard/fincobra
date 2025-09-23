@@ -3,7 +3,7 @@ import {
   getActivePortfolioWorkflowById,
   getActivePortfolioWorkflowsByInterval,
   type ActivePortfolioWorkflow,
-} from '../repos/portfolio-workflow.js';
+} from '../repos/portfolio-workflows.js';
 import {
   run as runMainTrader,
   collectPromptData,
@@ -41,7 +41,7 @@ export async function reviewPortfolio(
   const workflow = await getActivePortfolioWorkflowById(workflowId);
   if (!workflow) return;
   const { toRun, skipped } = filterRunningWorkflows([workflow]);
-  if (skipped.length) throw new Error('Agent is already reviewing portfolio');
+  if (skipped.length) throw new Error('Workflow is already reviewing portfolio');
   await runReviewWorkflows(log, toRun);
 }
 
@@ -259,5 +259,5 @@ async function saveFailure(
   await insertReviewResult(entry);
 }
 
-export { reviewPortfolio as reviewAgentPortfolio };
+export { reviewPortfolio as reviewWorkflowPortfolio };
 

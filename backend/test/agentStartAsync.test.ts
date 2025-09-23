@@ -1,18 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import { insertUserWithKeys } from './repos/users.js';
 
-const reviewAgentPortfolioMock = vi.fn<
-  (log: unknown, agentId: string) => Promise<unknown>
+const reviewWorkflowPortfolioMock = vi.fn<
+  (log: unknown, workflowId: string) => Promise<unknown>
 >(() => new Promise(() => {}));
 vi.mock('../src/workflows/portfolio-review.js', () => ({
-  reviewAgentPortfolio: reviewAgentPortfolioMock,
+  reviewWorkflowPortfolio: reviewWorkflowPortfolioMock,
 }));
 
 import buildServer from '../src/server.js';
 import { authCookies } from './helpers.js';
 
 
-describe('agent start', () => {
+describe('portfolio workflow start', () => {
   it('does not await initial review', async () => {
     const app = await buildServer();
     const userId = await insertUserWithKeys('1');
@@ -71,8 +71,8 @@ describe('agent start', () => {
     ]);
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: 'active' });
-    expect(reviewAgentPortfolioMock).toHaveBeenCalledTimes(1);
-    expect(reviewAgentPortfolioMock.mock.calls[0][1]).toBe(id);
+    expect(reviewWorkflowPortfolioMock).toHaveBeenCalledTimes(1);
+    expect(reviewWorkflowPortfolioMock.mock.calls[0][1]).toBe(id);
 
     (globalThis as any).fetch = originalFetch;
     await app.close();

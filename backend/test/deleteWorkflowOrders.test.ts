@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import buildServer from '../src/server.js';
 import { insertUserWithKeys } from './repos/users.js';
-import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { getLimitOrdersByReviewResult } from '../src/repos/limit-orders.js';
@@ -10,7 +10,7 @@ import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 
 vi.mock('../src/workflows/portfolio-review.js', () => ({
-  reviewAgentPortfolio: vi.fn(() => Promise.resolve()),
+  reviewWorkflowPortfolio: vi.fn(() => Promise.resolve()),
   removeWorkflowFromSchedule: vi.fn(),
 }));
 
@@ -35,7 +35,7 @@ describe('delete workflow cancels all orders', () => {
     cancelOrdersSpy.mockClear();
     const app = await buildServer();
     const userId = await insertUserWithKeys('multi');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'm',
       status: 'active',

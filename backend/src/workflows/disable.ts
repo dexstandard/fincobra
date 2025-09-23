@@ -1,12 +1,12 @@
 import type { FastifyBaseLogger } from 'fastify';
-import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflow.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.js';
 import {
   getActivePortfolioWorkflowsByUser,
   getActivePortfolioWorkflowsByUserAndAiKey,
   getActivePortfolioWorkflowsByUserAndExchangeKey,
   deactivateWorkflowsByUser,
   deactivateWorkflowsByIds,
-} from '../repos/portfolio-workflow.js';
+} from '../repos/portfolio-workflows.js';
 import {
   CANCEL_ORDER_REASONS,
   cancelOrdersForWorkflow,

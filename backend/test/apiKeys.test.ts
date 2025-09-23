@@ -11,8 +11,8 @@ import buildServer from '../src/server.js';
 import { insertUser, insertAdminUser } from './repos/users.js';
 import { getAiKey, setAiKey, shareAiKey, hasAiKeyShare } from '../src/repos/ai-api-key.js';
 import { getBinanceKey, setBinanceKey } from '../src/repos/exchange-api-keys.js';
-import { insertAgent, getPortfolioWorkflow } from './repos/portfolio-workflow.js';
-import { getUserApiKeys } from '../src/repos/portfolio-workflow.js';
+import { insertPortfolioWorkflow, getPortfolioWorkflow } from './repos/portfolio-workflows.js';
+import { getUserApiKeys } from '../src/repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
@@ -401,7 +401,7 @@ describe('key deletion effects on agents', () => {
       apiKeyEnc: bk,
       apiSecretEnc: bs,
     });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt-5',
       status: 'active',
@@ -462,7 +462,7 @@ describe('key deletion effects on agents', () => {
       apiKeyEnc: bk,
       apiSecretEnc: bs,
     });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt-5',
       status: 'active',
@@ -535,7 +535,7 @@ describe('key deletion effects on agents', () => {
       targetUserId: userId,
       model: 'gpt-5',
     });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt-5',
       status: 'active',
@@ -609,7 +609,7 @@ describe('key deletion effects on agents', () => {
       targetUserId: userId,
       model: 'gpt-5',
     });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt-5',
       status: 'active',
@@ -691,7 +691,7 @@ describe('key deletion effects on agents', () => {
       targetUserId: userId,
       model: 'gpt-5',
     });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt-5',
       status: 'active',
@@ -746,7 +746,7 @@ describe('key deletion effects on agents', () => {
       apiKeyEnc: bk,
       apiSecretEnc: bs,
     });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt-5',
       status: 'active',

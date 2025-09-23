@@ -4,7 +4,7 @@ import { isStablecoin } from '../util/tokens.js';
 import { fetchAccount, fetchPairData, fetchPairInfo } from '../services/binance-client.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
-import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflow.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.js';
 import type {
   RunParams,
   RebalancePosition,
