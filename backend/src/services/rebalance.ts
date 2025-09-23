@@ -4,7 +4,7 @@ import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import type { MainTraderOrder } from '../agents/main-trader.js';
 import {
   fetchPairInfo,
-  fetchSymbolData,
+  fetchSymbolPrice,
   createLimitOrder,
   parseBinanceError,
 } from './binance-client.js';
@@ -109,7 +109,7 @@ export async function createDecisionLimitOrders(opts: {
     const [a, b] = splitPair(o.pair);
     if (!a || !b) continue;
     const info = await fetchPairInfo(a, b);
-    const { currentPrice } = await fetchSymbolData(info.symbol);
+    const { currentPrice } = await fetchSymbolPrice(info.symbol);
     const requestedSide = o.side;
     const requestedToken =
       typeof o.token === 'string' ? o.token.toUpperCase() : '';

@@ -56,6 +56,7 @@ vi.mock('../src/services/binance-client.js', () => ({
     ],
   }),
   fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
+  fetchPairPrice: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
   fetchMarketTimeseries: vi.fn().mockResolvedValue({ minute_60: [], hourly_24h: [], monthly_24m: [] }),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
@@ -89,7 +90,7 @@ describe('cleanup open orders', () => {
   });
 
   it('cancels open orders before running agent', async () => {
-    const userId = await insertUser('1');
+    const userId = await insertUser();
     await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertPortfolioWorkflow({
       userId,
@@ -136,7 +137,7 @@ describe('cleanup open orders', () => {
         }),
     );
 
-    const userId = await insertUser('1');
+    const userId = await insertUser();
     await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertPortfolioWorkflow({
       userId,
@@ -191,7 +192,7 @@ describe('cleanup open orders', () => {
     cancelOrder.mockRejectedValueOnce(new Error('err'));
     parseBinanceError.mockReturnValueOnce({ code: -2013 });
     fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
-    const userId = await insertUser('1');
+    const userId = await insertUser();
     await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertPortfolioWorkflow({
       userId,
@@ -233,7 +234,7 @@ describe('cleanup open orders', () => {
     cancelOrder.mockRejectedValueOnce(new Error('err'));
     parseBinanceError.mockReturnValueOnce({ code: -2013 });
     fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
-    const userId = await insertUser('1');
+    const userId = await insertUser();
     await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertPortfolioWorkflow({
       userId,
@@ -273,7 +274,7 @@ describe('cleanup open orders', () => {
 
   it('marks order filled when cancel returns FILLED', async () => {
     cancelOrder.mockResolvedValueOnce({ status: 'FILLED' } as any);
-    const userId = await insertUser('2');
+    const userId = await insertUser();
     await setAiKey({ userId, apiKeyEnc: 'enc' });
     const agent = await insertPortfolioWorkflow({
       userId,
