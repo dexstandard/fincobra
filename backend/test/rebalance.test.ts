@@ -15,7 +15,9 @@ vi.mock('../src/services/binance-client.js', () => ({
       { asset: 'DOGE', free: '1000', locked: '0' },
     ],
   }),
-  fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
+  fetchSymbolData: vi
+    .fn()
+    .mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
     baseAsset: 'BTC',
@@ -32,8 +34,8 @@ import { createDecisionLimitOrders } from '../src/services/rebalance.js';
 import {
   createLimitOrder,
   fetchAccount,
-  fetchPairData,
   fetchPairInfo,
+  fetchSymbolData,
 } from '../src/services/binance-client.js';
 
 describe('createDecisionLimitOrders', () => {
@@ -134,7 +136,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -198,7 +200,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -262,7 +264,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 3,
       minNotional: 0,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 251 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 251 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -322,7 +324,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 3,
       minNotional: 0,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 98 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 98 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -379,7 +381,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 105 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 105 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -429,7 +431,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -481,7 +483,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -584,7 +586,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 0.02056,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 0.0207 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ currentPrice: 0.0207 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -644,7 +646,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -705,7 +707,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -757,7 +759,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchSymbolData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
     await createDecisionLimitOrders({
       userId,
       orders: [
