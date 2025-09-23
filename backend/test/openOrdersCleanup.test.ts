@@ -35,7 +35,7 @@ const sampleIndicators = vi.hoisted(() => ({
   oscStochD: 0,
 }));
 
-vi.mock('../src/services/ai.js', () => ({
+vi.mock('../src/services/openai-client.js', () => ({
   callAi: vi.fn().mockResolvedValue('ok'),
 }));
 
@@ -48,7 +48,7 @@ const { cancelOrder, parseBinanceError, fetchOrder } = vi.hoisted(() => ({
   parseBinanceError: vi.fn().mockReturnValue({}),
   fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../src/services/binance.js', () => ({
+vi.mock('../src/services/binance-client.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
       { asset: 'BTC', free: '1', locked: '0' },

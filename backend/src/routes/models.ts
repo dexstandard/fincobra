@@ -7,7 +7,7 @@ import type {
     AiApiKeyDetails,
     SharedAiApiKeyDetails,
 } from '../repos/ai-api-key.types.js';
-import { fetchSupportedModels } from '../services/ai.js';
+import { fetchSupportedModels } from '../services/openai-client.js';
 import { decryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';

@@ -9,7 +9,7 @@ import {
 import {
   verifyBinanceKey,
   type BinanceKeyVerificationResult,
-} from '../services/binance.js';
+} from '../services/binance-client.js';
 import { encryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { REDACTED_KEY } from './_shared/constants.js';

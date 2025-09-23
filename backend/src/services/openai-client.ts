@@ -1,3 +1,9 @@
+import type {
+  AIResponse,
+  AIResponseContent,
+  AIResponseOutput,
+} from './openai-client.types.js';
+
 const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
 
 interface OpenAiModel {
@@ -48,22 +54,6 @@ export function compactJson(value: unknown): string {
     }
   }
   return JSON.stringify(value);
-}
-
-export interface AIResponse {
-  output: AIResponseOutput[];
-}
-
-interface AIResponseOutput {
-  id?: string;
-  type?: string;
-  role?: string;
-  content?: AIResponseContent[];
-}
-
-interface AIResponseContent {
-  type: string;
-  text?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -145,3 +135,9 @@ export async function fetchSupportedModels(apiKey: string): Promise<string[] | n
     return null;
   }
 }
+
+export type {
+  AIResponse,
+  AIResponseContent,
+  AIResponseOutput,
+} from './openai-client.types.js';

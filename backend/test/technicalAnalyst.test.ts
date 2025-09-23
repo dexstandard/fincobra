@@ -41,12 +41,14 @@ const extractJson = vi.hoisted(() => (res: string) => {
   }
 });
 
-vi.mock('../src/services/derivatives.js', () => ({
-  fetchOrderBook: vi.fn().mockResolvedValue({ bid: [0, 0], ask: [0, 0] }),
-}));
-vi.mock('../src/services/binance.js', () => ({
-  fetchFearGreedIndex: fetchFearGreedIndexMock,
+vi.mock('../src/services/binance-client.js', () => ({
   fetchOrder: vi.fn().mockResolvedValue(undefined),
+  fetchOrderBook: vi
+    .fn()
+    .mockResolvedValue({ bid: [0, 0], ask: [0, 0] }),
+}));
+vi.mock('../src/services/sentiment.js', () => ({
+  fetchFearGreedIndex: fetchFearGreedIndexMock,
 }));
 vi.mock('../src/repos/review-raw-log.js', () => ({
   insertReviewRawLog: insertReviewRawLogMock,
@@ -54,7 +56,7 @@ vi.mock('../src/repos/review-raw-log.js', () => ({
 vi.mock('../src/services/indicators.js', () => ({
   fetchTokenIndicators: fetchTokenIndicatorsMock,
 }));
-vi.mock('../src/services/ai.js', () => ({
+vi.mock('../src/services/openai-client.js', () => ({
   callAi: callAiMock,
   extractJson: extractJson,
 }));

@@ -11,7 +11,7 @@ import {
   hasAiKeyShare,
   getAiKeyShareTargets,
 } from '../repos/ai-api-key.js';
-import { verifyAiKey } from '../services/ai.js';
+import { verifyAiKey } from '../services/openai-client.js';
 import { encryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { findUserByEmail } from '../repos/users.js';

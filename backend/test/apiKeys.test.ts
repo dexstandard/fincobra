@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../src/services/binance.js', async () => {
-  const actual = await vi.importActual<typeof import('../src/services/binance.js')>(
-    '../src/services/binance.js',
+vi.mock('../src/services/binance-client.js', async () => {
+  const actual = await vi.importActual<typeof import('../src/services/binance-client.js')>(
+    '../src/services/binance-client.js',
   );
   return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
 });
@@ -18,7 +18,7 @@ import { insertLimitOrder } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { encrypt } from '../src/util/crypto.js';
 import * as portfolioReview from '../src/workflows/portfolio-review.js';
-import { cancelOrder } from '../src/services/binance.js';
+import { cancelOrder } from '../src/services/binance-client.js';
 import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 

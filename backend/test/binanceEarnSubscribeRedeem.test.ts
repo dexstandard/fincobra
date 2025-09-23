@@ -6,7 +6,7 @@ import { createHmac } from 'node:crypto';
 import {
   subscribeEarnFlexible,
   redeemEarnFlexible,
-} from '../src/services/binance.js';
+} from '../src/services/binance-client.js';
 
 describe('binance earn subscribe/redeem helpers', () => {
   afterEach(() => {

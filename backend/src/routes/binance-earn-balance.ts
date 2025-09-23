@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { fetchEarnFlexibleBalance } from '../services/binance.js';
+import { fetchEarnFlexibleBalance } from '../services/binance-client.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 import {parseRequestParams, userTokenParamsSchema} from './_shared/validation.js';

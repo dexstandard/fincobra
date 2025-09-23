@@ -37,7 +37,7 @@ import {
   CANCEL_ORDER_REASONS,
   cancelOrdersForWorkflow,
 } from '../services/order-orchestrator.js';
-import { parseBinanceError } from '../services/binance.js';
+import { parseBinanceError } from '../services/binance-client.js';
 import type { MainTraderDecision, MainTraderOrder } from '../agents/main-trader.js';
 import { getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';

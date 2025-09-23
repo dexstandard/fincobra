@@ -7,7 +7,7 @@ import {
   fetchPairInfo,
   createLimitOrder,
   parseBinanceError,
-} from './binance.js';
+} from './binance-client.js';
 import { TOKEN_SYMBOLS } from '../util/tokens.js';
 
 function splitPair(pair: string): [string, string] {

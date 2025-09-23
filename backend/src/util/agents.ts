@@ -11,7 +11,7 @@ import {
   ERROR_MESSAGES,
   type ErrorResponse,
 } from './errorMessages.js';
-import { fetchTokensBalanceUsd } from '../services/binance.js';
+import { fetchTokensBalanceUsd } from '../services/binance-client.js';
 import { validateAllocations } from './allocations.js';
 
 export enum AgentStatus {

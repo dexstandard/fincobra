@@ -2,15 +2,17 @@ import { createHmac } from 'node:crypto';
 
 import { getBinanceKey } from '../repos/exchange-api-keys.js';
 import { decryptKey } from '../util/crypto.js';
+import type {
+  BinanceAccount,
+  BinanceKeyVerificationResult,
+  Kline,
+  OrderStatusResponse,
+  PairInfo,
+} from './binance-client.types.js';
 
 interface UserCreds {
   key: string;
   secret: string;
-}
-
-export interface BinanceKeyVerificationResult {
-  ok: boolean;
-  reason?: string;
 }
 
 export async function verifyBinanceKey(
@@ -75,16 +77,6 @@ export async function verifyBinanceKey(
   }
 }
 
-export interface BinanceBalance {
-  asset: string;
-  free: string;
-  locked: string;
-}
-
-export interface BinanceAccount {
-  balances: BinanceBalance[];
-}
-
 interface LotSizeFilter {
   filterType: 'LOT_SIZE';
   stepSize: string;
@@ -117,37 +109,6 @@ interface SymbolInfo {
 
 interface ExchangeInfoResponse {
   symbols?: SymbolInfo[];
-}
-
-export type PairInfo = {
-  symbol: string;
-  baseAsset: string;
-  quoteAsset: string;
-  quantityPrecision: number;
-  pricePrecision: number;
-  minNotional: number;
-};
-
-export type Kline = [
-  number,
-  string,
-  string,
-  string,
-  string,
-  string,
-  ...unknown[],
-];
-
-export type OpenOrder = { orderId: number };
-
-export type OrderStatusResponse = {
-  status?: string;
-};
-
-interface FearGreedResponse {
-  data?: { value: string; value_classification: string }[];
-  value?: string;
-  value_classification?: string;
 }
 
 const pairInfoCache = new Map<string, PairInfo>();
@@ -503,6 +464,28 @@ export async function fetchOpenOrders(id: string, opts: { symbol?: string }) {
   });
 }
 
+interface OrderBookResponse {
+  bids: [string, string][];
+  asks: [string, string][];
+}
+
+export async function fetchOrderBook(symbol: string) {
+  const res = await fetch(
+    `https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=5`,
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`failed to fetch order book: ${res.status} ${body}`);
+  }
+  const json = (await res.json()) as OrderBookResponse;
+  const [bestBidP = '0', bestBidQ = '0'] = json.bids[0] ?? [];
+  const [bestAskP = '0', bestAskQ = '0'] = json.asks[0] ?? [];
+  return {
+    bid: [Number(bestBidP), Number(bestBidQ)] as [number, number],
+    ask: [Number(bestAskP), Number(bestAskQ)] as [number, number],
+  };
+}
+
 async function fetchSymbolData(symbol: string) {
   const [priceRes, depthRes, dayRes, yearRes] = await Promise.all([
     fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`),
@@ -619,19 +602,12 @@ export async function fetchMarketTimeseries(symbol: string) {
   };
 }
 
-export type FearGreedIndex = { value: number; classification: string };
-
-export async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
-  const res = await fetch('https://api.alternative.me/fng/');
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(
-      `failed to fetch fear & greed index: ${res.status} ${body}`,
-    );
-  }
-  const json = (await res.json()) as FearGreedResponse;
-  const value = Number(json?.data?.[0]?.value ?? json?.value);
-  const classification =
-    json?.data?.[0]?.value_classification ?? json?.value_classification ?? '';
-  return { value, classification };
-}
+export type {
+  BinanceAccount,
+  BinanceBalance,
+  BinanceKeyVerificationResult,
+  Kline,
+  OpenOrder,
+  OrderStatusResponse,
+  PairInfo,
+} from './binance-client.types.js';
