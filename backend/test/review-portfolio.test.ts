@@ -105,6 +105,7 @@ vi.mock('../src/services/binance-client.js', () => ({
     ],
   }),
   fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
+  fetchPairPrice: vi.fn().mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
   fetchMarketTimeseries: vi.fn().mockResolvedValue(sampleTimeseries),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
