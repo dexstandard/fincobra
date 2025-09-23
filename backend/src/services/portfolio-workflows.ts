@@ -1,37 +1,20 @@
 import type { FastifyBaseLogger } from 'fastify';
+import type { PortfolioWorkflowInput } from '../routes/portfolio-workflows.js';
 import {
   getUserApiKeys,
-  findIdenticalDraftAgent,
+  findIdenticalDraftWorkflow,
   findActiveTokenConflicts,
-} from '../repos/portfolio-workflow.js';
+} from '../repos/portfolio-workflows.js';
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
-import {
-  errorResponse,
-  lengthMessage,
-  ERROR_MESSAGES,
-  type ErrorResponse,
-} from './errorMessages.js';
-import { fetchTokensBalanceUsd } from '../services/binance-client.js';
-import { validateAllocations } from './allocations.js';
+import { errorResponse, lengthMessage, type ErrorResponse } from '../util/errorMessages.js';
+import { fetchTokensBalanceUsd } from './binance-client.js';
+import { validateAllocations } from '../util/allocations.js';
 
-export enum AgentStatus {
+export enum PortfolioWorkflowStatus {
   Active = 'active',
   Inactive = 'inactive',
   Draft = 'draft',
   Retired = 'retired',
-}
-
-export interface AgentInput {
-  model: string;
-  name: string;
-  cash: string;
-  tokens: { token: string; minAllocation: number }[];
-  risk: string;
-  reviewInterval: string;
-  agentInstructions: string;
-  manualRebalance: boolean;
-  useEarn: boolean;
-  status: AgentStatus;
 }
 
 export interface ValidationErr {
@@ -54,10 +37,10 @@ export async function validateTokenConflicts(
   return { code: 400, body: errorResponse(msg) };
 }
 
-async function validateAgentInput(
+async function validateWorkflowInput(
   log: FastifyBaseLogger,
   userId: string,
-  body: AgentInput,
+  body: PortfolioWorkflowInput,
   id?: string,
 ): Promise<ValidationErr | null> {
   body.cash = (body.cash ?? '').toUpperCase();
@@ -73,12 +56,12 @@ async function validateAgentInput(
     log.error('cash token in positions');
     return { code: 400, body: errorResponse('cash token in positions') };
   }
-  if (body.status === AgentStatus.Retired) {
+  if (body.status === PortfolioWorkflowStatus.Retired) {
     log.error('invalid status');
     return { code: 400, body: errorResponse('invalid status') };
   }
   if (!body.model) {
-    if (body.status !== AgentStatus.Draft) {
+    if (body.status !== PortfolioWorkflowStatus.Draft) {
       log.error('model required');
       return { code: 400, body: errorResponse('model required') };
     }
@@ -95,8 +78,8 @@ async function validateAgentInput(
       return { code: 400, body: errorResponse('model not allowed') };
     }
   }
-  if (body.status === AgentStatus.Draft) {
-    const dupDraft = await findIdenticalDraftAgent(
+  if (body.status === PortfolioWorkflowStatus.Draft) {
+    const dupDraft = await findIdenticalDraftWorkflow(
       {
         userId,
         model: body.model,
@@ -112,7 +95,7 @@ async function validateAgentInput(
       id,
     );
     if (dupDraft) {
-      log.error({ agentId: dupDraft.id }, 'identical draft exists');
+      log.error({ workflowId: dupDraft.id }, 'identical draft exists');
       return {
         code: 400,
         body: errorResponse(
@@ -166,12 +149,12 @@ export async function getStartBalance(
   }
 }
 
-export async function prepareAgentForUpsert(
+export async function preparePortfolioWorkflowForUpsert(
   log: FastifyBaseLogger,
   userId: string,
-  body: AgentInput,
+  body: PortfolioWorkflowInput,
   id?: string,
-): Promise<{ body: AgentInput; startBalance: number | null } | ValidationErr> {
+): Promise<{ body: PortfolioWorkflowInput; startBalance: number | null } | ValidationErr> {
   try {
     body.manualRebalance = !!body.manualRebalance;
     body.useEarn = body.useEarn !== false;
@@ -180,10 +163,10 @@ export async function prepareAgentForUpsert(
     log.error('invalid allocations');
     return { code: 400, body: errorResponse('invalid minimum allocations') };
   }
-  const err = await validateAgentInput(log, userId, body, id);
+  const err = await validateWorkflowInput(log, userId, body, id);
   if (err) return err;
   let startBalance: number | null = null;
-  if (body.status === AgentStatus.Active) {
+  if (body.status === PortfolioWorkflowStatus.Active) {
     const keyErr = await ensureApiKeys(log, userId);
     if (keyErr) return keyErr;
     const bal = await getStartBalance(

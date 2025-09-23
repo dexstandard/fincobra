@@ -1,5 +1,5 @@
 import { db, withTransaction } from '../db/index.js';
-import { AgentStatus } from '../util/agents.js';
+import { PortfolioWorkflowStatus } from '../services/portfolio-workflows.js';
 import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
   ActivePortfolioWorkflow,
@@ -8,7 +8,7 @@ import type {
   PortfolioWorkflow,
   PortfolioWorkflowUpdate,
   PortfolioWorkflowUserApiKeys,
-} from './portfolio-workflow.types.js';
+} from './portfolio-workflows.types.js';
 
 export type {
   PortfolioWorkflow,
@@ -17,7 +17,7 @@ export type {
   PortfolioWorkflowInsert,
   PortfolioWorkflowUpdate,
   PortfolioWorkflowUserApiKeys,
-} from './portfolio-workflow.types.js';
+} from './portfolio-workflows.types.js';
 
 export function toApi(row: PortfolioWorkflow) {
   return {
@@ -57,23 +57,23 @@ const baseSelect = `
     LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
 `;
 
-export async function getAgent(id: string): Promise<PortfolioWorkflow | undefined> {
+export async function getPortfolioWorkflow(id: string): Promise<PortfolioWorkflow | undefined> {
   const { rows } = await db.query(
     `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id`,
-    [id, AgentStatus.Retired],
+    [id, PortfolioWorkflowStatus.Retired],
   );
   if (!rows[0]) return undefined;
   return convertKeysToCamelCase(rows[0]) as PortfolioWorkflow;
 }
 
-export async function getAgentsPaginated(
+export async function getPortfolioWorkflowsPaginated(
   userId: string,
   status: string | undefined,
   limit: number,
   offset: number,
 ) {
   if (status) {
-    if (status === AgentStatus.Retired) return { rows: [], total: 0 };
+    if (status === PortfolioWorkflowStatus.Retired) return { rows: [], total: 0 };
     const where = 'WHERE pw.user_id = $1 AND pw.status = $2';
     const totalRes = await db.query(
       `SELECT COUNT(*) as count FROM portfolio_workflow pw ${where}`,
@@ -91,11 +91,11 @@ export async function getAgentsPaginated(
   const where = 'WHERE pw.user_id = $1 AND pw.status != $2';
   const totalRes = await db.query(
     `SELECT COUNT(*) as count FROM portfolio_workflow pw ${where}`,
-    [userId, AgentStatus.Retired],
+    [userId, PortfolioWorkflowStatus.Retired],
   );
   const { rows } = await db.query(
     `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $3 OFFSET $4`,
-    [userId, AgentStatus.Retired, limit, offset],
+    [userId, PortfolioWorkflowStatus.Retired, limit, offset],
   );
   return {
     rows: convertKeysToCamelCase(rows) as PortfolioWorkflow[],
@@ -103,7 +103,7 @@ export async function getAgentsPaginated(
   };
 }
 
-export async function findIdenticalDraftAgent(
+export async function findIdenticalDraftWorkflow(
   data: PortfolioWorkflowDraftSearch,
   excludeId?: string,
 ) {
@@ -175,7 +175,7 @@ export async function getUserApiKeys(userId: string) {
   return convertKeysToCamelCase(rows[0]) as PortfolioWorkflowUserApiKeys;
 }
 
-export async function insertAgent(
+export async function insertPortfolioWorkflow(
   data: PortfolioWorkflowInsert,
 ): Promise<PortfolioWorkflow> {
   let id = '';
@@ -211,10 +211,10 @@ export async function insertAgent(
         params,
       );
   });
-  return (await getAgent(id))!;
+  return (await getPortfolioWorkflow(id))!;
 }
 
-export async function updateAgent(
+export async function updatePortfolioWorkflow(
   data: PortfolioWorkflowUpdate,
 ): Promise<void> {
   await withTransaction(async (client) => {
@@ -249,27 +249,27 @@ export async function updateAgent(
   });
 }
 
-export async function deleteAgent(id: string): Promise<void> {
+export async function deletePortfolioWorkflow(id: string): Promise<void> {
   await db.query(
     'UPDATE portfolio_workflow SET status = $1, start_balance = NULL WHERE id = $2',
-    [AgentStatus.Retired, id],
+    [PortfolioWorkflowStatus.Retired, id],
   );
 }
 
-export async function startAgent(
+export async function startPortfolioWorkflow(
   id: string,
   startBalance: number,
 ): Promise<void> {
   await db.query(
     'UPDATE portfolio_workflow SET status = $1, start_balance = $2 WHERE id = $3',
-    [AgentStatus.Active, startBalance, id],
+    [PortfolioWorkflowStatus.Active, startBalance, id],
   );
 }
 
-export async function stopAgent(id: string): Promise<void> {
+export async function stopPortfolioWorkflow(id: string): Promise<void> {
   await db.query(
     'UPDATE portfolio_workflow SET status = $1, start_balance = NULL WHERE id = $2',
-    [AgentStatus.Inactive, id],
+    [PortfolioWorkflowStatus.Inactive, id],
   );
 }
 
@@ -429,7 +429,7 @@ export async function deactivateWorkflowsByUser(
   if (!aiKeyId) {
     await db.query(
       `UPDATE portfolio_workflow SET status = $1, start_balance = NULL WHERE user_id = $2 AND status = $3`,
-      [AgentStatus.Inactive, userId, AgentStatus.Active],
+      [PortfolioWorkflowStatus.Inactive, userId, PortfolioWorkflowStatus.Active],
     );
     return;
   }
@@ -461,7 +461,7 @@ export async function deactivateWorkflowsByUser(
                  LIMIT 1
               )
             ) = $4`,
-    [AgentStatus.Inactive, userId, AgentStatus.Active, aiKeyId],
+    [PortfolioWorkflowStatus.Inactive, userId, PortfolioWorkflowStatus.Active, aiKeyId],
   );
 }
 
@@ -476,6 +476,6 @@ export async function deactivateWorkflowsByIds(
             start_balance = NULL
       WHERE id = ANY($2::bigint[])
         AND status = $3`,
-    [AgentStatus.Inactive, ids, AgentStatus.Active],
+    [PortfolioWorkflowStatus.Inactive, ids, PortfolioWorkflowStatus.Active],
   );
 }

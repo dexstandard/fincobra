@@ -4,7 +4,7 @@ import {
   CANCEL_ORDER_REASONS,
 } from '../src/services/order-orchestrator.js';
 import { insertUser } from './repos/users.js';
-import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import {
   insertLimitOrder,
@@ -41,7 +41,7 @@ describe('syncOpenOrderStatuses', () => {
 
   async function setupOrder(orderId = '123') {
     const userId = await insertUser('user-1');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',

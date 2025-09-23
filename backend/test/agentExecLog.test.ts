@@ -3,7 +3,7 @@ import buildServer from '../src/server.js';
 import { parseExecLog } from '../src/util/parse-exec-log.js';
 import { insertReviewResult } from '../src/repos/review-result.js';
 import { insertUser } from './repos/users.js';
-import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewRawLog } from './repos/review-raw-log.js';
 import { insertLimitOrder, getLimitOrder, getLimitOrdersByReviewResult } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
@@ -11,12 +11,12 @@ import { db } from '../src/db/index.js';
 import * as binance from '../src/services/binance-client.js';
 import { authCookies } from './helpers.js';
 
-describe('agent exec log routes', () => {
+describe('portfolio workflow exec log routes', () => {
   it('returns orders for log and enforces ownership', async () => {
     const app = await buildServer();
     const user1Id = await insertUser('10');
     const user2Id = await insertUser('11');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId: user1Id,
       model: 'gpt',
       status: 'active',
@@ -72,7 +72,7 @@ describe('agent exec log routes', () => {
     const app = await buildServer();
     const user1Id = await insertUser('12');
     const user2Id = await insertUser('13');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId: user1Id,
       model: 'gpt',
       status: 'active',
@@ -126,7 +126,7 @@ describe('agent exec log routes', () => {
   it('marks order filled when cancel returns FILLED', async () => {
     const app = await buildServer();
     const userId = await insertUser('40');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -168,7 +168,7 @@ describe('agent exec log routes', () => {
     const app = await buildServer();
     const user1Id = await insertUser('20');
     const user2Id = await insertUser('21');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId: user1Id,
       model: 'gpt',
       status: 'active',
@@ -214,7 +214,7 @@ describe('agent exec log routes', () => {
     const user1Id = await insertUser('1');
     const user2Id = await insertUser('2');
 
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId: user1Id,
       model: 'gpt',
       status: 'active',
@@ -230,13 +230,13 @@ describe('agent exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const agentId = agent.id;
+    const workflowId = agent.id;
 
     for (let i = 0; i < 3; i++) {
-      await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: `prompt-${i}`, response: `log-${i}` });
+      await insertReviewRawLog({ portfolioWorkflowId: workflowId, prompt: `prompt-${i}`, response: `log-${i}` });
       const parsed = parseExecLog(`log-${i}`);
       await insertReviewResult({
-        portfolioWorkflowId: agentId,
+        portfolioWorkflowId: workflowId,
         log: parsed.response ? JSON.stringify(parsed.response) : parsed.text,
         ...(parsed.response
           ? {
@@ -250,7 +250,7 @@ describe('agent exec log routes', () => {
 
     let res = await app.inject({
       method: 'GET',
-      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=2`,
+      url: `/api/portfolio-workflows/${workflowId}/exec-log?page=1&pageSize=2`,
       cookies: authCookies(user1Id),
     });
     expect(res.statusCode).toBe(200);
@@ -259,7 +259,7 @@ describe('agent exec log routes', () => {
 
     res = await app.inject({
       method: 'GET',
-      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=2`,
+      url: `/api/portfolio-workflows/${workflowId}/exec-log?page=1&pageSize=2`,
       cookies: authCookies(user2Id),
     });
     expect(res.statusCode).toBe(403);
@@ -271,7 +271,7 @@ describe('agent exec log routes', () => {
     const app = await buildServer();
     const userId = await insertUser('3');
 
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -287,7 +287,7 @@ describe('agent exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const agentId = agent.id;
+    const workflowId = agent.id;
 
     const aiLog = JSON.stringify({
       object: 'response',
@@ -307,10 +307,10 @@ describe('agent exec log routes', () => {
       ],
     });
 
-    await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: 'p', response: aiLog });
+    await insertReviewRawLog({ portfolioWorkflowId: workflowId, prompt: 'p', response: aiLog });
     const parsedAi = parseExecLog(aiLog);
     await insertReviewResult({
-      portfolioWorkflowId: agentId,
+      portfolioWorkflowId: workflowId,
       log: JSON.stringify(parsedAi.response),
       rebalance: true,
       shortReport: parsedAi.response?.shortReport,
@@ -319,7 +319,7 @@ describe('agent exec log routes', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=10`,
+      url: `/api/portfolio-workflows/${workflowId}/exec-log?page=1&pageSize=10`,
       cookies: authCookies(userId),
     });
 
@@ -344,7 +344,7 @@ describe('agent exec log routes', () => {
   it('handles exec log entries with prompt wrapper', async () => {
     const app = await buildServer();
     const userId = await insertUser('5');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -360,12 +360,12 @@ describe('agent exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const agentId = agent.id;
+    const workflowId = agent.id;
     const entry = JSON.stringify({ prompt: { instructions: 'inst' }, response: 'ok' });
-    await insertReviewRawLog({ portfolioWorkflowId: agentId, prompt: 'p', response: entry });
+    await insertReviewRawLog({ portfolioWorkflowId: workflowId, prompt: 'p', response: entry });
     const parsedP = parseExecLog(entry);
     await insertReviewResult({
-      portfolioWorkflowId: agentId,
+      portfolioWorkflowId: workflowId,
       log: parsedP.response ? JSON.stringify(parsedP.response) : parsedP.text,
       ...(parsedP.response
         ? {
@@ -377,7 +377,7 @@ describe('agent exec log routes', () => {
     });
     const res = await app.inject({
       method: 'GET',
-      url: `/api/portfolio-workflows/${agentId}/exec-log?page=1&pageSize=10`,
+      url: `/api/portfolio-workflows/${workflowId}/exec-log?page=1&pageSize=10`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -389,7 +389,7 @@ describe('agent exec log routes', () => {
   it('creates manual rebalance order once', async () => {
     const app = await buildServer();
     const userId = await insertUser('20');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -463,7 +463,7 @@ describe('agent exec log routes', () => {
   it('rejects manual rebalance order below minimum value', async () => {
     const app = await buildServer();
     const userId = await insertUser('60');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -529,7 +529,7 @@ describe('agent exec log routes', () => {
   it('previews manual rebalance order', async () => {
     const app = await buildServer();
     const userId = await insertUser('21');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -583,7 +583,7 @@ describe('agent exec log routes', () => {
   it('returns binance error message when limit order fails', async () => {
     const app = await buildServer();
     const userId = await insertUser('31');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -669,7 +669,7 @@ describe('agent exec log routes', () => {
   it('filters exec log by rebalanceOnly', async () => {
     const app = await buildServer();
     const userId = await insertUser('9');
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',

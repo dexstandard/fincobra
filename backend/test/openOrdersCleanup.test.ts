@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { insertUser } from './repos/users.js';
-import { insertAgent } from './repos/portfolio-workflow.js';
+import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { mockLogger } from './helpers.js';
 import {
@@ -9,7 +9,7 @@ import {
 } from '../src/repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { setAiKey } from '../src/repos/ai-api-key.js';
-import { reviewAgentPortfolio } from '../src/workflows/portfolio-review.js';
+import { reviewWorkflowPortfolio } from '../src/workflows/portfolio-review.js';
 
 const sampleIndicators = vi.hoisted(() => ({
   ret1h: 0,
@@ -91,7 +91,7 @@ describe('cleanup open orders', () => {
   it('cancels open orders before running agent', async () => {
     const userId = await insertUser('1');
     await setAiKey({ userId, apiKeyEnc: 'enc' });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -121,7 +121,7 @@ describe('cleanup open orders', () => {
       orderId: '123',
     });
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent.id);
+    await reviewWorkflowPortfolio(log, agent.id);
     expect(cancelOrder).toHaveBeenCalledTimes(1);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe(LimitOrderStatus.Canceled);
@@ -138,7 +138,7 @@ describe('cleanup open orders', () => {
 
     const userId = await insertUser('1');
     await setAiKey({ userId, apiKeyEnc: 'enc' });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -176,7 +176,7 @@ describe('cleanup open orders', () => {
     });
 
     const log = mockLogger();
-    const runPromise = reviewAgentPortfolio(log, agent.id);
+    const runPromise = reviewWorkflowPortfolio(log, agent.id);
     await vi.waitUntil(() => cancelOrder.mock.calls.length === 2);
     resolves.forEach((r) => r());
     await runPromise;
@@ -193,7 +193,7 @@ describe('cleanup open orders', () => {
     fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
     const userId = await insertUser('1');
     await setAiKey({ userId, apiKeyEnc: 'enc' });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -223,7 +223,7 @@ describe('cleanup open orders', () => {
       orderId: '123',
     });
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent.id);
+    await reviewWorkflowPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe(LimitOrderStatus.Filled);
     expect(orders[0].cancellationReason).toBeNull();
@@ -235,7 +235,7 @@ describe('cleanup open orders', () => {
     fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
     const userId = await insertUser('1');
     await setAiKey({ userId, apiKeyEnc: 'enc' });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -265,7 +265,7 @@ describe('cleanup open orders', () => {
       orderId: '123',
     });
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent.id);
+    await reviewWorkflowPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe(LimitOrderStatus.Canceled);
     expect(orders[0].cancellationReason).toBe('Could not fill within interval');
@@ -275,7 +275,7 @@ describe('cleanup open orders', () => {
     cancelOrder.mockResolvedValueOnce({ status: 'FILLED' } as any);
     const userId = await insertUser('2');
     await setAiKey({ userId, apiKeyEnc: 'enc' });
-    const agent = await insertAgent({
+    const agent = await insertPortfolioWorkflow({
       userId,
       model: 'gpt',
       status: 'active',
@@ -305,7 +305,7 @@ describe('cleanup open orders', () => {
       orderId: '789',
     });
     const log = mockLogger();
-    await reviewAgentPortfolio(log, agent.id);
+    await reviewWorkflowPortfolio(log, agent.id);
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
     expect(orders[0].status).toBe(LimitOrderStatus.Filled);
     expect(orders[0].cancellationReason).toBeNull();
