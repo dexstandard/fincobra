@@ -54,7 +54,7 @@ const workflowUpsertSchema = z
   .object({
     model: z.string().optional().transform((value) => value ?? ''),
     name: z.string(),
-    cash: z.string(),
+    cash: z.string().optional().transform((value) => value ?? ''),
     tokens: z.array(workflowTokenSchema),
     risk: z.string(),
     reviewInterval: z.string(),

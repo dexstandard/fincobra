@@ -8,7 +8,22 @@ import {
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
 import { errorResponse, lengthMessage, type ErrorResponse } from '../util/errorMessages.js';
 import { fetchTokensBalanceUsd } from './binance-client.js';
-import { validateAllocations } from '../util/allocations.js';
+
+interface TokenAllocation {
+  token: string;
+  minAllocation: number;
+}
+
+function validateAllocations(tokens: TokenAllocation[]) {
+  let total = 0;
+  for (const allocation of tokens) {
+    if (allocation.minAllocation < 0 || allocation.minAllocation > 95)
+      throw new Error('invalid minimum allocations');
+    total += allocation.minAllocation;
+  }
+  if (total > 95) throw new Error('invalid minimum allocations');
+  return tokens;
+}
 
 export enum PortfolioWorkflowStatus {
   Active = 'active',
