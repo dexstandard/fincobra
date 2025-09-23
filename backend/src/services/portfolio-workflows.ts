@@ -6,7 +6,7 @@ import {
   findActiveTokenConflicts,
 } from '../repos/portfolio-workflows.js';
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
-import { errorResponse, lengthMessage, type ErrorResponse } from '../util/errorMessages.js';
+import { errorResponse, lengthMessage, type ErrorResponse } from '../util/error-messages.js';
 import { fetchTokensBalanceUsd } from './binance-client.js';
 
 interface TokenAllocation {

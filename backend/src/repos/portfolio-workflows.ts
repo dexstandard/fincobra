@@ -1,6 +1,6 @@
 import { db, withTransaction } from '../db/index.js';
 import { PortfolioWorkflowStatus } from '../services/portfolio-workflows.js';
-import { convertKeysToCamelCase } from '../util/objectCase.js';
+import { convertKeysToCamelCase } from '../util/object-case.js';
 import type {
   ActivePortfolioWorkflow,
   PortfolioWorkflowDraftSearch,

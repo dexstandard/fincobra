@@ -9,7 +9,7 @@ import type {
 } from '../repos/ai-api-key.types.js';
 import { fetchSupportedModels } from '../services/openai-client.js';
 import { decryptKey } from '../util/crypto.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 
 const CACHE_TTL_SEC = 6 * 60 * 60;

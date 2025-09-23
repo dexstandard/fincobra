@@ -12,7 +12,7 @@ import {
   type PortfolioWorkflow,
 } from '../repos/portfolio-workflows.js';
 import { getPortfolioReviewResults } from '../repos/review-result.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import {
   reviewWorkflowPortfolio,
   removeWorkflowFromSchedule,

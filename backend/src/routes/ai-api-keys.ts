@@ -13,7 +13,7 @@ import {
 } from '../repos/ai-api-key.js';
 import { verifyAiKey } from '../services/openai-client.js';
 import { encryptKey } from '../util/crypto.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { findUserByEmail } from '../repos/users.js';
 import {
   disableUserWorkflowsByAiKey,

@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { errorResponse, ERROR_MESSAGES } from './errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from './error-messages.js';
 import { getUser } from '../repos/users.js';
 import jwt from 'jsonwebtoken';
 import { env } from './env.js';

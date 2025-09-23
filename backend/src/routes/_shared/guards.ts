@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { requireAdmin, requireUserId } from '../../util/auth.js';
-import { errorResponse, ERROR_MESSAGES } from '../../util/errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from '../../util/error-messages.js';
 import { parseRequestParams, userIdParams } from './validation.js';
 
 export async function parseUserIdParam(

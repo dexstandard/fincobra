@@ -11,7 +11,7 @@ import {
   type BinanceKeyVerificationResult,
 } from '../services/binance-client.js';
 import { encryptKey } from '../util/crypto.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { REDACTED_KEY } from './_shared/constants.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 import {

@@ -10,7 +10,7 @@ import {
     getUserTotpStatus,
     setUserTotpSecret,
 } from '../repos/users.js';
-import { errorResponse } from '../util/errorMessages.js';
+import { errorResponse } from '../util/error-messages.js';
 import { getValidatedUserId, sessionPreHandlers } from './_shared/guards.js';
 
 const OTP_ISSUER = 'FinCobra' as const;
