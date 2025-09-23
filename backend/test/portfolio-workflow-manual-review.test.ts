@@ -12,7 +12,7 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
   reviewWorkflowPortfolio: reviewWorkflowPortfolioMock,
 }));
 
-describe('manual review endpoint', () => {
+describe('portfolio workflow manual review endpoint', () => {
   it('triggers portfolio review', async () => {
     const app = await buildServer();
     const userId = await insertUser('1');
