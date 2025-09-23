@@ -82,7 +82,7 @@ export default async function buildServer(
     }),
   });
 
-  await fetchOutputIp();
+  await fetchOutputIp(app.log);
 
   for (const file of fs.readdirSync(routesDir)) {
     if (file.endsWith('.js') || (file.endsWith('.ts') && !file.endsWith('.d.ts'))) {
