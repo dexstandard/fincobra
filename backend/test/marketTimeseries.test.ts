@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchMarketTimeseries } from '../src/services/binance.js';
+import { fetchMarketTimeseries } from '../src/services/binance-client.js';
 
 describe('fetchMarketTimeseries', () => {
   afterEach(() => {

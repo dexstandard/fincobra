@@ -3,9 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { mockLogger } from './helpers.js';
 import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflow.js';
 import { collectPromptData } from '../src/agents/main-trader.js';
-import { fetchAccount } from '../src/services/binance.js';
+import { fetchAccount } from '../src/services/binance-client.js';
 
-vi.mock('../src/services/binance.js', () => ({
+vi.mock('../src/services/binance-client.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
       { asset: 'BTC', free: '1', locked: '0' },

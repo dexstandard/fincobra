@@ -8,7 +8,7 @@ import { insertReviewRawLog } from './repos/review-raw-log.js';
 import { insertLimitOrder, getLimitOrder, getLimitOrdersByReviewResult } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { db } from '../src/db/index.js';
-import * as binance from '../src/services/binance.js';
+import * as binance from '../src/services/binance-client.js';
 import { authCookies } from './helpers.js';
 
 describe('agent exec log routes', () => {

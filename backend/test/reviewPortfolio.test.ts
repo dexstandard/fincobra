@@ -97,7 +97,7 @@ vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
 }));
 
-vi.mock('../src/services/binance.js', () => ({
+vi.mock('../src/services/binance-client.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
       { asset: 'BTC', free: '1', locked: '0.5' },
@@ -116,10 +116,13 @@ vi.mock('../src/services/binance.js', () => ({
   }),
   cancelOrder: vi.fn().mockResolvedValue(undefined),
   parseBinanceError: vi.fn().mockReturnValue({}),
+  fetchOrder: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../src/services/sentiment.js', () => ({
   fetchFearGreedIndex: vi
     .fn()
     .mockResolvedValue({ value: 50, classification: 'Neutral' }),
-  fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../src/services/indicators.js', () => ({

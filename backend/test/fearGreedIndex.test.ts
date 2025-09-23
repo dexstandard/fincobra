@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchFearGreedIndex } from '../src/services/binance.js';
+import { fetchFearGreedIndex } from '../src/services/sentiment.js';
 
 describe('fetchFearGreedIndex', () => {
   afterEach(() => {

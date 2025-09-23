@@ -14,17 +14,12 @@ import {
   fetchOrder,
   parseBinanceError,
   type OpenOrder,
-} from './binance.js';
+} from './binance-client.js';
 import { cancelLimitOrder } from './limit-order.js';
+import type { CancelOrderReason } from './order-orchestrator.types.js';
 
-export const CANCEL_ORDER_REASONS = {
-  API_KEY_REMOVED: 'API key removed',
-  WORKFLOW_DELETED: 'Workflow deleted',
-  WORKFLOW_STOPPED: 'Workflow stopped',
-} as const;
-
-export type CancelOrderReason =
-  (typeof CANCEL_ORDER_REASONS)[keyof typeof CANCEL_ORDER_REASONS];
+export { CANCEL_ORDER_REASONS } from './order-orchestrator.types.js';
+export type { CancelOrderReason } from './order-orchestrator.types.js';
 
 interface CancelOrdersForWorkflowOptions {
   workflowId: string;

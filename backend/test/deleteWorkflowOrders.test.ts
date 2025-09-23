@@ -18,9 +18,9 @@ const { cancelOrder } = vi.hoisted(() => ({
   cancelOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../src/services/binance.js', async () => {
-  const actual = await vi.importActual<typeof import('../src/services/binance.js')>(
-    '../src/services/binance.js',
+vi.mock('../src/services/binance-client.js', async () => {
+  const actual = await vi.importActual<typeof import('../src/services/binance-client.js')>(
+    '../src/services/binance-client.js',
   );
   return { ...actual, cancelOrder };
 });

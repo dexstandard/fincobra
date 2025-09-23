@@ -6,7 +6,7 @@ import { createHmac } from 'node:crypto';
 import {
   createLimitOrder,
   cancelOrder,
-} from '../src/services/binance.js';
+} from '../src/services/binance-client.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 
 describe('binance order helpers', () => {

@@ -20,7 +20,7 @@ const { fetchOpenOrders, fetchOrder, parseBinanceError } = vi.hoisted(() => ({
   parseBinanceError: vi.fn(),
 }));
 
-vi.mock('../src/services/binance.js', () => ({
+vi.mock('../src/services/binance-client.js', () => ({
   fetchOpenOrders,
   fetchOrder,
   parseBinanceError,

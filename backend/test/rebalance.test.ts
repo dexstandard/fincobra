@@ -7,7 +7,7 @@ import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { db } from '../src/db/index.js';
 
-vi.mock('../src/services/binance.js', () => ({
+vi.mock('../src/services/binance-client.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
       { asset: 'USDT', free: '1000', locked: '0' },
@@ -34,7 +34,7 @@ import {
   fetchAccount,
   fetchPairData,
   fetchPairInfo,
-} from '../src/services/binance.js';
+} from '../src/services/binance-client.js';
 
 describe('createDecisionLimitOrders', () => {
   beforeEach(async () => {

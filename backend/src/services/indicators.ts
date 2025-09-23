@@ -1,4 +1,4 @@
-import {fetchPairData, type Kline} from './binance.js';
+import {fetchPairData, type Kline} from './binance-client.js';
 import type {TokenIndicators} from './indicators.types.js';
 
 function pctChange(current: number, past: number) {

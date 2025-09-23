@@ -1,4 +1,4 @@
-import { cancelOrder, fetchOrder, parseBinanceError } from './binance.js';
+import { cancelOrder, fetchOrder, parseBinanceError } from './binance-client.js';
 import { updateLimitOrderStatus } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 
