@@ -34,7 +34,7 @@ function sanitize(obj: unknown): unknown {
 export default async function buildServer(
   routesDir: string = path.join(new URL('.', import.meta.url).pathname, 'routes'),
 ): Promise<FastifyInstance> {
-  await migrate();
+  // await migrate();
   const app = Fastify({
     logger: {
       base: undefined,
