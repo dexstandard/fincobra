@@ -1,8 +1,3 @@
-DROP TABLE IF EXISTS agent_tokens;
-DROP TABLE IF EXISTS agent_review_result;
-DROP TABLE IF EXISTS agent_review_raw_log;
-DROP TABLE IF EXISTS agents;
-
 CREATE TABLE IF NOT EXISTS migrations(
   id TEXT PRIMARY KEY,
   run_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
