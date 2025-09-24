@@ -22,5 +22,3 @@ export const STABLECOINS = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP'] as co
 export function isStablecoin(sym: string): boolean {
   return STABLECOINS.includes(sym.toUpperCase() as any);
 }
-
-export type { TokenTags } from './tokens.types.js';

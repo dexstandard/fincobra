@@ -12,5 +12,3 @@ export function lengthMessage(field: string, max: number) {
 export function errorResponse(message: string): ErrorResponse {
   return { error: message };
 }
-
-export type { ErrorResponse } from './error-messages.types.js';

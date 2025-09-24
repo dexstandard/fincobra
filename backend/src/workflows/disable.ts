@@ -14,8 +14,6 @@ import {
 } from '../services/order-orchestrator.js';
 import { removeWorkflowFromSchedule } from './portfolio-review.js';
 
-export type { DisableWorkflowsSummary } from './disable.types.js';
-
 async function disableWorkflowSet(
   log: FastifyBaseLogger,
   workflows: ActivePortfolioWorkflow[],

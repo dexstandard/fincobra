@@ -18,8 +18,6 @@ import type {
   MainTraderOrder,
 } from './main-trader.types.js';
 
-export type { MainTraderDecision, MainTraderOrder } from './main-trader.types.js';
-
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
   '- You lead a crypto analyst team (news, technical). Reports from each member are attached.',

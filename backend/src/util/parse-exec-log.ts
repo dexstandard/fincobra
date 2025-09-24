@@ -1,12 +1,6 @@
 import type { ExecOrder, ParsedExecLog } from './parse-exec-log.types.js';
 import { TOKEN_SYMBOLS } from './tokens.js';
 
-export type {
-  ExecOrder,
-  ParsedExecLog,
-  ParsedExecLogResponse,
-} from './parse-exec-log.types.js';
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

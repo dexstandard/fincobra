@@ -44,11 +44,6 @@ import type {
 import { getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
-export type {
-  PortfolioWorkflowInput,
-  PortfolioWorkflowTokenInput,
-} from './portfolio-workflows.types.js';
-
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
 const orderIdParams = z.object({ logId: z.string().regex(/^\d+$/), orderId: z.string() });

@@ -9,7 +9,8 @@ import {
   findActiveTokenConflicts,
 } from '../repos/portfolio-workflows.js';
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
-import { errorResponse, lengthMessage, type ErrorResponse } from '../util/error-messages.js';
+import { errorResponse, lengthMessage } from '../util/error-messages.js';
+import type { ErrorResponse } from '../util/error-messages.types.js';
 import { fetchTokensBalanceUsd } from './binance-client.js';
 
 function validateAllocations(tokens: PortfolioWorkflowTokenInput[]) {
