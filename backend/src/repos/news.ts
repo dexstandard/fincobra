@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { convertKeysToCamelCase } from '../util/object-case.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type { NewsEntry, NewsInsert } from './news.types.js';
 
 export async function insertNews(items: NewsInsert[]): Promise<void> {

@@ -1,7 +1,7 @@
 import { db } from '../db/index.js';
 import { encrypt, decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
-import { convertKeysToCamelCase } from '../util/object-case.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
   UserAuthInfo,
   UserDetails,

@@ -1,11 +1,9 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { fetchTokenIndicators } from '../services/indicators.js';
-import type { TokenIndicators } from '../services/indicators.types.js';
-import { fetchOrderBook } from '../services/binance-client.js';
-import { fetchFearGreedIndex } from '../services/sentiment.js';
-import type { FearGreedIndex } from '../services/sentiment.types.js';
+import { fetchTokenIndicators, type TokenIndicators } from '../services/indicators.js';
+import { fetchOrderBook } from '../services/derivatives.js';
+import { fetchFearGreedIndex, type FearGreedIndex } from '../services/binance.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
-import { callAi, extractJson } from '../services/openai-client.js';
+import { callAi, extractJson } from '../util/ai.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
   type RebalancePrompt,

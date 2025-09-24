@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { errorResponse } from '../util/error-messages.js';
+import { errorResponse } from '../util/errorMessages.js';
 import { decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
 import { getUser, listUsers, setUserEnabled } from '../repos/users.js';

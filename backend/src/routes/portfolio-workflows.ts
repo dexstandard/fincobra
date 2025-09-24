@@ -1,44 +1,44 @@
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
-  getPortfolioWorkflow,
-  getPortfolioWorkflowsPaginated,
+  getAgent,
+  getAgentsPaginated,
   toApi,
-  insertPortfolioWorkflow,
-  updatePortfolioWorkflow,
-  deletePortfolioWorkflow as repoDeleteWorkflow,
-  startPortfolioWorkflow as repoStartWorkflow,
-  stopPortfolioWorkflow as repoStopWorkflow,
-} from '../repos/portfolio-workflows.js';
-import type { PortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
+  insertAgent,
+  updateAgent,
+  deleteAgent as repoDeleteAgent,
+  startAgent as repoStartAgent,
+  stopAgent as repoStopAgent,
+  type PortfolioWorkflow,
+} from '../repos/portfolio-workflow.js';
 import { getPortfolioReviewResults } from '../repos/review-result.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import {
-  reviewWorkflowPortfolio,
+  reviewAgentPortfolio,
   removeWorkflowFromSchedule,
 } from '../workflows/portfolio-review.js';
 import { requireUserId } from '../util/auth.js';
 import { RATE_LIMITS } from '../rate-limit.js';
 import {
-  PortfolioWorkflowStatus,
-  preparePortfolioWorkflowForUpsert,
+  AgentStatus,
+  type AgentInput,
+  prepareAgentForUpsert,
   validateTokenConflicts,
   ensureApiKeys,
   getStartBalance,
-} from '../services/portfolio-workflows.js';
+} from '../util/agents.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { getRebalanceInfo } from '../repos/review-result.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
-import { cancelOrdersForWorkflow } from '../services/order-orchestrator.js';
-import { CANCEL_ORDER_REASONS } from '../services/order-orchestrator.types.js';
-import { parseBinanceError } from '../services/binance-client.js';
-import type {
-  MainTraderDecision,
-  MainTraderOrder,
-} from '../agents/main-trader.types.js';
+import {
+  CANCEL_ORDER_REASONS,
+  cancelOrdersForWorkflow,
+} from '../services/order-orchestrator.js';
+import { parseBinanceError } from '../services/binance.js';
+import type { MainTraderDecision, MainTraderOrder } from '../agents/main-trader.js';
 import { getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
@@ -46,30 +46,10 @@ const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
 const orderIdParams = z.object({ logId: z.string().regex(/^\d+$/), orderId: z.string() });
 
-const workflowTokenSchema = z.object({
-  token: z.string(),
-  minAllocation: z.number(),
-});
-
-const workflowUpsertSchema = z
-  .object({
-    model: z.string().optional().transform((value) => value ?? ''),
-    name: z.string(),
-    cash: z.string().optional().transform((value) => value ?? ''),
-    tokens: z.array(workflowTokenSchema),
-    risk: z.string(),
-    reviewInterval: z.string(),
-    agentInstructions: z.string(),
-    manualRebalance: z.boolean().optional().default(false),
-    useEarn: z.boolean().optional().default(true),
-    status: z.nativeEnum(PortfolioWorkflowStatus),
-  })
-  .strip();
-
 const paginationQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).optional(),
   pageSize: z.string().regex(/^\d+$/).optional(),
-  status: z.nativeEnum(PortfolioWorkflowStatus).optional(),
+  status: z.nativeEnum(AgentStatus).optional(),
 });
 
 const execLogQuerySchema = z.object({
@@ -127,8 +107,8 @@ async function getWorkflowForRequest(
   if (!params) return;
   const { id } = params;
   const log = req.log.child({ userId, workflowId: id });
-  const workflow = await getPortfolioWorkflow(id);
-  if (!workflow || workflow.status === PortfolioWorkflowStatus.Retired) {
+  const workflow = await getAgent(id);
+  if (!workflow || workflow.status === AgentStatus.Retired) {
     log.error('workflow not found');
     reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
     return;
@@ -201,7 +181,7 @@ function isValidManualOrder(value: unknown): value is MainTraderOrder {
 function parsePaginationQuery(
   req: FastifyRequest,
   reply: FastifyReply,
-): { page: number; pageSize: number; status?: PortfolioWorkflowStatus } | undefined {
+): { page: number; pageSize: number; status?: AgentStatus } | undefined {
   const result = paginationQuerySchema.safeParse(req.query);
   if (!result.success) {
     reply.code(400).send(errorResponse('invalid query parameter'));
@@ -256,7 +236,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { page, pageSize, status } = pagination;
       const offset = (page - 1) * pageSize;
       const log = req.log.child({ userId });
-      const { rows, total } = await getPortfolioWorkflowsPaginated(userId, status, pageSize, offset);
+      const { rows, total } = await getAgentsPaginated(userId, status, pageSize, offset);
       log.info('listed workflows');
       return {
         items: rows.map(toApi),
@@ -274,15 +254,14 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       preHandler: sessionPreHandlers,
     },
     async (req, reply) => {
-      const body = parseBody(workflowUpsertSchema, req, reply);
-      if (!body) return;
+      const body = req.body as AgentInput;
       const userId = getValidatedUserId(req);
       const log = req.log.child({ userId });
-      const res = await preparePortfolioWorkflowForUpsert(log, userId, body);
+      const res = await prepareAgentForUpsert(log, userId, body);
       if ('code' in res) return reply.code(res.code).send(res.body);
       const { body: validated, startBalance } = res;
       const status = validated.status;
-      const row = await insertPortfolioWorkflow({
+      const row = await insertAgent({
         userId,
         model: validated.model,
         status,
@@ -296,8 +275,8 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
       });
-      if (status === PortfolioWorkflowStatus.Active)
-        reviewWorkflowPortfolio(req.log, row.id).catch((err) =>
+      if (status === AgentStatus.Active)
+        reviewAgentPortfolio(req.log, row.id).catch((err) =>
           log.error({ err, workflowId: row.id }, 'initial review failed'),
         );
       log.info({ workflowId: row.id }, 'created workflow');
@@ -603,13 +582,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { userId, id, log } = ctx;
-      const body = parseBody(workflowUpsertSchema, req, reply);
-      if (!body) return;
-      const res = await preparePortfolioWorkflowForUpsert(log, userId, body, id);
+      const body = req.body as AgentInput;
+      const res = await prepareAgentForUpsert(log, userId, body, id);
       if ('code' in res) return reply.code(res.code).send(res.body);
       const { body: validated, startBalance } = res;
       const status = validated.status;
-      await updatePortfolioWorkflow({
+      await updateAgent({
         id,
         model: validated.model,
         status,
@@ -623,9 +601,9 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
       });
-      const row = (await getPortfolioWorkflow(id))!;
-      if (status === PortfolioWorkflowStatus.Active)
-        await reviewWorkflowPortfolio(req.log, id);
+      const row = (await getAgent(id))!;
+      if (status === AgentStatus.Active)
+        await reviewAgentPortfolio(req.log, id);
       log.info('updated workflow');
       return toApi(row);
     }
@@ -641,7 +619,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
-      await repoDeleteWorkflow(id);
+      await repoDeleteAgent(id);
       removeWorkflowFromSchedule(id);
       await cancelOrdersForWorkflow({
         workflowId: id,
@@ -679,11 +657,11 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if (keyErr) return reply.code(keyErr.code).send(keyErr.body);
       const bal = await getStartBalance(log, userId, tokens);
       if (typeof bal !== 'number') return reply.code(bal.code).send(bal.body);
-      await repoStartWorkflow(id, bal);
-      reviewWorkflowPortfolio(req.log, id).catch((err) =>
+      await repoStartAgent(id, bal);
+      reviewAgentPortfolio(req.log, id).catch((err) =>
         log.error({ err }, 'initial review failed')
       );
-      const row = (await getPortfolioWorkflow(id))!;
+      const row = (await getAgent(id))!;
       log.info('started workflow');
       return toApi(row);
     }
@@ -699,7 +677,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log } = ctx;
-      await repoStopWorkflow(id);
+      await repoStopAgent(id);
       try {
         await cancelOrdersForWorkflow({
           workflowId: id,
@@ -709,7 +687,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       } catch (err) {
         log.error({ err }, 'failed to cancel open orders after stop');
       }
-      const row = (await getPortfolioWorkflow(id))!;
+      const row = (await getAgent(id))!;
       log.info('stopped workflow');
       return toApi(row);
     }
@@ -725,14 +703,14 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { id, log, workflow } = ctx;
-      if (workflow.status !== PortfolioWorkflowStatus.Active) {
+      if (workflow.status !== AgentStatus.Active) {
         log.error('workflow not active');
         return reply
           .code(400)
           .send(errorResponse('workflow not active'));
       }
       try {
-        await reviewWorkflowPortfolio(req.log, id);
+        await reviewAgentPortfolio(req.log, id);
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : 'manual review failed';

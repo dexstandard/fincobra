@@ -3,7 +3,6 @@ import NodeCache from 'node-cache';
 import type { FastifyBaseLogger } from 'fastify';
 import { insertNews } from '../repos/news.js';
 import { TOKENS } from '../util/tokens.js';
-import type { NewsItem } from './news.types.js';
 
 const parser = new Parser();
 
@@ -19,6 +18,13 @@ export const FEEDS = [
   'https://cryptopotato.com/feed/',
   'https://news.bitcoin.com/feed/',
 ];
+
+export interface NewsItem {
+  title: string;
+  link: string;
+  pubDate?: string;
+  tokens: string[];
+}
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, (m) => `\\${m}`);
@@ -142,4 +148,3 @@ export async function fetchAndStoreNews(log: FastifyBaseLogger): Promise<void> {
     log.error({ err }, 'failed to fetch or store news');
   }
 }
-
