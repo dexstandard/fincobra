@@ -9,8 +9,8 @@ import {
   deletePortfolioWorkflow as repoDeleteWorkflow,
   startPortfolioWorkflow as repoStartWorkflow,
   stopPortfolioWorkflow as repoStopWorkflow,
-  type PortfolioWorkflow,
 } from '../repos/portfolio-workflows.js';
+import type { PortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import { getPortfolioReviewResults } from '../repos/review-result.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import {
@@ -32,10 +32,8 @@ import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { getRebalanceInfo } from '../repos/review-result.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
-import {
-  CANCEL_ORDER_REASONS,
-  cancelOrdersForWorkflow,
-} from '../services/order-orchestrator.js';
+import { cancelOrdersForWorkflow } from '../services/order-orchestrator.js';
+import { CANCEL_ORDER_REASONS } from '../services/order-orchestrator.types.js';
 import { parseBinanceError } from '../services/binance-client.js';
 import type {
   MainTraderDecision,

@@ -85,7 +85,11 @@ export default async function buildServer(
   await fetchOutputIp(app.log);
 
   for (const file of fs.readdirSync(routesDir)) {
-    if (file.endsWith('.js') || (file.endsWith('.ts') && !file.endsWith('.d.ts'))) {
+    if (
+      (file.endsWith('.js') || file.endsWith('.ts')) &&
+      !file.endsWith('.d.ts') &&
+      !file.endsWith('.types.ts')
+    ) {
       const route = await import(pathToFileURL(path.join(routesDir, file)).href);
       app.register(route.default, { prefix: '/api' });
     }

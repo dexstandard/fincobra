@@ -8,7 +8,7 @@ import {
 } from '../services/binance-client.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
-import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import type {
   RunParams,
   RebalancePosition,

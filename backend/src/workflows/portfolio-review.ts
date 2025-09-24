@@ -2,8 +2,8 @@ import type { FastifyBaseLogger } from 'fastify';
 import {
   getActivePortfolioWorkflowById,
   getActivePortfolioWorkflowsByInterval,
-  type ActivePortfolioWorkflow,
 } from '../repos/portfolio-workflows.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import { run as runMainTrader, collectPromptData } from '../agents/main-trader.js';
 import type { MainTraderDecision } from '../agents/main-trader.types.js';
 import { runNewsAnalyst } from '../agents/news-analyst.js';

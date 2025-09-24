@@ -136,8 +136,3 @@ export async function fetchSupportedModels(apiKey: string): Promise<string[] | n
   }
 }
 
-export type {
-  AIResponse,
-  AIResponseContent,
-  AIResponseOutput,
-} from './openai-client.types.js';

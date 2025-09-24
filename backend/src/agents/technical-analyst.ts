@@ -1,10 +1,9 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { fetchTokenIndicators, type TokenIndicators } from '../services/indicators.js';
+import { fetchTokenIndicators } from '../services/indicators.js';
+import type { TokenIndicators } from '../services/indicators.types.js';
 import { fetchOrderBook } from '../services/binance-client.js';
-import {
-  fetchFearGreedIndex,
-  type FearGreedIndex,
-} from '../services/sentiment.js';
+import { fetchFearGreedIndex } from '../services/sentiment.js';
+import type { FearGreedIndex } from '../services/sentiment.types.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
 import { callAi, extractJson } from '../services/openai-client.js';
 import { isStablecoin } from '../util/tokens.js';

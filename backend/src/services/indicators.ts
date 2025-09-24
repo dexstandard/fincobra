@@ -1,5 +1,6 @@
-import {fetchPairData, type Kline} from './binance-client.js';
-import type {TokenIndicators} from './indicators.types.js';
+import { fetchPairData } from './binance-client.js';
+import type { Kline } from './binance-client.types.js';
+import type { TokenIndicators } from './indicators.types.js';
 
 function pctChange(current: number, past: number) {
   return ((current - past) / past) * 100;
@@ -230,4 +231,3 @@ export async function fetchTokenIndicators(token: string): Promise<TokenIndicato
   };
 }
 
-export type { TokenIndicators } from './indicators.types.js';

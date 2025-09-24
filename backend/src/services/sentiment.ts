@@ -24,4 +24,3 @@ export async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
   return { value, classification };
 }
 
-export type { FearGreedIndex } from './sentiment.types.js';

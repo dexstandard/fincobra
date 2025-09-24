@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { Analysis } from './news-analyst.types.js';
 import type { OrderBookSnapshot } from './technical-analyst.types.js';
-import type { TokenIndicators } from '../services/indicators.js';
+import type { TokenIndicators } from '../services/indicators.types.js';
 
 export interface RunParams {
   log: FastifyBaseLogger;

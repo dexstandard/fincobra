@@ -8,6 +8,7 @@ import { getLimitOrdersByReviewResult } from '../src/repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
+import { CANCEL_ORDER_REASONS } from '../src/services/order-orchestrator.types.js';
 
 vi.mock('../src/workflows/portfolio-review.js', () => ({
   reviewWorkflowPortfolio: vi.fn(() => Promise.resolve()),
@@ -87,7 +88,7 @@ describe('delete workflow cancels all orders', () => {
     expect(cancelOrdersSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         workflowId: agent.id,
-        reason: orderOrchestrator.CANCEL_ORDER_REASONS.WORKFLOW_DELETED,
+        reason: CANCEL_ORDER_REASONS.WORKFLOW_DELETED,
       }),
     );
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);

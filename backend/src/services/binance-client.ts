@@ -634,12 +634,3 @@ export async function fetchMarketTimeseries(symbol: string) {
   };
 }
 
-export type {
-  BinanceAccount,
-  BinanceBalance,
-  BinanceKeyVerificationResult,
-  Kline,
-  OpenOrder,
-  OrderStatusResponse,
-  PairInfo,
-} from './binance-client.types.js';

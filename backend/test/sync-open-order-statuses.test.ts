@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  syncOpenOrderStatuses,
-  CANCEL_ORDER_REASONS,
-} from '../src/services/order-orchestrator.js';
+import { syncOpenOrderStatuses } from '../src/services/order-orchestrator.js';
+import { CANCEL_ORDER_REASONS } from '../src/services/order-orchestrator.types.js';
 import { insertUser } from './repos/users.js';
 import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
