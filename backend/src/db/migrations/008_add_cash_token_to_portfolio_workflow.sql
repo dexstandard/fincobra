@@ -1,1 +1,0 @@
-ALTER TABLE portfolio_workflow ADD COLUMN cash_token VARCHAR(20) NOT NULL DEFAULT 'USDT';
