@@ -1,6 +1,6 @@
 -- Ensure shared AI keys always have an explicit model
 UPDATE ai_api_key_shares
-SET model = 'gpt-5'
+SET model = 'gpt-5-nano'
 WHERE model IS NULL OR LENGTH(TRIM(model)) = 0;
 
 ALTER TABLE ai_api_key_shares
