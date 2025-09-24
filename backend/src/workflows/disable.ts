@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.js';
+import type { DisableWorkflowsSummary } from './disable.types.js';
 import {
   getActivePortfolioWorkflowsByUser,
   getActivePortfolioWorkflowsByUserAndAiKey,
@@ -13,10 +14,7 @@ import {
 } from '../services/order-orchestrator.js';
 import { removeWorkflowFromSchedule } from './portfolio-review.js';
 
-export interface DisableWorkflowsSummary {
-  disabledWorkflowIds: string[];
-  unscheduledWorkflowIds: string[];
-}
+export type { DisableWorkflowsSummary } from './disable.types.js';
 
 async function disableWorkflowSet(
   log: FastifyBaseLogger,

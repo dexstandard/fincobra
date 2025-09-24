@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { insertLimitOrder } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
-import type { MainTraderOrder } from '../agents/main-trader.js';
+import type { MainTraderOrder } from '../agents/main-trader.types.js';
 import {
   fetchPairInfo,
   fetchSymbolPrice,

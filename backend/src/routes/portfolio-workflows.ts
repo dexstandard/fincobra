@@ -37,9 +37,17 @@ import {
   cancelOrdersForWorkflow,
 } from '../services/order-orchestrator.js';
 import { parseBinanceError } from '../services/binance-client.js';
-import type { MainTraderDecision, MainTraderOrder } from '../agents/main-trader.js';
+import type {
+  MainTraderDecision,
+  MainTraderOrder,
+} from '../agents/main-trader.types.js';
 import { getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
+
+export type {
+  PortfolioWorkflowInput,
+  PortfolioWorkflowTokenInput,
+} from './portfolio-workflows.types.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
@@ -64,8 +72,6 @@ const workflowUpsertSchema = z
     status: z.nativeEnum(PortfolioWorkflowStatus),
   })
   .strip();
-
-export type PortfolioWorkflowInput = z.infer<typeof workflowUpsertSchema>;
 
 const paginationQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).optional(),

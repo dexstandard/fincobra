@@ -14,7 +14,11 @@ import type {
   RebalancePosition,
   PreviousReport,
   RebalancePrompt,
+  MainTraderDecision,
+  MainTraderOrder,
 } from './main-trader.types.js';
+
+export type { MainTraderDecision, MainTraderOrder } from './main-trader.types.js';
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
@@ -202,21 +206,6 @@ export async function collectPromptData(
     prompt.previousReports = previousReports;
   }
   return prompt;
-}
-
-export interface MainTraderOrder {
-  pair: string;
-  token: string;
-  side: string;
-  quantity: number;
-  limitPrice: number;
-  basePrice: number;
-  maxPriceDivergencePct: number;
-}
-
-export interface MainTraderDecision {
-  orders: MainTraderOrder[];
-  shortReport: string;
 }
 
 function extractResult(res: string): MainTraderDecision | null {

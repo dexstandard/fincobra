@@ -15,10 +15,8 @@ import { verifyAiKey } from '../services/openai-client.js';
 import { encryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { findUserByEmail } from '../repos/users.js';
-import {
-  disableUserWorkflowsByAiKey,
-  type DisableWorkflowsSummary,
-} from '../workflows/disable.js';
+import { disableUserWorkflowsByAiKey } from '../workflows/disable.js';
+import type { DisableWorkflowsSummary } from '../workflows/disable.types.js';
 import {
   adminPreHandlers,
   getValidatedUserId,

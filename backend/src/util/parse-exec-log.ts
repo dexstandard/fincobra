@@ -1,23 +1,11 @@
+import type { ExecOrder, ParsedExecLog } from './parse-exec-log.types.js';
 import { TOKEN_SYMBOLS } from './tokens.js';
 
-export interface ExecOrder {
-  pair: string;
-  token: string;
-  side: string;
-  quantity: number;
-  limitPrice?: number;
-  basePrice?: number;
-  maxPriceDivergencePct?: number;
-}
-
-export interface ParsedExecLog {
-  text: string;
-  response?: {
-    orders: ExecOrder[];
-    shortReport: string;
-  };
-  error?: Record<string, unknown>;
-}
+export type {
+  ExecOrder,
+  ParsedExecLog,
+  ParsedExecLogResponse,
+} from './parse-exec-log.types.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

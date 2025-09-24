@@ -73,3 +73,18 @@ export interface RebalancePrompt {
   previousReports?: PreviousReport[];
   reports?: PromptReport[];
 }
+
+export interface MainTraderOrder {
+  pair: string;
+  token: string;
+  side: string;
+  quantity: number;
+  limitPrice: number;
+  basePrice: number;
+  maxPriceDivergencePct: number;
+}
+
+export interface MainTraderDecision {
+  orders: MainTraderOrder[];
+  shortReport: string;
+}

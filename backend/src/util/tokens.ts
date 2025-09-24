@@ -1,7 +1,4 @@
-export interface TokenTags {
-  symbol: string;
-  tags: string[];
-}
+import type { TokenTags } from './tokens.types.js';
 
 export const TOKENS: TokenTags[] = [
   { symbol: 'BTC', tags: ['btc', 'bitcoin'] },
@@ -25,3 +22,5 @@ export const STABLECOINS = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP'] as co
 export function isStablecoin(sym: string): boolean {
   return STABLECOINS.includes(sym.toUpperCase() as any);
 }
+
+export type { TokenTags } from './tokens.types.js';
