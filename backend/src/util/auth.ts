@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { errorResponse, ERROR_MESSAGES } from './errorMessages.js';
+import { errorResponse, ERROR_MESSAGES } from './error-messages.js';
 import { getUser } from '../repos/users.js';
 import jwt from 'jsonwebtoken';
 import { env } from './env.js';
@@ -41,20 +41,6 @@ export async function requireAdmin(
   if (!userId) return null;
   const row = await getUser(userId);
   if (!row || row.role !== 'admin' || !row.isEnabled) {
-    reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
-    return null;
-  }
-  return userId;
-}
-
-export function requireUserIdMatch(
-  req: FastifyRequest,
-  reply: FastifyReply,
-  id: string,
-): string | null {
-  const userId = requireUserId(req, reply);
-  if (!userId) return null;
-  if (userId !== id) {
     reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
     return null;
   }

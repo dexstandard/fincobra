@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RATE_LIMITS } from './rate-limit.js';
-import { errorResponse } from './util/errorMessages.js';
+import { errorResponse } from './util/error-messages.js';
 import { fetchOutputIp } from './util/output-ip.js';
 import { migrate } from './db/index.js';
 import { tryGetUserId } from './util/auth.js';
@@ -82,10 +82,14 @@ export default async function buildServer(
     }),
   });
 
-  await fetchOutputIp();
+  await fetchOutputIp(app.log);
 
   for (const file of fs.readdirSync(routesDir)) {
-    if (file.endsWith('.js') || (file.endsWith('.ts') && !file.endsWith('.d.ts'))) {
+    if (
+      (file.endsWith('.js') || file.endsWith('.ts')) &&
+      !file.endsWith('.d.ts') &&
+      !file.endsWith('.types.ts')
+    ) {
       const route = await import(pathToFileURL(path.join(routesDir, file)).href);
       app.register(route.default, { prefix: '/api' });
     }

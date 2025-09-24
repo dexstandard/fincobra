@@ -6,19 +6,15 @@ import {
   setBinanceKey,
   clearBinanceKey,
 } from '../repos/exchange-api-keys.js';
-import {
-  ApiKeyType,
-  verifyApiKey,
-  encryptKey,
-} from '../util/api-keys.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { verifyBinanceKey } from '../services/binance-client.js';
+import type { BinanceKeyVerificationResult } from '../services/binance-client.types.js';
+import { encryptKey } from '../util/crypto.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { REDACTED_KEY } from './_shared/constants.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
-import {
-  disableUserWorkflowsByExchangeKey,
-  type DisableWorkflowsSummary,
-} from '../workflows/disable.js';
-import {parseBody} from "./_shared/validation.js";
+import { disableUserWorkflowsByExchangeKey } from '../workflows/disable.js';
+import type { DisableWorkflowsSummary } from '../workflows/disable.types.js';
+import { parseBody } from './_shared/validation.js';
 
 interface ExchangeKeyBody {
   key: string;
@@ -32,10 +28,8 @@ const exchangeKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
   })
   .strict();
 
-function formatVerificationError(result: boolean | string): string {
-  return `verification failed${
-    typeof result === 'string' ? `: ${result}` : ''
-  }`;
+function formatVerificationError(result: BinanceKeyVerificationResult): string {
+  return `verification failed${result.reason ? `: ${result.reason}` : ''}`;
 }
 
 function logDisabledWorkflows(
@@ -57,8 +51,12 @@ async function verifyAndSave(
     reply: FastifyReply,
     userId: string
 ) {
-  const verRes = await verifyApiKey(ApiKeyType.Binance, key, secret);
-  if (verRes !== true) return reply.code(400).send(errorResponse(formatVerificationError(verRes)));
+  const verRes = await verifyBinanceKey(key, secret);
+  if (!verRes.ok) {
+    return reply
+      .code(400)
+      .send(errorResponse(formatVerificationError(verRes)));
+  }
   const encKey = encryptKey(key);
   const encSecret = encryptKey(secret);
   await setBinanceKey({

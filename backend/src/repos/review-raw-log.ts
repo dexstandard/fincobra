@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { convertKeysToCamelCase } from '../util/objectCase.js';
+import { convertKeysToCamelCase } from '../util/object-case.js';
 import type { ReviewRawLogInsert, ReviewRawLog } from './review-raw-log.types.js';
 
 export async function insertReviewRawLog(entry: ReviewRawLogInsert): Promise<string> {
