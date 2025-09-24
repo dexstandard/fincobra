@@ -11,17 +11,12 @@ import {
   hasAiKeyShare,
   getAiKeyShareTargets,
 } from '../repos/ai-api-key.js';
-import {
-  ApiKeyType,
-  verifyApiKey,
-  encryptKey,
-} from '../util/api-keys.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { verifyAiKey } from '../services/openai-client.js';
+import { encryptKey } from '../util/crypto.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { findUserByEmail } from '../repos/users.js';
-import {
-  disableUserWorkflowsByAiKey,
-  type DisableWorkflowsSummary,
-} from '../workflows/disable.js';
+import { disableUserWorkflowsByAiKey } from '../workflows/disable.js';
+import type { DisableWorkflowsSummary } from '../workflows/disable.types.js';
 import {
   adminPreHandlers,
   getValidatedUserId,
@@ -88,7 +83,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       const { key } = body;
       const aiKey = await getAiKey(userId);
       if (aiKey) return reply.code(409).send(errorResponse('key already exists'));
-      if (!(await verifyApiKey(ApiKeyType.Ai, key)))
+      if (!(await verifyAiKey(key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
       await setAiKey({ userId: userId, apiKeyEnc: enc });
@@ -138,7 +133,7 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       const { key } = body;
       const aiKey = await getAiKey(id);
       if (!aiKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
-      if (!(await verifyApiKey(ApiKeyType.Ai, key)))
+      if (!(await verifyAiKey(key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
       await setAiKey({ userId: id, apiKeyEnc: enc });

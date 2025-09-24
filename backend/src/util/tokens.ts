@@ -1,7 +1,4 @@
-export interface TokenTags {
-  symbol: string;
-  tags: string[];
-}
+import type { TokenTags } from './tokens.types.js';
 
 export const TOKENS: TokenTags[] = [
   { symbol: 'BTC', tags: ['btc', 'bitcoin'] },

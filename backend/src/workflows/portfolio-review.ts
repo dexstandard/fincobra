@@ -2,13 +2,10 @@ import type { FastifyBaseLogger } from 'fastify';
 import {
   getActivePortfolioWorkflowById,
   getActivePortfolioWorkflowsByInterval,
-  type ActivePortfolioWorkflow,
-} from '../repos/portfolio-workflow.js';
-import {
-  run as runMainTrader,
-  collectPromptData,
-  type MainTraderDecision,
-} from '../agents/main-trader.js';
+} from '../repos/portfolio-workflows.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
+import { run as runMainTrader, collectPromptData } from '../agents/main-trader.js';
+import type { MainTraderDecision } from '../agents/main-trader.types.js';
 import { runNewsAnalyst } from '../agents/news-analyst.js';
 import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
@@ -41,7 +38,7 @@ export async function reviewPortfolio(
   const workflow = await getActivePortfolioWorkflowById(workflowId);
   if (!workflow) return;
   const { toRun, skipped } = filterRunningWorkflows([workflow]);
-  if (skipped.length) throw new Error('Agent is already reviewing portfolio');
+  if (skipped.length) throw new Error('Workflow is already reviewing portfolio');
   await runReviewWorkflows(log, toRun);
 }
 
@@ -90,7 +87,7 @@ async function cleanupOpenOrders(
   log: FastifyBaseLogger,
 ) {
   const orders = await getOpenLimitOrdersForWorkflow(wf.id);
-  const limit = (pLimit as any)(5);
+  const limit = pLimit(5);
   await Promise.all(
     orders.map((o) =>
       limit(async () => {
@@ -259,5 +256,5 @@ async function saveFailure(
   await insertReviewResult(entry);
 }
 
-export { reviewPortfolio as reviewAgentPortfolio };
+export { reviewPortfolio as reviewWorkflowPortfolio };
 
