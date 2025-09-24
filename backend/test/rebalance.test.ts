@@ -3,11 +3,11 @@ import { getLimitOrders, clearLimitOrders } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
-import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
+import { insertAgent } from './repos/portfolio-workflow.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { db } from '../src/db/index.js';
 
-vi.mock('../src/services/binance-client.js', () => ({
+vi.mock('../src/services/binance.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
     balances: [
       { asset: 'USDT', free: '1000', locked: '0' },
@@ -15,9 +15,7 @@ vi.mock('../src/services/binance-client.js', () => ({
       { asset: 'DOGE', free: '1000', locked: '0' },
     ],
   }),
-  fetchSymbolPrice: vi
-    .fn()
-    .mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
+  fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
     baseAsset: 'BTC',
@@ -34,9 +32,9 @@ import { createDecisionLimitOrders } from '../src/services/rebalance.js';
 import {
   createLimitOrder,
   fetchAccount,
+  fetchPairData,
   fetchPairInfo,
-  fetchSymbolPrice,
-} from '../src/services/binance-client.js';
+} from '../src/services/binance.js';
 
 describe('createDecisionLimitOrders', () => {
   beforeEach(async () => {
@@ -48,7 +46,7 @@ describe('createDecisionLimitOrders', () => {
   it('keeps side when quantity is given in quote asset', async () => {
     const log = mockLogger();
     const userId = await insertUser('10');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -111,7 +109,7 @@ describe('createDecisionLimitOrders', () => {
   it('uses final price for quote-denominated quantity', async () => {
     const log = mockLogger();
     const userId = await insertUser('13');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -136,7 +134,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -175,7 +173,7 @@ describe('createDecisionLimitOrders', () => {
   it('uses limit price for base-denominated quantity', async () => {
     const log = mockLogger();
     const userId = await insertUser('11');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -200,7 +198,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -239,7 +237,7 @@ describe('createDecisionLimitOrders', () => {
   it('boosts sell price when the market moves favorably within divergence bounds', async () => {
     const log = mockLogger();
     const userId = await insertUser('16');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -264,7 +262,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 3,
       minNotional: 0,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 251 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 251 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -299,7 +297,7 @@ describe('createDecisionLimitOrders', () => {
   it('tightens buy price when the market dips but remains within divergence', async () => {
     const log = mockLogger();
     const userId = await insertUser('19');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -324,7 +322,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 3,
       minNotional: 0,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 98 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 98 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -356,7 +354,7 @@ describe('createDecisionLimitOrders', () => {
   it('cancels order when price diverges beyond threshold', async () => {
     const log = mockLogger();
     const userId = await insertUser('12');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -381,7 +379,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 105 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 105 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -406,7 +404,7 @@ describe('createDecisionLimitOrders', () => {
   it('cancels orders with malformed limit price', async () => {
     const log = mockLogger();
     const userId = await insertUser('17');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -431,7 +429,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -458,7 +456,7 @@ describe('createDecisionLimitOrders', () => {
   it('requires a minimum maxPriceDivergencePct', async () => {
     const log = mockLogger();
     const userId = await insertUser('18');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -483,7 +481,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 8,
       minNotional: 0,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 100 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 100 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -510,7 +508,7 @@ describe('createDecisionLimitOrders', () => {
   it('records decision orders below min notional as canceled', async () => {
     const log = mockLogger();
     const userId = await insertUser('15');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -561,7 +559,7 @@ describe('createDecisionLimitOrders', () => {
   it('bumps nominal above min when rounding reduces buy order value', async () => {
     const log = mockLogger();
     const userId = await insertUser('26');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -586,7 +584,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 0.02056,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ currentPrice: 0.0207 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ currentPrice: 0.0207 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -621,7 +619,7 @@ describe('createDecisionLimitOrders', () => {
   it('bumps buy orders below min when prefix matches prompt requirement', async () => {
     const log = mockLogger();
     const userId = await insertUser('27');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -646,7 +644,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -682,7 +680,7 @@ describe('createDecisionLimitOrders', () => {
   it('rejects undersized buy orders when leading digit differs', async () => {
     const log = mockLogger();
     const userId = await insertUser('27A');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -707,7 +705,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -734,7 +732,7 @@ describe('createDecisionLimitOrders', () => {
   it('bumps sell orders below min when prefix matches prompt requirement', async () => {
     const log = mockLogger();
     const userId = await insertUser('28');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',
@@ -759,7 +757,7 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchPairData).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -797,7 +795,7 @@ describe('createDecisionLimitOrders', () => {
   it('preserves manuallyEdited flag when provided', async () => {
     const log = mockLogger();
     const userId = await insertUser('20');
-    const agent = await insertPortfolioWorkflow({
+    const agent = await insertAgent({
       userId,
       model: 'm',
       status: 'active',

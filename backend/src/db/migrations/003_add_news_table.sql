@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS news(
+  id BIGSERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  link TEXT NOT NULL UNIQUE,
+  pub_date TIMESTAMP,
+  tokens TEXT[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
+);
+CREATE INDEX IF NOT EXISTS idx_news_pub_date ON news(pub_date);

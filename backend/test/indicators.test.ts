@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchTokenIndicators } from '../src/services/indicators.js';
-import { fetchPairData } from '../src/services/binance-client.js';
+import { fetchPairData } from '../src/services/binance.js';
 
-vi.mock('../src/services/binance-client.js', () => ({
+vi.mock('../src/services/binance.js', () => ({
   fetchPairData: vi.fn(),
   fetchPairInfo: vi.fn().mockResolvedValue({ minNotional: 0 }),
   fetchOrder: vi.fn().mockResolvedValue(undefined),

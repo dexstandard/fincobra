@@ -1,5 +1,4 @@
-import { fetchPairData } from './binance-client.js';
-import type { Kline } from './binance-client.types.js';
+import { fetchPairData, type Kline } from './binance.js';
 import type { TokenIndicators } from './indicators.types.js';
 
 function pctChange(current: number, past: number) {
@@ -206,7 +205,7 @@ export async function fetchTokenIndicators(token: string): Promise<TokenIndicato
   );
   const regimeBtc = bollingerBandwidth(btcCloses, 20) < 10 ? 'range' : 'trend';
 
-  return {
+  const indicators: TokenIndicators = {
     ret1h: calcRet(hourCloses, 1, current),
     ret4h: calcRet(hourCloses, 4, current),
     ret24h: calcRet(dayCloses, 1, current),
@@ -229,5 +228,8 @@ export async function fetchTokenIndicators(token: string): Promise<TokenIndicato
     oscStochK,
     oscStochD,
   };
+
+  return indicators;
 }
 
+export type { TokenIndicators } from './indicators.types.js';

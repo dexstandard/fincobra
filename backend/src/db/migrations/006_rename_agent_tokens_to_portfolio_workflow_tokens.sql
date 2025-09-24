@@ -1,0 +1,4 @@
+ALTER TABLE agent_tokens RENAME COLUMN agent_id TO portfolio_workflow_id;
+ALTER TABLE agent_tokens RENAME TO portfolio_workflow_tokens;
+ALTER INDEX IF EXISTS idx_agent_tokens_agent_id RENAME TO idx_portfolio_workflow_tokens_portfolio_workflow_id;
+ALTER INDEX IF EXISTS idx_agent_tokens_token RENAME TO idx_portfolio_workflow_tokens_token;

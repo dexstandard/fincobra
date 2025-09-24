@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { errorResponse } from '../../util/error-messages.js';
+import { errorResponse } from '../../util/errorMessages.js';
 
 export const userIdParams = z.object({ id: z.string().regex(/^\d+$/) });
 

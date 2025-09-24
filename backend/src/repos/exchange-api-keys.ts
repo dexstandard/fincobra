@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { convertKeysToCamelCase } from '../util/object-case.js';
+import { convertKeysToCamelCase } from '../util/objectCase.js';
 import type {
   BinanceApiKeyDetails,
   BinanceApiKeyUpsert,

@@ -1,26 +1,21 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { insertLimitOrder } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
-import type { MainTraderOrder } from '../agents/main-trader.types.js';
+import type { MainTraderOrder } from '../agents/main-trader.js';
 import {
+  fetchPairData,
   fetchPairInfo,
-  fetchSymbolPrice,
   createLimitOrder,
   parseBinanceError,
-} from './binance-client.js';
+} from './binance.js';
 import { TOKEN_SYMBOLS } from '../util/tokens.js';
 
-const TOKEN_SYMBOLS_BY_LENGTH = [...TOKEN_SYMBOLS].sort(
-  (a, b) => b.length - a.length,
-);
-const TOKEN_SYMBOL_SET = new Set(TOKEN_SYMBOLS);
-
 function splitPair(pair: string): [string, string] {
-  const normalized = pair.toUpperCase();
-  for (const sym of TOKEN_SYMBOLS_BY_LENGTH) {
-    if (!normalized.startsWith(sym)) continue;
-    const rest = normalized.slice(sym.length);
-    if (TOKEN_SYMBOL_SET.has(rest)) return [sym, rest];
+  for (const sym of TOKEN_SYMBOLS) {
+    if (pair.startsWith(sym)) {
+      const rest = pair.slice(sym.length);
+      if (TOKEN_SYMBOLS.includes(rest)) return [sym, rest];
+    }
   }
   return ['', ''];
 }
@@ -109,15 +104,13 @@ export async function createDecisionLimitOrders(opts: {
     const [a, b] = splitPair(o.pair);
     if (!a || !b) continue;
     const info = await fetchPairInfo(a, b);
-    const { currentPrice } = await fetchSymbolPrice(info.symbol);
+    const { currentPrice } = await fetchPairData(a, b);
     const requestedSide = o.side;
-    const requestedToken =
-      typeof o.token === 'string' ? o.token.toUpperCase() : '';
     const manuallyEdited = o.manuallyEdited ?? false;
     const plannedBase: Record<string, unknown> = {
       symbol: info.symbol,
       pair: o.pair,
-      token: requestedToken || o.token,
+      token: o.token,
       side: requestedSide,
       manuallyEdited,
       basePrice: o.basePrice,
@@ -140,18 +133,6 @@ export async function createDecisionLimitOrders(opts: {
     }
 
     const side: 'BUY' | 'SELL' = requestedSide;
-
-    if (!Number.isFinite(o.quantity) || o.quantity <= 0) {
-      await insertLimitOrder({
-        userId: opts.userId,
-        planned: plannedBase,
-        status: LimitOrderStatus.Canceled,
-        reviewResultId: opts.reviewResultId,
-        orderId: String(Date.now()),
-        cancellationReason: `Malformed quantity: ${o.quantity}`,
-      });
-      continue;
-    }
 
     if (!Number.isFinite(o.basePrice) || o.basePrice <= 0) {
       await insertLimitOrder({
@@ -233,9 +214,9 @@ export async function createDecisionLimitOrders(opts: {
     }
 
     let quantity: number;
-    if (requestedToken === info.baseAsset) {
+    if (o.token === info.baseAsset) {
       quantity = o.quantity;
-    } else if (requestedToken === info.quoteAsset) {
+    } else if (o.token === info.quoteAsset) {
       quantity = o.quantity / roundedLimit;
     } else {
       continue;
