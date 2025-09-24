@@ -143,4 +143,3 @@ export async function fetchAndStoreNews(log: FastifyBaseLogger): Promise<void> {
   }
 }
 
-export type { NewsItem } from './news.types.js';

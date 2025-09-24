@@ -9,17 +9,10 @@ import {
   LimitOrderStatus,
   type LimitOrderOpen,
 } from '../repos/limit-orders.types.js';
-import {
-  fetchOpenOrders,
-  fetchOrder,
-  parseBinanceError,
-  type OpenOrder,
-} from './binance-client.js';
+import { fetchOpenOrders, fetchOrder, parseBinanceError } from './binance-client.js';
+import type { OpenOrder } from './binance-client.types.js';
 import { cancelLimitOrder } from './limit-order.js';
 import type { CancelOrderReason } from './order-orchestrator.types.js';
-
-export { CANCEL_ORDER_REASONS } from './order-orchestrator.types.js';
-export type { CancelOrderReason } from './order-orchestrator.types.js';
 
 interface CancelOrdersForWorkflowOptions {
   workflowId: string;

@@ -20,6 +20,7 @@ import * as portfolioReview from '../src/workflows/portfolio-review.js';
 import { cancelOrder } from '../src/services/binance-client.js';
 import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
+import { CANCEL_ORDER_REASONS } from '../src/services/order-orchestrator.types.js';
 
 const cancelOrdersSpy = vi.spyOn(orderOrchestrator, 'cancelOrdersForWorkflow');
 const removeWorkflowFromScheduleSpy = vi.spyOn(portfolioReview, 'removeWorkflowFromSchedule');
@@ -230,7 +231,7 @@ describe('Exchange API key effects on agents', () => {
     expect(cancelOrdersSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         workflowId: agent.id,
-        reason: orderOrchestrator.CANCEL_ORDER_REASONS.API_KEY_REMOVED,
+        reason: CANCEL_ORDER_REASONS.API_KEY_REMOVED,
       }),
     );
     await app.close();

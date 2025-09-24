@@ -1,20 +1,19 @@
 import type { FastifyBaseLogger } from 'fastify';
-import type { PortfolioWorkflowInput } from '../routes/portfolio-workflows.js';
+import type {
+  PortfolioWorkflowInput,
+  PortfolioWorkflowTokenInput,
+} from '../routes/portfolio-workflows.types.js';
 import {
   getUserApiKeys,
   findIdenticalDraftWorkflow,
   findActiveTokenConflicts,
 } from '../repos/portfolio-workflows.js';
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
-import { errorResponse, lengthMessage, type ErrorResponse } from '../util/error-messages.js';
+import { errorResponse, lengthMessage } from '../util/error-messages.js';
+import type { ErrorResponse } from '../util/error-messages.types.js';
 import { fetchTokensBalanceUsd } from './binance-client.js';
 
-interface TokenAllocation {
-  token: string;
-  minAllocation: number;
-}
-
-function validateAllocations(tokens: TokenAllocation[]) {
+function validateAllocations(tokens: PortfolioWorkflowTokenInput[]) {
   let total = 0;
   for (const allocation of tokens) {
     if (allocation.minAllocation < 0 || allocation.minAllocation > 95)

@@ -8,12 +8,14 @@ import {
 } from '../services/binance-client.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
-import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import type {
   RunParams,
   RebalancePosition,
   PreviousReport,
   RebalancePrompt,
+  MainTraderDecision,
+  MainTraderOrder,
 } from './main-trader.types.js';
 
 export const developerInstructions = [
@@ -202,21 +204,6 @@ export async function collectPromptData(
     prompt.previousReports = previousReports;
   }
   return prompt;
-}
-
-export interface MainTraderOrder {
-  pair: string;
-  token: string;
-  side: string;
-  quantity: number;
-  limitPrice: number;
-  basePrice: number;
-  maxPriceDivergencePct: number;
-}
-
-export interface MainTraderDecision {
-  orders: MainTraderOrder[];
-  shortReport: string;
 }
 
 function extractResult(res: string): MainTraderDecision | null {

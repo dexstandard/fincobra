@@ -6,19 +6,15 @@ import {
   setBinanceKey,
   clearBinanceKey,
 } from '../repos/exchange-api-keys.js';
-import {
-  verifyBinanceKey,
-  type BinanceKeyVerificationResult,
-} from '../services/binance-client.js';
+import { verifyBinanceKey } from '../services/binance-client.js';
+import type { BinanceKeyVerificationResult } from '../services/binance-client.types.js';
 import { encryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { REDACTED_KEY } from './_shared/constants.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
-import {
-  disableUserWorkflowsByExchangeKey,
-  type DisableWorkflowsSummary,
-} from '../workflows/disable.js';
-import {parseBody} from "./_shared/validation.js";
+import { disableUserWorkflowsByExchangeKey } from '../workflows/disable.js';
+import type { DisableWorkflowsSummary } from '../workflows/disable.types.js';
+import { parseBody } from './_shared/validation.js';
 
 interface ExchangeKeyBody {
   key: string;

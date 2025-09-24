@@ -1,0 +1,17 @@
+export interface PortfolioWorkflowTokenInput {
+  token: string;
+  minAllocation: number;
+}
+
+export interface PortfolioWorkflowInput {
+  model: string;
+  name: string;
+  cash: string;
+  tokens: PortfolioWorkflowTokenInput[];
+  risk: string;
+  reviewInterval: string;
+  agentInstructions: string;
+  manualRebalance: boolean;
+  useEarn: boolean;
+  status: 'active' | 'inactive' | 'draft' | 'retired';
+}

@@ -10,15 +10,6 @@ import type {
   PortfolioWorkflowUserApiKeys,
 } from './portfolio-workflows.types.js';
 
-export type {
-  PortfolioWorkflow,
-  ActivePortfolioWorkflow,
-  PortfolioWorkflowToken,
-  PortfolioWorkflowInsert,
-  PortfolioWorkflowUpdate,
-  PortfolioWorkflowUserApiKeys,
-} from './portfolio-workflows.types.js';
-
 export function toApi(row: PortfolioWorkflow) {
   return {
     id: row.id,
