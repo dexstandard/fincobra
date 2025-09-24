@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchPairData, fetchPairInfo } from '../src/services/binance-client.js';
+import { fetchPairData, fetchPairInfo } from '../src/services/binance.js';
 
 describe('fetchPairData', () => {
   afterEach(() => {

@@ -1,0 +1,3 @@
+ALTER TABLE agents RENAME TO portfolio_workflow;
+ALTER INDEX IF EXISTS idx_agents_user_id_status RENAME TO idx_portfolio_workflow_user_id_status;
+ALTER INDEX IF EXISTS idx_agents_status_review_interval RENAME TO idx_portfolio_workflow_status_review_interval;

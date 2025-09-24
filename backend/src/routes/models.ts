@@ -7,13 +7,17 @@ import type {
     AiApiKeyDetails,
     SharedAiApiKeyDetails,
 } from '../repos/ai-api-key.types.js';
-import { fetchSupportedModels } from '../services/openai-client.js';
-import { decryptKey } from '../util/crypto.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
+import { decryptKey } from '../util/api-keys.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 
+const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
 const CACHE_TTL_SEC = 6 * 60 * 60;
 const MODEL_FETCH_ERROR = 'failed to fetch models';
+
+interface OpenAiModel {
+    id: string;
+}
 
 const modelsCache = new NodeCache({
     stdTTL: CACHE_TTL_SEC,
@@ -37,6 +41,25 @@ function getEncryptedKey(
     sharedKey: SharedAiApiKeyDetails | null | undefined,
 ): string | null {
     return ownKey?.aiApiKeyEnc ?? sharedKey?.aiApiKeyEnc ?? null;
+}
+
+function filterSupportedModels(models: OpenAiModel[]): string[] {
+    return models
+        .map((m) => m.id)
+        .filter((id) => id.startsWith('gpt-5') || id.startsWith('o3') || id.includes('search'));
+}
+
+async function fetchSupportedModels(apiKey: string): Promise<string[] | null> {
+    try {
+        const res = await fetch(OPENAI_MODELS_URL, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!res.ok) return null;
+        const body = (await res.json()) as { data?: OpenAiModel[] };
+        return filterSupportedModels(body.data ?? []);
+    } catch {
+        return null;
+    }
 }
 
 export default async function modelsRoutes(app: FastifyInstance) {
