@@ -17,8 +17,6 @@ declare module 'fastify' {
   interface FastifyInstance {
     /** Indicates whether the HTTP server finished booting */
     isStarted: boolean;
-    /** Collects issues detected during startup so health checks can fail fast */
-    startupIssues: string[];
   }
 }
 
@@ -49,7 +47,6 @@ export default async function buildServer(
   });
 
   app.decorate('isStarted', false);
-  app.decorate('startupIssues', [] as string[]);
 
 
   await app.register(cookie);
@@ -95,28 +92,26 @@ export default async function buildServer(
     const isTest   = /\.(spec|test)\.([tj])s$/.test(file);
     if (!isScript || isTypes || isTest) continue;
 
+    let plugin: unknown;
     try {
       const mod = await import(pathToFileURL(path.join(routesDir, file)).href);
-      const plugin = typeof mod === 'function' ? mod : mod.default;
+      plugin = typeof mod === 'function' ? mod : mod.default;
       if (typeof plugin !== 'function') {
         const available =
           mod && typeof mod === 'object' ? Object.keys(mod as Record<string, unknown>) : [];
         app.log.error({ file, exports: available }, 'route module must export a Fastify plugin');
-        app.startupIssues.push(`Route ${file} does not export a Fastify plugin.`);
-        continue;
-      }
-
-      try {
-        app.register(plugin, { prefix: '/api' });
-      } catch (err) {
-        app.log.error({ err, file }, 'failed to register route module');
-        const message = err instanceof Error ? err.message : String(err);
-        app.startupIssues.push(`Route ${file} failed to register: ${message}`);
+        throw new Error(`Route ${file} does not export a Fastify plugin.`);
       }
     } catch (err) {
       app.log.error({ err, file }, 'failed to load route module');
-      const message = err instanceof Error ? err.message : String(err);
-      app.startupIssues.push(`Route ${file} failed to load: ${message}`);
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+
+    try {
+      app.register(plugin as any, { prefix: '/api' });
+    } catch (err) {
+      app.log.error({ err, file }, 'failed to register route module');
+      throw err instanceof Error ? err : new Error(String(err));
     }
   }
 
