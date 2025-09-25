@@ -92,13 +92,27 @@ export default async function buildServer(
     const isTest   = /\.(spec|test)\.([tj])s$/.test(file);
     if (!isScript || isTypes || isTest) continue;
 
-    const mod = await import(pathToFileURL(path.join(routesDir, file)).href);
-    const plugin = typeof mod === 'function' ? mod : mod.default;
-    if (typeof plugin !== 'function') {
-      app.log.warn({ file, exports: Object.keys(mod) }, 'skipping non-plugin module');
-      continue;
+    let plugin: unknown;
+    try {
+      const mod = await import(pathToFileURL(path.join(routesDir, file)).href);
+      plugin = typeof mod === 'function' ? mod : mod.default;
+      if (typeof plugin !== 'function') {
+        const available =
+          mod && typeof mod === 'object' ? Object.keys(mod as Record<string, unknown>) : [];
+        app.log.error({ file, exports: available }, 'route module must export a Fastify plugin');
+        throw new Error(`Route ${file} does not export a Fastify plugin.`);
+      }
+    } catch (err) {
+      app.log.error({ err, file }, 'failed to load route module');
+      throw err instanceof Error ? err : new Error(String(err));
     }
-    app.register(plugin, { prefix: '/api' });
+
+    try {
+      await app.register(plugin as any, { prefix: '/api' });
+    } catch (err) {
+      app.log.error({ err, file }, 'failed to register route module');
+      throw err instanceof Error ? err : new Error(String(err));
+    }
   }
 
   app.addHook('preHandler', (req, _reply, done) => {
