@@ -44,4 +44,19 @@ describe('health route', () => {
     }
   });
 
+  it('fails to boot when a route throws during registration', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'routes-'));
+    try {
+      writeFileSync(
+        join(dir, 'broken.js'),
+        "export default async function () { throw new Error('startup boom'); }\n",
+        'utf8',
+      );
+
+      await expect(buildServer(dir)).rejects.toThrowError(/startup boom/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
 });

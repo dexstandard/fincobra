@@ -108,7 +108,7 @@ export default async function buildServer(
     }
 
     try {
-      app.register(plugin as any, { prefix: '/api' });
+      await app.register(plugin as any, { prefix: '/api' });
     } catch (err) {
       app.log.error({ err, file }, 'failed to register route module');
       throw err instanceof Error ? err : new Error(String(err));
