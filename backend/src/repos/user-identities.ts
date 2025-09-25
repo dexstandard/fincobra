@@ -1,7 +1,7 @@
 import { db } from '../db/index.js';
 import { decrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
-import { convertKeysToCamelCase } from '../util/objectCase.js';
+import { convertKeysToCamelCase } from '../util/object-case.js';
 import type { UserIdentityDetails } from './user-identities.types.js';
 
 export async function findUserByIdentity(

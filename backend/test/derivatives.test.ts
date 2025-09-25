@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fetchOrderBook } from '../src/services/derivatives.js';
+import { fetchOrderBook } from '../src/services/binance-client.js';
 
 describe('fetchOrderBook', () => {
   it('uses spot order book endpoint', async () => {

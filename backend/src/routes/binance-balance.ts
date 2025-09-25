@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { BinanceAccount, fetchAccount, fetchTotalBalanceUsd } from '../services/binance.js';
-import { errorResponse, ERROR_MESSAGES } from '../util/errorMessages.js';
+import { fetchAccount, fetchTotalBalanceUsd } from '../services/binance-client.js';
+import type { BinanceAccount } from '../services/binance-client.types.js';
+import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
 import { parseRequestParams, userTokenParamsSchema } from './_shared/validation.js';
 
