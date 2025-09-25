@@ -13,6 +13,12 @@ async function main() {
   const app = await buildServer(routesDir);
   const log = app.log;
 
+  if (app.startupIssues.length > 0) {
+    log.error({ issues: app.startupIssues }, 'aborting start due to startup issues');
+    process.exitCode = 1;
+    return;
+  }
+
   schedule('*/10 * * * *', () => fetchAndStoreNews(log));
   schedule('*/3 * * * *', () => syncOpenOrderStatuses(log));
 
@@ -35,6 +41,11 @@ async function main() {
   try {
     // Listen on all interfaces so Caddy can reach the backend in Docker
     await app.listen({ port: 3000, host: '0.0.0.0' });
+    if (app.startupIssues.length > 0) {
+      log.error({ issues: app.startupIssues }, 'startup issues detected after listen, exiting');
+      process.exit(1);
+      return;
+    }
     app.isStarted = true;
     log.info('server started');
   } catch (err) {

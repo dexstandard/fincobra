@@ -23,4 +23,14 @@ describe('health route', () => {
     expect(res.headers['content-security-policy']).toContain('https://api.binance.com');
     await app.close();
   });
+
+  it('returns 503 if startup issues were recorded', async () => {
+    const app = await buildServer();
+    app.isStarted = true;
+    app.startupIssues.push('Route foo failed to load');
+    const res = await app.inject({ method: 'GET', url: '/api/health' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ ok: false });
+    await app.close();
+  });
 });
