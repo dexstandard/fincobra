@@ -47,11 +47,11 @@ async function main() {
     } else {
       console.error(err);
     }
-    process.exit(1);
+
+    if (!app?.isStarted) {
+      process.exit(1);
+    }
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+void main();
