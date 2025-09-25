@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RATE_LIMITS } from './rate-limit.js';
-import { errorResponse } from './util/errorMessages.js';
+import { errorResponse } from './util/error-messages.js';
 import { fetchOutputIp } from './util/output-ip.js';
 import { migrate } from './db/index.js';
 import { tryGetUserId } from './util/auth.js';
@@ -34,7 +34,7 @@ function sanitize(obj: unknown): unknown {
 export default async function buildServer(
   routesDir: string = path.join(new URL('.', import.meta.url).pathname, 'routes'),
 ): Promise<FastifyInstance> {
-  // await migrate();
+  await migrate();
   const app = Fastify({
     logger: {
       base: undefined,
@@ -82,13 +82,23 @@ export default async function buildServer(
     }),
   });
 
-  await fetchOutputIp();
+  await fetchOutputIp(app.log);
 
   for (const file of fs.readdirSync(routesDir)) {
-    if (file.endsWith('.js') || (file.endsWith('.ts') && !file.endsWith('.d.ts'))) {
-      const route = await import(pathToFileURL(path.join(routesDir, file)).href);
-      app.register(route.default, { prefix: '/api' });
+    if (fs.statSync(path.join(routesDir, file)).isDirectory()) continue;
+
+    const isScript = /\.([tj])s$/.test(file);
+    const isTypes  = /\.d\.([tj])s$/.test(file) || /\.types\.([tj])s$/.test(file);
+    const isTest   = /\.(spec|test)\.([tj])s$/.test(file);
+    if (!isScript || isTypes || isTest) continue;
+
+    const mod = await import(pathToFileURL(path.join(routesDir, file)).href);
+    const plugin = typeof mod === 'function' ? mod : mod.default;
+    if (typeof plugin !== 'function') {
+      app.log.warn({ file, exports: Object.keys(mod) }, 'skipping non-plugin module');
+      continue;
     }
+    app.register(plugin, { prefix: '/api' });
   }
 
   app.addHook('preHandler', (req, _reply, done) => {

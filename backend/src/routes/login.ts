@@ -14,7 +14,8 @@ import { getUserAuthInfo, insertUser, setUserEmail } from '../repos/users.js';
 import { requireUserId } from '../util/auth.js';
 import { encrypt } from '../util/crypto.js';
 import { env } from '../util/env.js';
-import { errorResponse, type ErrorResponse } from '../util/errorMessages.js';
+import { errorResponse } from '../util/error-messages.js';
+import type { ErrorResponse } from '../util/error-messages.types.js';
 import { parseBody } from './_shared/validation.js';
 
 interface LoginBody {

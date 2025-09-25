@@ -1,15 +1,21 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { callAi } from '../util/ai.js';
+import { callAi } from '../services/openai-client.js';
 import { isStablecoin } from '../util/tokens.js';
-import { fetchAccount, fetchPairData, fetchPairInfo } from '../services/binance.js';
+import {
+  fetchAccount,
+  fetchPairInfo,
+  fetchPairPrice,
+} from '../services/binance-client.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
-import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflow.js';
+import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import type {
   RunParams,
   RebalancePosition,
   PreviousReport,
   RebalancePrompt,
+  MainTraderDecision,
+  MainTraderOrder,
 } from './main-trader.types.js';
 
 export const developerInstructions = [
@@ -112,7 +118,7 @@ export async function collectPromptData(
       log.error('failed to fetch token balances');
       return undefined;
     }
-    const { currentPrice } = await fetchPairData(t.token, cash);
+    const { currentPrice } = await fetchPairPrice(t.token, cash);
     positions.push({
       sym: t.token,
       qty,
@@ -127,7 +133,7 @@ export async function collectPromptData(
       try {
         const [info, data] = await Promise.all([
           fetchPairInfo(allTokens[i], allTokens[j]),
-          fetchPairData(allTokens[i], allTokens[j]),
+          fetchPairPrice(allTokens[i], allTokens[j]),
         ]);
         const baseMin = data.currentPrice
           ? info.minNotional / data.currentPrice
@@ -198,21 +204,6 @@ export async function collectPromptData(
     prompt.previousReports = previousReports;
   }
   return prompt;
-}
-
-export interface MainTraderOrder {
-  pair: string;
-  token: string;
-  side: string;
-  quantity: number;
-  limitPrice: number;
-  basePrice: number;
-  maxPriceDivergencePct: number;
-}
-
-export interface MainTraderDecision {
-  orders: MainTraderOrder[];
-  shortReport: string;
 }
 
 function extractResult(res: string): MainTraderDecision | null {
