@@ -8,65 +8,85 @@ import { fetchAndStoreNews } from '../src/services/news.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+let app: FastifyInstance | undefined;
+const cronTasks: ScheduledTask[] = [];
+let isShuttingDown = false;
+
+const registerCron = (expression: string, job: () => void) => {
+  const task = schedule(expression, job, { scheduled: false });
+  cronTasks.push(task);
+  return task;
+};
+
+const startCronJobs = (log?: FastifyBaseLogger) => {
+  for (const task of cronTasks) {
+    task.start();
+  }
+  log?.info({ jobs: cronTasks.length }, 'cron jobs started');
+};
+
+const stopCronJobs = (log?: FastifyBaseLogger) => {
+  while (cronTasks.length > 0) {
+    const task = cronTasks.pop();
+    if (!task) continue;
+
+    try {
+      task.stop();
+      const candidate = task as unknown as { destroy?: () => void };
+      if (typeof candidate.destroy === 'function') {
+        candidate.destroy();
+      }
+    } catch (err) {
+      log?.error({ err }, 'failed to stop cron job');
+    }
+  }
+};
+
+const shutdown = async (signal: NodeJS.Signals, exitCode = 0) => {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  const logger = app?.log;
+
+  if (app) {
+    app.isStarted = false;
+  }
+
+  logger?.info({ signal }, 'received shutdown signal');
+  stopCronJobs(logger);
+
+  try {
+    if (app) {
+      await app.close();
+      logger?.info('server stopped');
+    }
+  } catch (err) {
+    logger?.error({ err }, 'error during shutdown');
+  } finally {
+    process.exit(exitCode);
+  }
+};
+
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
+process.once('SIGINT', () => {
+  void shutdown('SIGINT');
+});
+process.on('unhandledRejection', (err) => {
+  app?.log.error({ err }, 'unhandledRejection');
+  void shutdown('SIGTERM', 1);
+});
+process.on('uncaughtException', (err) => {
+  app?.log.fatal({ err }, 'uncaughtException');
+  void shutdown('SIGTERM', 1);
+});
+
 async function main() {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const routesDir = path.join(__dirname, '../src/routes');
-  let app: FastifyInstance | undefined;
-  const cronTasks: ScheduledTask[] = [];
-  let isShuttingDown = false;
-
-  const registerCron = (expression: string, job: () => void) => {
-    const task = schedule(expression, job);
-    cronTasks.push(task);
-    return task;
-  };
-
-  const stopCronJobs = (log?: FastifyBaseLogger) => {
-    while (cronTasks.length > 0) {
-      const task = cronTasks.pop();
-      if (!task) continue;
-
-      try {
-        task.stop();
-        const candidate = task as unknown as { destroy?: () => void };
-        if (typeof candidate.destroy === 'function') {
-          candidate.destroy();
-        }
-      } catch (err) {
-        log?.error({ err }, 'failed to stop cron job');
-      }
-    }
-  };
-
-  const shutdown = async (signal: NodeJS.Signals) => {
-    if (isShuttingDown) {
-      return;
-    }
-
-    isShuttingDown = true;
-    const logger = app?.log;
-
-    logger?.info({ signal }, 'received shutdown signal');
-    stopCronJobs(logger);
-
-    try {
-      if (app) {
-        await app.close();
-        logger?.info('server stopped');
-      }
-    } catch (err) {
-      logger?.error({ err }, 'error during shutdown');
-    } finally {
-      process.exit(0);
-    }
-  };
-
-  process.once('SIGTERM', () => {
-    void shutdown('SIGTERM');
-  });
-  process.once('SIGINT', () => {
-    void shutdown('SIGINT');
-  });
 
   try {
     app = await buildServer(routesDir);
@@ -95,18 +115,25 @@ async function main() {
     // Listen on all interfaces so Caddy can reach the backend in Docker
     await app.listen({ port: 3000, host: '0.0.0.0' });
     app.isStarted = true;
+    startCronJobs(log);
     log.info('server started');
   } catch (err) {
+    const wasStarted = app?.isStarted ?? false;
+    if (app) {
+      app.isStarted = false;
+    }
     stopCronJobs(app?.log);
 
     if (app) {
-      app.log.error(err);
+      app.log.error({ err }, 'failed to start server');
     } else {
       console.error(err);
     }
 
-    if (!app?.isStarted) {
+    if (!wasStarted) {
       process.exit(1);
+    } else {
+      void shutdown('SIGTERM', 1);
     }
   }
 }
