@@ -8,7 +8,6 @@ import { useWorkflowActions } from '../lib/useWorkflowActions';
 import api from '../lib/axios';
 import Button from '../components/ui/Button';
 import { useToast } from '../lib/useToast';
-import PortfolioWorkflowSetup from './PortfolioWorkflowSetup';
 import ExecLogItem, { type ExecLog } from '../components/ExecLogItem';
 import FormattedDate from '../components/ui/FormattedDate';
 import WorkflowUpdateModal from '../components/WorkflowUpdateModal';
@@ -64,10 +63,6 @@ export default function WorkflowView() {
   });
 
   if (!workflow) return <div className="p-4">{t('loading')}</div>;
-  if (workflow.status === 'inactive') {
-    return <PortfolioWorkflowSetup workflow={workflow} />;
-  }
-
   const isActive = workflow.status === 'active';
   return (
     <div className="p-4">
