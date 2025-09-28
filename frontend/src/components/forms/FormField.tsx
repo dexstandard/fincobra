@@ -22,7 +22,9 @@ export default function FormField({
     <div className={className}>
       {label && (
         <label
-          className={labelClassName || 'block text-xs md:text-sm font-medium mb-1'}
+          className={
+            labelClassName || 'block text-xs md:text-sm font-medium mb-1'
+          }
           htmlFor={htmlFor}
         >
           <span className="inline-flex items-center">

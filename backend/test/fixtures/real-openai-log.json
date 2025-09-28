@@ -90,10 +90,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "rebalance",
-                  "shortReport"
-                ],
+                "required": ["rebalance", "shortReport"],
                 "additionalProperties": false
               },
               {
@@ -128,10 +125,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "orders",
-                  "shortReport"
-                ],
+                "required": ["orders", "shortReport"],
                 "additionalProperties": false
               },
               {
@@ -141,17 +135,13 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "error"
-                ],
+                "required": ["error"],
                 "additionalProperties": false
               }
             ]
           }
         },
-        "required": [
-          "result"
-        ],
+        "required": ["result"],
         "additionalProperties": false
       },
       "strict": true

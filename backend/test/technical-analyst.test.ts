@@ -43,9 +43,7 @@ const extractJson = vi.hoisted(() => (res: string) => {
 
 vi.mock('../src/services/binance-client.js', () => ({
   fetchOrder: vi.fn().mockResolvedValue(undefined),
-  fetchOrderBook: vi
-    .fn()
-    .mockResolvedValue({ bid: [0, 0], ask: [0, 0] }),
+  fetchOrderBook: vi.fn().mockResolvedValue({ bid: [0, 0], ask: [0, 0] }),
 }));
 vi.mock('../src/services/sentiment.js', () => ({
   fetchFearGreedIndex: fetchFearGreedIndexMock,
@@ -208,13 +206,18 @@ describe('technical analyst step', () => {
     );
     const report = prompt.reports?.find((r: any) => r.token === 'BTC');
     expect(report?.tech?.comment).toBe('outlook text');
-    expect(prompt.reports?.find((r: any) => r.token === 'USDC')?.tech).toBeNull();
+    expect(
+      prompt.reports?.find((r: any) => r.token === 'USDC')?.tech,
+    ).toBeNull();
     expect(prompt.marketData.indicators.BTC).toMatchObject({
       ret1h: 1,
       regimeBtc: 'range',
       volumeZ24h: 16,
     });
-    expect(prompt.marketData.orderBooks.BTC).toEqual({ bid: [0, 0], ask: [0, 0] });
+    expect(prompt.marketData.orderBooks.BTC).toEqual({
+      bid: [0, 0],
+      ask: [0, 0],
+    });
     expect(prompt.marketData.fearGreedIndex).toEqual({
       value: 50,
       classification: 'Neutral',

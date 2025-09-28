@@ -27,7 +27,8 @@ export function usePrerequisites(
         const res = await api.get(`/users/${user!.id}/ai-key`);
         return res.data.key as string;
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
         throw err;
       }
     },
@@ -41,7 +42,8 @@ export function usePrerequisites(
         const res = await api.get(`/users/${user!.id}/ai-key/shared`);
         return res.data.key as string;
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
         throw err;
       }
     },
@@ -55,7 +57,8 @@ export function usePrerequisites(
         const res = await api.get(`/users/${user!.id}/binance-key`);
         return res.data.key as string;
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
         throw err;
       }
     },
@@ -117,9 +120,7 @@ export function usePrerequisites(
     const walletInfo = accountBalances.find(
       (b) => b.asset.toUpperCase() === token.toUpperCase(),
     );
-    const wallet =
-      (walletInfo?.free ?? 0) +
-      (walletInfo?.locked ?? 0);
+    const wallet = (walletInfo?.free ?? 0) + (walletInfo?.locked ?? 0);
     const earn = earnBalanceQueries[idx]?.data?.total ?? 0;
     const price = priceQueries[idx]?.data ?? 0;
     return {
@@ -137,10 +138,9 @@ export function usePrerequisites(
   return {
     hasOpenAIKey,
     hasBinanceKey,
-    models: includeAiKey ? modelsQuery.data ?? [] : [],
+    models: includeAiKey ? (modelsQuery.data ?? []) : [],
     balances,
     accountBalances,
     isAccountLoading: accountQuery.isLoading,
   } as const;
 }
-

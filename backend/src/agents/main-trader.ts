@@ -209,8 +209,12 @@ export async function collectPromptData(
 function extractResult(res: string): MainTraderDecision | null {
   try {
     const json = JSON.parse(res);
-    const outputs = Array.isArray((json as any).output) ? (json as any).output : [];
-    const msg = outputs.find((o: any) => o.type === 'message' || o.id?.startsWith('msg_'));
+    const outputs = Array.isArray((json as any).output)
+      ? (json as any).output
+      : [];
+    const msg = outputs.find(
+      (o: any) => o.type === 'message' || o.id?.startsWith('msg_'),
+    );
     const text = msg?.content?.[0]?.text;
     if (typeof text !== 'string') return null;
     const parsed = JSON.parse(text);
@@ -239,4 +243,3 @@ export async function run(
   }
   return decision;
 }
-

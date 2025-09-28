@@ -86,7 +86,9 @@ const runTechnicalAnalyst = vi.fn((_params: any, prompt: any) => {
   if (report) report.tech = { comment: 'tech', score: 2 };
   return Promise.resolve();
 });
-vi.spyOn(techAnalyst, 'runTechnicalAnalyst').mockImplementation(runTechnicalAnalyst);
+vi.spyOn(techAnalyst, 'runTechnicalAnalyst').mockImplementation(
+  runTechnicalAnalyst,
+);
 
 import {
   reviewWorkflowPortfolio,
@@ -104,8 +106,12 @@ vi.mock('../src/services/binance-client.js', () => ({
       { asset: 'ETH', free: '2', locked: '0' },
     ],
   }),
-  fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
-  fetchPairPrice: vi.fn().mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
+  fetchPairData: vi
+    .fn()
+    .mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
+  fetchPairPrice: vi
+    .fn()
+    .mockResolvedValue({ symbol: 'BTCUSDT', currentPrice: 100 }),
   fetchMarketTimeseries: vi.fn().mockResolvedValue(sampleTimeseries),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
@@ -136,8 +142,6 @@ const createDecisionLimitOrders = vi.hoisted(() =>
 vi.mock('../src/services/rebalance.js', () => ({
   createDecisionLimitOrders,
 }));
-
-
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -186,7 +190,10 @@ describe('reviewPortfolio', () => {
   });
 
   it('calls createDecisionLimitOrders when orders requested', async () => {
-    const { userId: user2, workflowId: agent2 } = await setupWorkflow(['BTC', 'ETH']);
+    const { userId: user2, workflowId: agent2 } = await setupWorkflow([
+      'BTC',
+      'ETH',
+    ]);
     const decision = {
       orders: [
         { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
@@ -241,4 +248,3 @@ describe('reviewPortfolio', () => {
     expect(row.error).toBeTruthy();
   });
 });
-

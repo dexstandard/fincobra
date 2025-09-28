@@ -12,7 +12,6 @@ import buildServer from '../src/server.js';
 import { authCookies } from './helpers.js';
 import { db } from '../src/db/index.js';
 
-
 describe('portfolio workflow creation', () => {
   it('does not await initial review', async () => {
     const app = await buildServer();
@@ -130,8 +129,14 @@ describe('portfolio workflow creation', () => {
           ],
         }),
       } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '60' }) } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '40' }) } as any);
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '60' }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '40' }),
+      } as any);
 
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
@@ -246,4 +251,3 @@ describe('portfolio workflow creation', () => {
     }
   });
 });
-

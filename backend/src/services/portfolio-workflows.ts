@@ -43,7 +43,9 @@ export async function validateTokenConflicts(
 ): Promise<ValidationErr | null> {
   const dupRows = await findActiveTokenConflicts(userId, tokens, id);
   if (!dupRows.length) return null;
-  const conflicts = dupRows.map((r) => `${r.token} used by ${r.name} (${r.id})`);
+  const conflicts = dupRows.map(
+    (r) => `${r.token} used by ${r.name} (${r.id})`,
+  );
   const parts = conflicts;
   const msg = `token${parts.length > 1 ? 's' : ''} ${parts.join(', ')} already used`;
   log.error('token conflict');
@@ -167,7 +169,9 @@ export async function preparePortfolioWorkflowForUpsert(
   userId: string,
   body: PortfolioWorkflowInput,
   id?: string,
-): Promise<{ body: PortfolioWorkflowInput; startBalance: number | null } | ValidationErr> {
+): Promise<
+  { body: PortfolioWorkflowInput; startBalance: number | null } | ValidationErr
+> {
   try {
     body.manualRebalance = !!body.manualRebalance;
     body.useEarn = body.useEarn !== false;
@@ -182,11 +186,10 @@ export async function preparePortfolioWorkflowForUpsert(
   if (body.status === PortfolioWorkflowStatus.Active) {
     const keyErr = await ensureApiKeys(log, userId);
     if (keyErr) return keyErr;
-    const bal = await getStartBalance(
-      log,
-      userId,
-      [body.cash, ...body.tokens.map((t) => t.token)],
-    );
+    const bal = await getStartBalance(log, userId, [
+      body.cash,
+      ...body.tokens.map((t) => t.token),
+    ]);
     if (typeof bal === 'number') startBalance = bal;
     else return bal;
   }

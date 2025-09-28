@@ -1,18 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../src/services/binance-client.js', async () => {
-  const actual = await vi.importActual<typeof import('../src/services/binance-client.js')>(
-    '../src/services/binance-client.js',
-  );
+  const actual = await vi.importActual<
+    typeof import('../src/services/binance-client.js')
+  >('../src/services/binance-client.js');
   return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
 });
 
 import buildServer from '../src/server.js';
 import { insertUser, insertAdminUser } from './repos/users.js';
-import { getAiKey, setAiKey, shareAiKey, hasAiKeyShare } from '../src/repos/ai-api-key.js';
+import {
+  getAiKey,
+  setAiKey,
+  shareAiKey,
+  hasAiKeyShare,
+} from '../src/repos/ai-api-key.js';
 import { setBinanceKey } from '../src/repos/exchange-api-keys.js';
 import { getUserApiKeys } from '../src/repos/portfolio-workflows.js';
-import { insertPortfolioWorkflow, getPortfolioWorkflow } from './repos/portfolio-workflows.js';
+import {
+  insertPortfolioWorkflow,
+  getPortfolioWorkflow,
+} from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
@@ -24,7 +32,10 @@ import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 import { CANCEL_ORDER_REASONS } from '../src/services/order-orchestrator.types.js';
 
 const cancelOrdersSpy = vi.spyOn(orderOrchestrator, 'cancelOrdersForWorkflow');
-const removeWorkflowFromScheduleSpy = vi.spyOn(portfolioReview, 'removeWorkflowFromSchedule');
+const removeWorkflowFromScheduleSpy = vi.spyOn(
+  portfolioReview,
+  'removeWorkflowFromSchedule',
+);
 
 beforeEach(() => {
   removeWorkflowFromScheduleSpy.mockClear();
@@ -134,8 +145,14 @@ describe('AI API key routes', () => {
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
     fetchMock.mockResolvedValue({ ok: true } as any);
-    const adminId = await insertAdminUser('admin1', encrypt('admin@example.com', process.env.KEY_PASSWORD!));
-    const userId = await insertUser('u1', encrypt('user@example.com', process.env.KEY_PASSWORD!));
+    const adminId = await insertAdminUser(
+      'admin1',
+      encrypt('admin@example.com', process.env.KEY_PASSWORD!),
+    );
+    const userId = await insertUser(
+      'u1',
+      encrypt('user@example.com', process.env.KEY_PASSWORD!),
+    );
     const ai = encrypt('aikey1234567890', process.env.KEY_PASSWORD!);
     await setAiKey({ userId: adminId, apiKeyEnc: ai });
 
@@ -244,7 +261,10 @@ describe('AI API key routes', () => {
       useEarn: true,
     });
 
-    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
@@ -333,7 +353,10 @@ describe('AI API key effects on agents', () => {
       useEarn: true,
     });
 
-    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },

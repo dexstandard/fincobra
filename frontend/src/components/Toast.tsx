@@ -2,9 +2,10 @@ import { useState, type ReactNode } from 'react';
 import { ToastContext } from '../lib/useToast';
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toast, setToast] = useState<
-    { message: string; variant: 'error' | 'success' } | null
-  >(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    variant: 'error' | 'success';
+  } | null>(null);
 
   const show = (msg: string, variant: 'error' | 'success' = 'error') => {
     setToast({ message: msg, variant });
@@ -26,4 +27,3 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     </ToastContext.Provider>
   );
 }
-

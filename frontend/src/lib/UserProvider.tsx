@@ -29,12 +29,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
       (err) => {
         if ([401, 403].includes(err.response?.status)) setUser(null);
         return Promise.reject(err);
-      }
+      },
     );
     return () => {
       api.interceptors.response.eject(id);
     };
   }, [setUser]);
 
-  return <UserContext.Provider value={{ user, setUser }}>{children}</UserContext.Provider>;
+  return (
+    <UserContext.Provider value={{ user, setUser }}>
+      {children}
+    </UserContext.Provider>
+  );
 }

@@ -11,9 +11,7 @@ interface BinanceBalanceResponse {
 
 export function useWorkflowBalanceUsd(tokens: string[]) {
   const { user } = useUser();
-  const uniqTokens = Array.from(
-    new Set(tokens.map((t) => t.toUpperCase())),
-  );
+  const uniqTokens = Array.from(new Set(tokens.map((t) => t.toUpperCase())));
   const { data: binanceKey } = useQuery<string | null>({
     queryKey: ['binance-key', user?.id],
     enabled: !!user,
@@ -22,7 +20,8 @@ export function useWorkflowBalanceUsd(tokens: string[]) {
         const res = await api.get(`/users/${user!.id}/binance-key`);
         return res.data.key as string;
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
         throw err;
       }
     },
@@ -36,7 +35,7 @@ export function useWorkflowBalanceUsd(tokens: string[]) {
           enabled,
           queryFn: async () => {
             const res = await api.get(
-              `/users/${user!.id}/binance-balance/${token.toUpperCase()}`
+              `/users/${user!.id}/binance-balance/${token.toUpperCase()}`,
             );
             const bal = res.data as BinanceBalanceResponse;
             const amount =
@@ -44,7 +43,7 @@ export function useWorkflowBalanceUsd(tokens: string[]) {
             if (!amount) return 0;
             if (['USDT', 'USDC'].includes(token.toUpperCase())) return amount;
             const priceRes = await fetch(
-              `https://api.binance.com/api/v3/ticker/price?symbol=${token.toUpperCase()}USDT`
+              `https://api.binance.com/api/v3/ticker/price?symbol=${token.toUpperCase()}USDT`,
             );
             if (!priceRes.ok) return 0;
             const priceData = (await priceRes.json()) as { price: string };

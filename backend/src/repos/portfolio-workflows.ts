@@ -48,7 +48,9 @@ const baseSelect = `
     LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
 `;
 
-export async function getPortfolioWorkflow(id: string): Promise<PortfolioWorkflow | undefined> {
+export async function getPortfolioWorkflow(
+  id: string,
+): Promise<PortfolioWorkflow | undefined> {
   const { rows } = await db.query(
     `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id`,
     [id, PortfolioWorkflowStatus.Retired],
@@ -64,7 +66,8 @@ export async function getPortfolioWorkflowsPaginated(
   offset: number,
 ) {
   if (status) {
-    if (status === PortfolioWorkflowStatus.Retired) return { rows: [], total: 0 };
+    if (status === PortfolioWorkflowStatus.Retired)
+      return { rows: [], total: 0 };
     const where = 'WHERE pw.user_id = $1 AND pw.status = $2';
     const totalRes = await db.query(
       `SELECT COUNT(*) as count FROM portfolio_workflow pw ${where}`,
@@ -225,7 +228,10 @@ export async function updatePortfolioWorkflow(
         data.id,
       ],
     );
-    await client.query('DELETE FROM portfolio_workflow_tokens WHERE portfolio_workflow_id = $1', [data.id]);
+    await client.query(
+      'DELETE FROM portfolio_workflow_tokens WHERE portfolio_workflow_id = $1',
+      [data.id],
+    );
     const params: any[] = [data.id];
     const values: string[] = [];
     data.tokens.forEach((t, i) => {
@@ -420,7 +426,11 @@ export async function deactivateWorkflowsByUser(
   if (!aiKeyId) {
     await db.query(
       `UPDATE portfolio_workflow SET status = $1, start_balance = NULL WHERE user_id = $2 AND status = $3`,
-      [PortfolioWorkflowStatus.Inactive, userId, PortfolioWorkflowStatus.Active],
+      [
+        PortfolioWorkflowStatus.Inactive,
+        userId,
+        PortfolioWorkflowStatus.Active,
+      ],
     );
     return;
   }
@@ -452,7 +462,12 @@ export async function deactivateWorkflowsByUser(
                  LIMIT 1
               )
             ) = $4`,
-    [PortfolioWorkflowStatus.Inactive, userId, PortfolioWorkflowStatus.Active, aiKeyId],
+    [
+      PortfolioWorkflowStatus.Inactive,
+      userId,
+      PortfolioWorkflowStatus.Active,
+      aiKeyId,
+    ],
   );
 }
 

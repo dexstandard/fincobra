@@ -66,7 +66,10 @@ describe('binance order helpers', () => {
 
     const fetchMock = vi
       .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ status: LimitOrderStatus.Canceled }) });
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: LimitOrderStatus.Canceled }),
+      });
     vi.stubGlobal('fetch', fetchMock as any);
 
     await cancelOrder(id2, { symbol: 'BTCUSDT', orderId: 42 });
@@ -75,7 +78,7 @@ describe('binance order helpers', () => {
     const [url, options] = fetchMock.mock.calls[0];
     const parsedUrl = new URL(url);
     expect(parsedUrl.origin + parsedUrl.pathname).toBe(
-      'https://api.binance.com/api/v3/order'
+      'https://api.binance.com/api/v3/order',
     );
     expect(options.method).toBe('DELETE');
     expect(options.headers['X-MBX-APIKEY']).toBe(key);
@@ -88,4 +91,3 @@ describe('binance order helpers', () => {
     expect(signature).toBe(expectedSig);
   });
 });
-

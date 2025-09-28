@@ -9,7 +9,11 @@ import {
   LimitOrderStatus,
   type LimitOrderOpen,
 } from '../repos/limit-orders.types.js';
-import { fetchOpenOrders, fetchOrder, parseBinanceError } from './binance-client.js';
+import {
+  fetchOpenOrders,
+  fetchOrder,
+  parseBinanceError,
+} from './binance-client.js';
 import type { OpenOrder } from './binance-client.types.js';
 import { cancelLimitOrder } from './limit-order.js';
 import type { CancelOrderReason } from './order-orchestrator.types.js';
@@ -81,7 +85,11 @@ export async function cancelOrdersForWorkflow({
 }: CancelOrdersForWorkflowOptions): Promise<void> {
   const openOrders = await getOpenLimitOrdersForWorkflow(workflowId);
   for (const order of openOrders) {
-    const symbol = parsePlannedOrderSymbol(order.plannedJson, log, order.orderId);
+    const symbol = parsePlannedOrderSymbol(
+      order.plannedJson,
+      log,
+      order.orderId,
+    );
     if (!symbol) {
       await updateLimitOrderStatus(
         order.userId,
@@ -247,10 +255,7 @@ function parsePlannedOrderSymbol(
   }
 }
 
-function parsePlannedOrder(
-  plannedJson: string,
-  orderId: string,
-): PlannedOrder {
+function parsePlannedOrder(plannedJson: string, orderId: string): PlannedOrder {
   let parsed: Record<string, unknown> | null = null;
   try {
     parsed = JSON.parse(plannedJson) as Record<string, unknown> | null;

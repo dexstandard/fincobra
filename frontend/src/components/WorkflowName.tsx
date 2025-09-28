@@ -11,6 +11,7 @@ export default function WorkflowName({
   onChange,
   className = 'text-xl font-bold mb-2',
 }: Props) {
-  return <EditableText value={name} onChange={onChange} className={className} />;
+  return (
+    <EditableText value={name} onChange={onChange} className={className} />
+  );
 }
-

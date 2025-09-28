@@ -1,4 +1,3 @@
-
 const ICONS: Record<string, string> = {
   BTC: '/tokens/bitcoin-btc-logo.svg',
   BNB: '/tokens/bnb-bnb-logo.svg',
@@ -15,7 +14,13 @@ const ICONS: Record<string, string> = {
   XRP: '/tokens/xrp-xrp-logo.svg',
 };
 
-export default function TokenDisplay({ token, className = '' }: { token: string; className?: string }) {
+export default function TokenDisplay({
+  token,
+  className = '',
+}: {
+  token: string;
+  className?: string;
+}) {
   const symbol = token.toUpperCase();
   const src = ICONS[symbol];
   return (

@@ -21,7 +21,11 @@ function ApiStatus() {
   });
   const t = useTranslation();
 
-  return <span className="text-sm">API: {isSuccess ? t('online') : t('offline')}</span>;
+  return (
+    <span className="text-sm">
+      API: {isSuccess ? t('online') : t('offline')}
+    </span>
+  );
 }
 
 export default function AppShell() {
@@ -77,7 +81,9 @@ export default function AppShell() {
               }`}
               title={navCollapsed ? t('settings') : undefined}
             >
-              <SettingsIcon className={`${navCollapsed ? 'w-6 h-6' : 'w-4 h-4'}`} />
+              <SettingsIcon
+                className={`${navCollapsed ? 'w-6 h-6' : 'w-4 h-4'}`}
+              />
               {!navCollapsed && t('settings')}
             </Link>
             {user?.role === 'admin' && (
@@ -88,7 +94,9 @@ export default function AppShell() {
                 }`}
                 title={navCollapsed ? t('users') : undefined}
               >
-                <UsersIcon className={`${navCollapsed ? 'w-6 h-6' : 'w-4 h-4'}`} />
+                <UsersIcon
+                  className={`${navCollapsed ? 'w-6 h-6' : 'w-4 h-4'}`}
+                />
                 {!navCollapsed && t('users')}
               </Link>
             )}

@@ -127,7 +127,7 @@ describe('binance balance route', () => {
     (globalThis as any).fetch = originalFetch;
   });
 
-  it('forbids accessing another user\'s balance', async () => {
+  it("forbids accessing another user's balance", async () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'GET',

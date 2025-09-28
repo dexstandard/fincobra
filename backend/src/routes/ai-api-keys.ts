@@ -23,7 +23,7 @@ import {
   userPreHandlers,
 } from './_shared/guards.js';
 import { REDACTED_KEY } from './_shared/constants.js';
-import {parseBody} from "./_shared/validation.js";
+import { parseBody } from './_shared/validation.js';
 
 interface AiKeyBody {
   key: string;
@@ -82,7 +82,8 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key } = body;
       const aiKey = await getAiKey(userId);
-      if (aiKey) return reply.code(409).send(errorResponse('key already exists'));
+      if (aiKey)
+        return reply.code(409).send(errorResponse('key already exists'));
       if (!(await verifyAiKey(key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
@@ -115,7 +116,8 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const id = getValidatedUserId(req);
       const sharedKey = await getSharedAiKey(id);
-      if (!sharedKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!sharedKey)
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
       return { key: REDACTED_KEY, shared: true, model: sharedKey.model };
     },
   );
@@ -132,7 +134,8 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key } = body;
       const aiKey = await getAiKey(id);
-      if (!aiKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!aiKey)
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
       if (!(await verifyAiKey(key)))
         return reply.code(400).send(errorResponse('verification failed'));
       const enc = encryptKey(key);
@@ -150,7 +153,8 @@ export default async function aiApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const id = getValidatedUserId(req);
       const aiKey = await getAiKey(id);
-      if (!aiKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!aiKey)
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
 
       const disableSummary = await disableUserWorkflowsByAiKey(
         req.log,

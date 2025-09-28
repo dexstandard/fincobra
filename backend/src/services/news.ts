@@ -45,16 +45,19 @@ export function isRecent(pubDate?: string, now: Date = new Date()): boolean {
   return d.getTime() >= now.getTime() - DAY_MS;
 }
 
-function summarizeByToken(items: { tokens: string[] }[]): Record<string, number> {
+function summarizeByToken(
+  items: { tokens: string[] }[],
+): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const it of items) for (const t of it.tokens) counts[t] = (counts[t] ?? 0) + 1;
+  for (const it of items)
+    for (const t of it.tokens) counts[t] = (counts[t] ?? 0) + 1;
   return counts;
 }
 
 export async function fetchNews(
-    now: Date = new Date(),
-    log?: FastifyBaseLogger,
-    c: NodeCache = cache,
+  now: Date = new Date(),
+  log?: FastifyBaseLogger,
+  c: NodeCache = cache,
 ): Promise<NewsItem[]> {
   const nowMs = now.getTime();
   const collected: NewsItem[] = [];
@@ -74,7 +77,10 @@ export async function fetchNews(
         if (!isRecent(item.pubDate, now)) continue;
 
         const seenKey = `news:seen:${item.link}`;
-        if (c.get(seenKey)) { deduped++; continue; }
+        if (c.get(seenKey)) {
+          deduped++;
+          continue;
+        }
 
         const tokens = tagTokens(item.title);
         if (!tokens.length) continue;
@@ -103,8 +109,8 @@ export async function fetchNews(
   }
 
   const quietNow = Object.entries(perFeed)
-      .filter(([, count]) => count === 0)
-      .map(([url]) => url);
+    .filter(([, count]) => count === 0)
+    .map(([url]) => url);
 
   const silent24h: string[] = [];
   for (const url of FEEDS) {
@@ -117,17 +123,17 @@ export async function fetchNews(
 
   if (log) {
     log.info(
-        {
-          totalRaw: rawItems,
-          totalNew: collected.length,
-          deduped,
-          perFeed,
-          failedFeeds,   // parse/network errors this run
-          quietNow,      // 0 new items in this run
-          silent24h,     // no new items for >24h (cumulative)
-          perToken: summarizeByToken(collected),
-        },
-        'news fetch summary',
+      {
+        totalRaw: rawItems,
+        totalNew: collected.length,
+        deduped,
+        perFeed,
+        failedFeeds, // parse/network errors this run
+        quietNow, // 0 new items in this run
+        silent24h, // no new items for >24h (cumulative)
+        perToken: summarizeByToken(collected),
+      },
+      'news fetch summary',
     );
   }
 
@@ -142,4 +148,3 @@ export async function fetchAndStoreNews(log: FastifyBaseLogger): Promise<void> {
     log.error({ err }, 'failed to fetch or store news');
   }
 }
-

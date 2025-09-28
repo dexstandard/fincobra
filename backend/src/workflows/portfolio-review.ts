@@ -4,7 +4,10 @@ import {
   getActivePortfolioWorkflowsByInterval,
 } from '../repos/portfolio-workflows.js';
 import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
-import { run as runMainTrader, collectPromptData } from '../agents/main-trader.js';
+import {
+  run as runMainTrader,
+  collectPromptData,
+} from '../agents/main-trader.js';
 import type { MainTraderDecision } from '../agents/main-trader.types.js';
 import { runNewsAnalyst } from '../agents/news-analyst.js';
 import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
@@ -14,9 +17,7 @@ import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import { env } from '../util/env.js';
 import { decrypt } from '../util/crypto.js';
 import { insertReviewResult } from '../repos/review-result.js';
-import type {
-  ReviewResultInsert
-} from '../repos/review-result.types.js';
+import type { ReviewResultInsert } from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
@@ -38,7 +39,8 @@ export async function reviewPortfolio(
   const workflow = await getActivePortfolioWorkflowById(workflowId);
   if (!workflow) return;
   const { toRun, skipped } = filterRunningWorkflows([workflow]);
-  if (skipped.length) throw new Error('Workflow is already reviewing portfolio');
+  if (skipped.length)
+    throw new Error('Workflow is already reviewing portfolio');
   await runReviewWorkflows(log, toRun);
 }
 
@@ -81,7 +83,6 @@ function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflow[]) {
   return { toRun, skipped };
 }
 
-
 async function cleanupOpenOrders(
   wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
@@ -100,7 +101,9 @@ async function cleanupOpenOrders(
           });
           log.info(
             { orderId: o.orderId },
-            res === LimitOrderStatus.Canceled ? 'canceled stale order' : 'order already filled',
+            res === LimitOrderStatus.Canceled
+              ? 'canceled stale order'
+              : 'order already filled',
           );
         } catch (err) {
           log.error({ err }, 'failed to cancel order');
@@ -169,19 +172,30 @@ export async function executeWorkflow(
 
     const key = decrypt(wf.aiApiKeyEnc, env.KEY_PASSWORD);
 
-    prompt = await runStep('collectPromptData', () => collectPromptData(wf, runLog));
+    prompt = await runStep('collectPromptData', () =>
+      collectPromptData(wf, runLog),
+    );
     if (!prompt) {
       runLog.error('workflow run failed: could not collect prompt data');
       return;
     }
 
-    const params = { log: runLog, model: wf.model, apiKey: key, portfolioId: wf.id };
+    const params = {
+      log: runLog,
+      model: wf.model,
+      apiKey: key,
+      portfolioId: wf.id,
+    };
     await Promise.all([
       runStep('runNewsAnalyst', () => runNewsAnalyst(params, prompt!)),
-      runStep('runTechnicalAnalyst', () => runTechnicalAnalyst(params, prompt!)),
+      runStep('runTechnicalAnalyst', () =>
+        runTechnicalAnalyst(params, prompt!),
+      ),
     ]);
 
-    const decision = await runStep('runMainTrader', () => runMainTrader(params, prompt!));
+    const decision = await runStep('runMainTrader', () =>
+      runMainTrader(params, prompt!),
+    );
     const logId = await runStep('insertReviewRawLog', () =>
       insertReviewRawLog({
         portfolioWorkflowId: wf.id,
@@ -193,14 +207,17 @@ export async function executeWorkflow(
       decision ?? undefined,
       prompt!.portfolio.positions.map((p) => p.sym),
     );
-    if (validationError) runLog.error({ err: validationError }, 'validation failed');
+    if (validationError)
+      runLog.error({ err: validationError }, 'validation failed');
     const resultEntry = buildReviewResultEntry({
       workflowId: wf.id,
       decision,
       logId,
       validationError,
     });
-    const resultId = await runStep('insertReviewResult', () => insertReviewResult(resultEntry));
+    const resultId = await runStep('insertReviewResult', () =>
+      insertReviewResult(resultEntry),
+    );
     if (
       decision &&
       !validationError &&
@@ -235,7 +252,8 @@ async function saveFailure(
   const parsed = parseExecLog({ error: message });
 
   const rebalance =
-    Array.isArray(parsed.response?.orders) && parsed.response!.orders.length > 0;
+    Array.isArray(parsed.response?.orders) &&
+    parsed.response!.orders.length > 0;
 
   const entry: ReviewResultInsert = {
     portfolioWorkflowId: row.id,
@@ -257,4 +275,3 @@ async function saveFailure(
 }
 
 export { reviewPortfolio as reviewWorkflowPortfolio };
-

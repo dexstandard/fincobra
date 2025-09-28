@@ -42,7 +42,11 @@ function WorkflowRow({
   ];
   const { balance, isLoading } = useWorkflowBalanceUsd(tokenList);
   const balanceText =
-    balance === null ? '-' : isLoading ? t('loading') : `$${balance.toFixed(2)}`;
+    balance === null
+      ? '-'
+      : isLoading
+        ? t('loading')
+        : `$${balance.toFixed(2)}`;
   const pnl =
     balance !== null && workflow.startBalanceUsd != null
       ? balance - workflow.startBalanceUsd
@@ -55,26 +59,26 @@ function WorkflowRow({
     pnl === null
       ? '-'
       : isLoading
-      ? t('loading')
-      : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
-          pnlPercent !== null
-            ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
-            : ''
-        }`;
+        ? t('loading')
+        : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
+            pnlPercent !== null
+              ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
+              : ''
+          }`;
   const pnlClass =
     pnl === null || isLoading
       ? ''
       : pnlPercent !== null
-      ? pnlPercent <= -3
-        ? 'text-red-600'
-        : pnlPercent >= 3
-        ? 'text-green-600'
-        : 'text-gray-600'
-      : pnl <= -0.03
-      ? 'text-red-600'
-      : pnl >= 0.03
-      ? 'text-green-600'
-      : 'text-gray-600';
+        ? pnlPercent <= -3
+          ? 'text-red-600'
+          : pnlPercent >= 3
+            ? 'text-green-600'
+            : 'text-gray-600'
+        : pnl <= -0.03
+          ? 'text-red-600'
+          : pnl >= 0.03
+            ? 'text-green-600'
+            : 'text-gray-600';
   const pnlTooltip =
     pnl === null || isLoading
       ? undefined
@@ -151,7 +155,11 @@ function WorkflowBlock({
   ];
   const { balance, isLoading } = useWorkflowBalanceUsd(tokenList);
   const balanceText =
-    balance === null ? '-' : isLoading ? t('loading') : `$${balance.toFixed(2)}`;
+    balance === null
+      ? '-'
+      : isLoading
+        ? t('loading')
+        : `$${balance.toFixed(2)}`;
   const pnl =
     balance !== null && workflow.startBalanceUsd != null
       ? balance - workflow.startBalanceUsd
@@ -164,26 +172,26 @@ function WorkflowBlock({
     pnl === null
       ? '-'
       : isLoading
-      ? t('loading')
-      : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
-          pnlPercent !== null
-            ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
-            : ''
-        }`;
+        ? t('loading')
+        : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
+            pnlPercent !== null
+              ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
+              : ''
+          }`;
   const pnlClass =
     pnl === null || isLoading
       ? ''
       : pnlPercent !== null
-      ? pnlPercent <= -3
-        ? 'text-red-600'
-        : pnlPercent >= 3
-        ? 'text-green-600'
-        : 'text-gray-600'
-      : pnl <= -0.03
-      ? 'text-red-600'
-      : pnl >= 0.03
-      ? 'text-green-600'
-      : 'text-gray-600';
+        ? pnlPercent <= -3
+          ? 'text-red-600'
+          : pnlPercent >= 3
+            ? 'text-green-600'
+            : 'text-gray-600'
+        : pnl <= -0.03
+          ? 'text-red-600'
+          : pnl >= 0.03
+            ? 'text-green-600'
+            : 'text-gray-600';
   const pnlTooltip =
     pnl === null || isLoading
       ? undefined
@@ -324,11 +332,11 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">{t('my_workflows')}</h2>
             </div>
-            <p>{
-              hasBinanceKey
+            <p>
+              {hasBinanceKey
                 ? t('no_workflows_yet_connected')
-                : t('no_workflows_yet')
-            }</p>
+                : t('no_workflows_yet')}
+            </p>
           </div>
         </ErrorBoundary>
       </div>
@@ -371,11 +379,9 @@ export default function Dashboard() {
             </div>
             {items.length === 0 ? (
               <p>
-                {
-                  hasBinanceKey
-                    ? t('no_workflows_yet_connected')
-                    : t('no_workflows_yet')
-                }
+                {hasBinanceKey
+                  ? t('no_workflows_yet_connected')
+                  : t('no_workflows_yet')}
               </p>
             ) : (
               <>

@@ -34,7 +34,9 @@ interface NominalAdjustmentOptions {
   targetNominal: number;
 }
 
-function extractLeadingDigit(value: number): { exponent: number; digit: number } | null {
+function extractLeadingDigit(
+  value: number,
+): { exponent: number; digit: number } | null {
   if (!Number.isFinite(value) || value <= 0) return null;
   const scientific = value.toExponential();
   const [coeff, exponentPart] = scientific.split('e');
@@ -58,12 +60,22 @@ function matchesTruncatedPrefix(requested: number, target: number): boolean {
   );
 }
 
-function adjustLimitPrice(requested: number, current: number, side: 'BUY' | 'SELL'): number {
+function adjustLimitPrice(
+  requested: number,
+  current: number,
+  side: 'BUY' | 'SELL',
+): number {
   const anchor = side === 'BUY' ? current * 0.999 : current * 1.001;
-  return side === 'BUY' ? Math.min(requested, anchor) : Math.max(requested, anchor);
+  return side === 'BUY'
+    ? Math.min(requested, anchor)
+    : Math.max(requested, anchor);
 }
 
-function roundLimitPrice(price: number, precision: number, side: 'BUY' | 'SELL'): number {
+function roundLimitPrice(
+  price: number,
+  precision: number,
+  side: 'BUY' | 'SELL',
+): number {
   if (!Number.isFinite(price) || price <= 0) return 0;
   const factor = 10 ** precision;
   if (!Number.isFinite(factor) || factor <= 0) return 0;
@@ -95,7 +107,8 @@ function increaseQuantityToMeetNominal({
 
 function meetsMinNotional(value: number, minNotional: number): boolean {
   if (!Number.isFinite(value) || !Number.isFinite(minNotional)) return false;
-  const tolerance = Math.max(Math.abs(value), Math.abs(minNotional), 1) * Number.EPSILON;
+  const tolerance =
+    Math.max(Math.abs(value), Math.abs(minNotional), 1) * Number.EPSILON;
   return value + tolerance >= minNotional;
 }
 
@@ -213,8 +226,16 @@ export async function createDecisionLimitOrders(opts: {
       continue;
     }
 
-    const adjustedLimit = adjustLimitPrice(requestedLimitPrice, currentPrice, side);
-    const roundedLimit = roundLimitPrice(adjustedLimit, info.pricePrecision, side);
+    const adjustedLimit = adjustLimitPrice(
+      requestedLimitPrice,
+      currentPrice,
+      side,
+    );
+    const roundedLimit = roundLimitPrice(
+      adjustedLimit,
+      info.pricePrecision,
+      side,
+    );
     if (!Number.isFinite(roundedLimit) || roundedLimit <= 0) {
       await insertLimitOrder({
         userId: opts.userId,
@@ -244,7 +265,10 @@ export async function createDecisionLimitOrders(opts: {
     let qty = Number(rawQuantity.toFixed(info.quantityPrecision));
     const freshNominal = rawQuantity * roundedLimit;
     const roundedNominal = qty * roundedLimit;
-    const meetsRoundedNominal = meetsMinNotional(roundedNominal, info.minNotional);
+    const meetsRoundedNominal = meetsMinNotional(
+      roundedNominal,
+      info.minNotional,
+    );
     if (!meetsRoundedNominal && info.minNotional > 0) {
       let minForRequestedToken: number | null = null;
       if (o.token === info.baseAsset) {
@@ -274,7 +298,12 @@ export async function createDecisionLimitOrders(opts: {
       }
     }
     const nominalValue = qty * roundedLimit;
-    const params = { symbol: info.symbol, side, quantity: qty, price: roundedLimit } as const;
+    const params = {
+      symbol: info.symbol,
+      side,
+      quantity: qty,
+      price: roundedLimit,
+    } as const;
     const planned = {
       ...plannedBase,
       quantity: qty,
@@ -316,10 +345,14 @@ export async function createDecisionLimitOrders(opts: {
         reviewResultId: opts.reviewResultId,
         orderId: String(res.orderId),
       });
-      opts.log.info({ step: 'createLimitOrder', orderId: res.orderId }, 'step success');
+      opts.log.info(
+        { step: 'createLimitOrder', orderId: res.orderId },
+        'step success',
+      );
     } catch (err) {
       const { msg } = parseBinanceError(err);
-      const reason = msg || (err instanceof Error ? err.message : 'unknown error');
+      const reason =
+        msg || (err instanceof Error ? err.message : 'unknown error');
       await insertLimitOrder({
         userId: opts.userId,
         planned,

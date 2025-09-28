@@ -10,10 +10,7 @@ interface Props {
 }
 
 export default function WorkflowDetailsMobile({ workflow }: Props) {
-  const tokens = [
-    workflow.cashToken,
-    ...workflow.tokens.map((t) => t.token),
-  ];
+  const tokens = [workflow.cashToken, ...workflow.tokens.map((t) => t.token)];
   const t = useTranslation();
   return (
     <div>

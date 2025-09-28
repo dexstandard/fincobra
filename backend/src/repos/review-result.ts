@@ -8,7 +8,9 @@ import type {
   ReviewResultSummary,
 } from './review-result.types.js';
 
-export async function insertReviewResult(entry: ReviewResultInsert): Promise<string> {
+export async function insertReviewResult(
+  entry: ReviewResultInsert,
+): Promise<string> {
   const { rows } = await db.query(
     'INSERT INTO review_result (portfolio_workflow_id, log, rebalance, short_report, error, raw_log_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
     [
@@ -76,7 +78,10 @@ export async function getPortfolioReviewResults(
   return { rows: entities, total: Number(totalRes.rows[0].count) };
 }
 
-export async function getRebalanceInfo(portfolioWorkflowId: string, id: string) {
+export async function getRebalanceInfo(
+  portfolioWorkflowId: string,
+  id: string,
+) {
   const { rows } = await db.query(
     'SELECT rebalance, log FROM review_result WHERE id = $1 AND portfolio_workflow_id = $2',
     [id, portfolioWorkflowId],

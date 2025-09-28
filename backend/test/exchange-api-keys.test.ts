@@ -1,17 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../src/services/binance-client.js', async () => {
-  const actual = await vi.importActual<typeof import('../src/services/binance-client.js')>(
-    '../src/services/binance-client.js',
-  );
+  const actual = await vi.importActual<
+    typeof import('../src/services/binance-client.js')
+  >('../src/services/binance-client.js');
   return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
 });
 
 import buildServer from '../src/server.js';
 import { insertUser } from './repos/users.js';
-import { getBinanceKey, setBinanceKey } from '../src/repos/exchange-api-keys.js';
+import {
+  getBinanceKey,
+  setBinanceKey,
+} from '../src/repos/exchange-api-keys.js';
 import { setAiKey } from '../src/repos/ai-api-key.js';
-import { insertPortfolioWorkflow, getPortfolioWorkflow } from './repos/portfolio-workflows.js';
+import {
+  insertPortfolioWorkflow,
+  getPortfolioWorkflow,
+} from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
@@ -23,7 +29,10 @@ import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 import { CANCEL_ORDER_REASONS } from '../src/services/order-orchestrator.types.js';
 
 const cancelOrdersSpy = vi.spyOn(orderOrchestrator, 'cancelOrdersForWorkflow');
-const removeWorkflowFromScheduleSpy = vi.spyOn(portfolioReview, 'removeWorkflowFromSchedule');
+const removeWorkflowFromScheduleSpy = vi.spyOn(
+  portfolioReview,
+  'removeWorkflowFromSchedule',
+);
 
 beforeEach(() => {
   removeWorkflowFromScheduleSpy.mockClear();
@@ -205,7 +214,10 @@ describe('Exchange API key effects on agents', () => {
       useEarn: true,
     });
 
-    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },

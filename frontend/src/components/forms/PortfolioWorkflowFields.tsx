@@ -61,9 +61,7 @@ export default function PortfolioWorkflowFields({
     .map((b) => ({ token: b.asset.toUpperCase(), total: b.free + b.locked }))
     .filter(
       (b) =>
-        b.total > 0 &&
-        !stableCoins.includes(b.token) &&
-        tokenSet.has(b.token),
+        b.total > 0 && !stableCoins.includes(b.token) && tokenSet.has(b.token),
     )
     .sort((a, b) => b.total - a.total)
     .slice(0, 3)
@@ -108,9 +106,7 @@ export default function PortfolioWorkflowFields({
 
   useEffect(() => {
     onTokensChange?.(
-      tokensWatch
-        .map((t) => t.token)
-        .filter((t): t is string => Boolean(t)),
+      tokensWatch.map((t) => t.token).filter((t): t is string => Boolean(t)),
     );
   }, [tokensWatch, onTokensChange]);
 
@@ -136,9 +132,7 @@ export default function PortfolioWorkflowFields({
     const newToken = available[0]?.value || tokens[0].value;
     append({ token: newToken, minAllocation: 0 });
     onTokensChange?.([
-      ...tokensWatch
-        .map((t) => t.token)
-        .filter((t): t is string => Boolean(t)),
+      ...tokensWatch.map((t) => t.token).filter((t): t is string => Boolean(t)),
       newToken,
     ]);
   };
@@ -185,9 +179,7 @@ export default function PortfolioWorkflowFields({
                       if (index === 0) {
                         return stableCoins.includes(t.value) && !isSelected;
                       }
-                      return (
-                        !stableCoins.includes(t.value) && !isSelected
-                      );
+                      return !stableCoins.includes(t.value) && !isSelected;
                     })}
                   />
                 )}
@@ -217,9 +209,7 @@ export default function PortfolioWorkflowFields({
                         if (value < 0) value = 0;
                         const totalOthers = tokensWatch.reduce(
                           (sum, t, i) =>
-                            i === index
-                              ? sum
-                              : sum + (t.minAllocation || 0),
+                            i === index ? sum : sum + (t.minAllocation || 0),
                           0,
                         );
                         const maxAllowed = Math.max(0, 95 - totalOthers);
@@ -254,7 +244,9 @@ export default function PortfolioWorkflowFields({
       <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2 mt-2">
         <span className="text-left text-md font-bold">Total $:</span>
         <span>{totalUsd.toFixed(2)}</span>
-        <span className="text-left text-md font-bold">{t('use_binance_earn')}</span>
+        <span className="text-left text-md font-bold">
+          {t('use_binance_earn')}
+        </span>
         <Toggle
           label=""
           checked={useEarn}
@@ -300,6 +292,6 @@ export default function PortfolioWorkflowFields({
           />
         </FormField>
       </div>
-      </>
-    );
-  }
+    </>
+  );
+}

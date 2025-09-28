@@ -36,15 +36,26 @@ describe('fetchNews', () => {
     parseURL.mockResolvedValue({ items: [] });
     parseURL.mockResolvedValueOnce({
       items: [
-        { title: 'BTC surges', link: 'https://example.com/btc', pubDate: recent },
+        {
+          title: 'BTC surges',
+          link: 'https://example.com/btc',
+          pubDate: recent,
+        },
         { title: 'ETH old', link: 'https://example.com/eth', pubDate: old },
-        { title: 'General news', link: 'https://example.com/general', pubDate: recent },
+        {
+          title: 'General news',
+          link: 'https://example.com/general',
+          pubDate: recent,
+        },
       ],
     });
     const res = await fetchNews(now);
     expect(parseURL).toHaveBeenCalledTimes(FEEDS.length);
     expect(res).toHaveLength(1);
-    expect(res[0]).toMatchObject({ link: 'https://example.com/btc', tokens: ['BTC'] });
+    expect(res[0]).toMatchObject({
+      link: 'https://example.com/btc',
+      tokens: ['BTC'],
+    });
     parseURL.mockRestore();
   });
 });
@@ -72,7 +83,9 @@ describe('insertNews', () => {
       tokens: [],
     };
     await insertNews([item]);
-    const { rows } = await db.query('SELECT 1 FROM news WHERE link = $1', [item.link]);
+    const { rows } = await db.query('SELECT 1 FROM news WHERE link = $1', [
+      item.link,
+    ]);
     expect(rows).toHaveLength(0);
   });
 });

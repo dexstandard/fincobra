@@ -15,7 +15,9 @@ export async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
   const res = await fetch('https://api.alternative.me/fng/');
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`failed to fetch fear & greed index: ${res.status} ${body}`);
+    throw new Error(
+      `failed to fetch fear & greed index: ${res.status} ${body}`,
+    );
   }
   const json = (await res.json()) as FearGreedResponse;
   const value = Number(json?.data?.[0]?.value ?? json?.value);
@@ -23,4 +25,3 @@ export async function fetchFearGreedIndex(): Promise<FearGreedIndex> {
     json?.data?.[0]?.value_classification ?? json?.value_classification ?? '';
   return { value, classification };
 }
-

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
-import { getActivePortfolioWorkflowById, getPortfolioWorkflow } from '../src/repos/portfolio-workflows.js';
+import {
+  getActivePortfolioWorkflowById,
+  getPortfolioWorkflow,
+} from '../src/repos/portfolio-workflows.js';
 import { insertUser, insertUserWithKeys } from './repos/users.js';
 import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import {
@@ -25,18 +28,13 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
 }));
 
 vi.mock('../src/services/binance-client.js', async () => {
-  const actual = await vi.importActual<typeof import('../src/services/binance-client.js')>(
-    '../src/services/binance-client.js',
-  );
+  const actual = await vi.importActual<
+    typeof import('../src/services/binance-client.js')
+  >('../src/services/binance-client.js');
   return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
 });
 
-
-const cancelOrdersSpy = vi.spyOn(
-  orderOrchestrator,
-  'cancelOrdersForWorkflow',
-);
-
+const cancelOrdersSpy = vi.spyOn(orderOrchestrator, 'cancelOrdersForWorkflow');
 
 describe('portfolio workflow routes', () => {
   beforeEach(() => {
@@ -57,8 +55,14 @@ describe('portfolio workflow routes', () => {
           ],
         }),
       } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '60' }) } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '40' }) } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '60' }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '40' }),
+      } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ balances: [] }),
@@ -72,8 +76,14 @@ describe('portfolio workflow routes', () => {
           ],
         }),
       } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '60' }) } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '40' }) } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '60' }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '40' }),
+      } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ balances: [] }),
@@ -105,7 +115,12 @@ describe('portfolio workflow routes', () => {
     expect(res.statusCode).toBe(200);
     const id = res.json().id as string;
     const { cash, ...rest } = payload;
-    expect(res.json()).toMatchObject({ id, cashToken: cash, ...rest, startBalanceUsd: 100 });
+    expect(res.json()).toMatchObject({
+      id,
+      cashToken: cash,
+      ...rest,
+      startBalanceUsd: 100,
+    });
     expect(typeof res.json().aiApiKeyId).toBe('string');
     expect(typeof res.json().exchangeApiKeyId).toBe('string');
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -116,7 +131,12 @@ describe('portfolio workflow routes', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ id, cashToken: cash, ...rest, startBalanceUsd: 100 });
+    expect(res.json()).toMatchObject({
+      id,
+      cashToken: cash,
+      ...rest,
+      startBalanceUsd: 100,
+    });
     expect(typeof res.json().aiApiKeyId).toBe('string');
     expect(typeof res.json().exchangeApiKeyId).toBe('string');
 
@@ -167,7 +187,10 @@ describe('portfolio workflow routes', () => {
     expect(res.json()).toMatchObject({ total: 1, page: 1, pageSize: 10 });
     expect(res.json().items).toHaveLength(1);
 
-    const execId = await insertReviewResult({ portfolioWorkflowId: id, log: '' });
+    const execId = await insertReviewResult({
+      portfolioWorkflowId: id,
+      log: '',
+    });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
@@ -532,8 +555,14 @@ describe('portfolio workflow routes', () => {
           ],
         }),
       } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '60' }) } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '40' }) } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '60' }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '40' }),
+      } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -543,8 +572,14 @@ describe('portfolio workflow routes', () => {
           ],
         }),
       } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '60' }) } as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '40' }) } as any);
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '60' }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ price: '40' }),
+      } as any);
     fetchMock.mockResolvedValue({ ok: true, text: async () => 'ok' } as any);
     const origFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
@@ -643,7 +678,9 @@ describe('portfolio workflow routes', () => {
       payload: inactivePayload,
     });
     expect(resDup.statusCode).toBe(400);
-    expect(resDup.json().error).toContain('identical inactive workflow already exists');
+    expect(resDup.json().error).toContain(
+      'identical inactive workflow already exists',
+    );
     expect(resDup.json().error).toContain(firstInactiveId);
 
     const resOk = await app.inject({

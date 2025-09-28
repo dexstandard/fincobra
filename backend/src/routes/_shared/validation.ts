@@ -4,15 +4,21 @@ import { errorResponse } from '../../util/error-messages.js';
 
 export const userIdParams = z.object({ id: z.string().regex(/^\d+$/) });
 
-export const userTokenParamsSchema = z.object({
-  id: z.string(),
-  token: z.string().trim().min(1).regex(/^[A-Za-z0-9]{1,20}$/),
-}).strict();
+export const userTokenParamsSchema = z
+  .object({
+    id: z.string(),
+    token: z
+      .string()
+      .trim()
+      .min(1)
+      .regex(/^[A-Za-z0-9]{1,20}$/),
+  })
+  .strict();
 
 export function parseBody<S extends z.ZodTypeAny>(
-    schema: S,
-    req: FastifyRequest,
-    reply: FastifyReply,
+  schema: S,
+  req: FastifyRequest,
+  reply: FastifyReply,
 ): z.infer<S> | undefined {
   const result = schema.safeParse(req.body);
   if (!result.success) {

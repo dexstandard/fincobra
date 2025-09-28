@@ -13,7 +13,12 @@ interface Props {
   onCancel?: () => Promise<unknown> | void;
 }
 
-export default function ExecTxCard({ workflowId, logId, orders, onCancel }: Props) {
+export default function ExecTxCard({
+  workflowId,
+  logId,
+  orders,
+  onCancel,
+}: Props) {
   const [canceling, setCanceling] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const t = useTranslation();

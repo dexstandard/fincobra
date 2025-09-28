@@ -20,7 +20,9 @@ export default function AgentInstructions({
   return (
     <div className="mt-4">
       <div className="flex items-center gap-1 mb-2">
-        <h2 className="text-md font-bold flex-1">{t('trading_instructions')}</h2>
+        <h2 className="text-md font-bold flex-1">
+          {t('trading_instructions')}
+        </h2>
         <Pencil
           className="w-4 h-4 text-gray-500 cursor-pointer"
           onMouseDown={(e) => e.preventDefault()}
@@ -57,4 +59,3 @@ export default function AgentInstructions({
     </div>
   );
 }
-

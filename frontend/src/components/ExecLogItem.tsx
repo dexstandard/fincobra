@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, Eye, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import {
+  AlertCircle,
+  Eye,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import api from '../lib/axios';
@@ -17,7 +23,7 @@ function truncate(text: string) {
 }
 
 function isErrorWithMessage(
-  err: Record<string, unknown>
+  err: Record<string, unknown>,
 ): err is { message: string } {
   return typeof (err as { message?: unknown }).message === 'string';
 }
@@ -63,10 +69,7 @@ export default function ExecLogItem({
   const hasError = error && Object.keys(error).length > 0;
   const hasResponse = response && Object.keys(response).length > 0;
   const t = useTranslation();
-  const {
-    data: orders,
-    refetch: refetchOrders,
-  } = useQuery({
+  const { data: orders, refetch: refetchOrders } = useQuery({
     queryKey: ['exec-orders', workflowId, log.id],
     queryFn: async () => {
       const res = await api.get(
@@ -80,7 +83,11 @@ export default function ExecLogItem({
   const txEnabled = !!response?.rebalance && (!manualRebalance || hasOrders);
   const [creating, setCreating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [order, setOrder] = useState<{ quantity: number; price: number; side: string } | null>(null);
+  const [order, setOrder] = useState<{
+    quantity: number;
+    price: number;
+    side: string;
+  } | null>(null);
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
   const [manuallyEdited, setManuallyEdited] = useState(false);
@@ -113,7 +120,11 @@ export default function ExecLogItem({
       const res = await api.get(
         `/portfolio-workflows/${workflowId}/exec-log/${log.id}/rebalance/preview`,
       );
-      const ord = res.data.order as { quantity: number; price: number; side: string };
+      const ord = res.data.order as {
+        quantity: number;
+        price: number;
+        side: string;
+      };
       setOrder(ord);
       setManuallyEdited(false);
       setShowPreview(true);
@@ -131,11 +142,14 @@ export default function ExecLogItem({
   async function confirmRebalance() {
     setCreating(true);
     try {
-      await api.post(`/portfolio-workflows/${workflowId}/exec-log/${log.id}/rebalance`, {
-        quantity: Number(quantity),
-        price: Number(price),
-        ...(manuallyEdited ? { manuallyEdited: true } : {}),
-      });
+      await api.post(
+        `/portfolio-workflows/${workflowId}/exec-log/${log.id}/rebalance`,
+        {
+          quantity: Number(quantity),
+          price: Number(price),
+          ...(manuallyEdited ? { manuallyEdited: true } : {}),
+        },
+      );
       setShowPreview(false);
       await refetchOrders();
     } catch (err: unknown) {
@@ -153,7 +167,9 @@ export default function ExecLogItem({
       <div className="flex items-start">
         <div className="flex-1 min-w-0">
           {!hasError && !hasResponse && text && (
-            <div className="whitespace-pre-wrap break-words">{truncate(text)}</div>
+            <div className="whitespace-pre-wrap break-words">
+              {truncate(text)}
+            </div>
           )}
           {hasError && (
             <div className="mt-1 flex items-center gap-2 rounded border border-red-300 bg-red-50 p-2 text-red-800">
@@ -243,7 +259,9 @@ export default function ExecLogItem({
             {t('side')}: {order.side}
           </div>
           <div className="mb-2">
-            <label className="mb-1 block text-sm">{t('quantity')} ({tokens[0]})</label>
+            <label className="mb-1 block text-sm">
+              {t('quantity')} ({tokens[0]})
+            </label>
             <TextInput
               type="number"
               value={quantity}
@@ -254,7 +272,9 @@ export default function ExecLogItem({
             />
           </div>
           <div className="mb-4">
-            <label className="mb-1 block text-sm">{t('price')} ({tokens[1]})</label>
+            <label className="mb-1 block text-sm">
+              {t('price')} ({tokens[1]})
+            </label>
             <TextInput
               type="number"
               value={price}

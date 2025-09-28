@@ -20,7 +20,10 @@ import {
 import { type OrderBookSnapshot } from './technical-analyst.types.js';
 
 const CACHE_MS = 3 * 60 * 1000;
-const cache = new Map<string, { promise: Promise<AnalysisLog>; expires: number }>();
+const cache = new Map<
+  string,
+  { promise: Promise<AnalysisLog>; expires: number }
+>();
 const indicatorCache = new Map<
   string,
   { promise: Promise<TokenIndicators>; expires: number }
@@ -86,11 +89,24 @@ export async function getTechnicalOutlook(
   const instructions = `You are a crypto technical analyst. Given the indicators, order book snapshot, and fear & greed index, write a short outlook for ${token} covering short, mid, and long-term timeframes. Include a bullishness score from 0-10 and key signals. - shortReport ≤255 chars.`;
   const fallback: Analysis = { comment: 'Analysis unavailable', score: 0 };
   try {
-    const res = await callAi(model, instructions, analysisSchema, prompt, apiKey);
+    const res = await callAi(
+      model,
+      instructions,
+      analysisSchema,
+      prompt,
+      apiKey,
+    );
     const analysis = extractJson<Analysis>(res);
     if (!analysis) {
-      log.error({ token, response: res }, 'technical analyst returned invalid response');
-      return { analysis: fallback, prompt: { instructions, input: prompt }, response: res };
+      log.error(
+        { token, response: res },
+        'technical analyst returned invalid response',
+      );
+      return {
+        analysis: fallback,
+        prompt: { instructions, input: prompt },
+        response: res,
+      };
     }
     return { analysis, prompt: { instructions, input: prompt }, response: res };
   } catch (err) {
@@ -122,8 +138,10 @@ export async function runTechnicalAnalyst(
     string,
     TokenIndicators
   >;
-  const orderBooksMap =
-    prompt.marketData.orderBooks as Record<string, OrderBookSnapshot>;
+  const orderBooksMap = prompt.marketData.orderBooks as Record<
+    string,
+    OrderBookSnapshot
+  >;
 
   const fearGreedIndex = await fetchFearGreedIndex().catch((err) => {
     log.error({ err }, 'failed to fetch fear & greed index');
@@ -137,7 +155,11 @@ export async function runTechnicalAnalyst(
         fetchTokenIndicatorsCached(token, log),
         fetchOrderBook(`${token}USDT`),
       ]);
-      const { analysis, prompt: p, response } = await getTechnicalOutlookCached(
+      const {
+        analysis,
+        prompt: p,
+        response,
+      } = await getTechnicalOutlookCached(
         token,
         rawIndicators,
         orderBook,
@@ -147,7 +169,11 @@ export async function runTechnicalAnalyst(
         log,
       );
       if (p && response)
-        await insertReviewRawLog({ portfolioWorkflowId: portfolioId, prompt: p, response });
+        await insertReviewRawLog({
+          portfolioWorkflowId: portfolioId,
+          prompt: p,
+          response,
+        });
       indicatorsMap[token] = rawIndicators;
       orderBooksMap[token] = orderBook;
       for (const r of reports) r.tech = analysis;

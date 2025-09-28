@@ -14,7 +14,8 @@ function isExecOrder(value: unknown): value is ExecOrder {
     typeof value.quantity !== 'number'
   )
     return false;
-  if ('limitPrice' in value && typeof value.limitPrice !== 'number') return false;
+  if ('limitPrice' in value && typeof value.limitPrice !== 'number')
+    return false;
   if ('basePrice' in value && typeof value.basePrice !== 'number') return false;
   if (
     'maxPriceDivergencePct' in value &&
@@ -26,11 +27,11 @@ function isExecOrder(value: unknown): value is ExecOrder {
 
 export function parseExecLog(log: unknown): ParsedExecLog {
   let text =
-      typeof log === 'string'
-          ? log
-          : log !== undefined
-              ? JSON.stringify(log)
-              : '';
+    typeof log === 'string'
+      ? log
+      : log !== undefined
+        ? JSON.stringify(log)
+        : '';
 
   let response: ParsedExecLog['response'];
   let error: Record<string, unknown> | undefined;
@@ -56,8 +57,8 @@ export function parseExecLog(log: unknown): ParsedExecLog {
     if ('error' in parsed && parsed.error) {
       const parsedError = parsed.error;
       error = isRecord(parsedError)
-          ? parsedError
-          : { message: String(parsedError) };
+        ? parsedError
+        : { message: String(parsedError) };
       const { error: _err, ...rest } = parsed;
       text = Object.keys(rest).length > 0 ? JSON.stringify(rest) : '';
       return { text, response, error };
@@ -66,16 +67,15 @@ export function parseExecLog(log: unknown): ParsedExecLog {
     if (parsed.object === 'response') {
       const outputs = Array.isArray(parsed.output) ? parsed.output : [];
 
-      const msg = outputs.find(
-          (o): o is Record<string, unknown> => {
-            if (!isRecord(o)) return false;
-            const id = o.id;
-            const type = o.type;
-            return (
-              (typeof id === 'string' && id.startsWith('msg_')) || type === 'message'
-            );
-          },
-      );
+      const msg = outputs.find((o): o is Record<string, unknown> => {
+        if (!isRecord(o)) return false;
+        const id = o.id;
+        const type = o.type;
+        return (
+          (typeof id === 'string' && id.startsWith('msg_')) ||
+          type === 'message'
+        );
+      });
 
       let textField: string | undefined;
       if (msg && Array.isArray(msg.content)) {
@@ -89,7 +89,9 @@ export function parseExecLog(log: unknown): ParsedExecLog {
         text = textField;
 
         try {
-          const sanitized = textField.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+          const sanitized = textField
+            .replace(/\r/g, '\\r')
+            .replace(/\n/g, '\\n');
           const out = JSON.parse(sanitized);
 
           if (isRecord(out) && 'result' in out) {
@@ -99,19 +101,21 @@ export function parseExecLog(log: unknown): ParsedExecLog {
               if ('error' in result && result.error) {
                 const resultError = result.error;
                 const message =
-                    typeof resultError === 'string'
-                        ? resultError
-                        : JSON.stringify(resultError);
+                  typeof resultError === 'string'
+                    ? resultError
+                    : JSON.stringify(resultError);
                 error = { message };
               } else if ('orders' in result) {
                 const ordersValue = result.orders;
                 const orders = Array.isArray(ordersValue)
-                    ? ordersValue.filter(isExecOrder)
-                    : [];
+                  ? ordersValue.filter(isExecOrder)
+                  : [];
                 response = {
                   orders,
                   shortReport:
-                      typeof result.shortReport === 'string' ? result.shortReport : '',
+                    typeof result.shortReport === 'string'
+                      ? result.shortReport
+                      : '',
                 };
               }
             }

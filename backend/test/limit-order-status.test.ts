@@ -2,10 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { insertUser } from './repos/users.js';
 import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from '../src/repos/review-result.js';
-import {
-  insertLimitOrder,
-  getLimitOrder,
-} from './repos/limit-orders.js';
+import { insertLimitOrder, getLimitOrder } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { updateLimitOrderStatus } from '../src/repos/limit-orders.js';
 

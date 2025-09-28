@@ -22,7 +22,8 @@ export default function WorkflowDetailsDesktop({ workflow }: Props) {
         <span>{t('workflow')}:</span> <span>{workflow.name}</span>
       </h1>
       <p className="mt-2">
-        <strong>{t('created')}:</strong> <FormattedDate date={workflow.createdAt} />
+        <strong>{t('created')}:</strong>{' '}
+        <FormattedDate date={workflow.createdAt} />
       </p>
       <p className="mt-2">
         <strong>{t('status')}:</strong>{' '}

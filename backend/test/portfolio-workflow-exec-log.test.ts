@@ -5,7 +5,11 @@ import { insertReviewResult } from '../src/repos/review-result.js';
 import { insertUser } from './repos/users.js';
 import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewRawLog } from './repos/review-raw-log.js';
-import { insertLimitOrder, getLimitOrder, getLimitOrdersByReviewResult } from './repos/limit-orders.js';
+import {
+  insertLimitOrder,
+  getLimitOrder,
+  getLimitOrdersByReviewResult,
+} from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { db } from '../src/db/index.js';
 import * as binance from '../src/services/binance-client.js';
@@ -32,7 +36,10 @@ describe('portfolio workflow exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     await insertLimitOrder({
       userId: user1Id,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
@@ -88,7 +95,10 @@ describe('portfolio workflow exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     await insertLimitOrder({
       userId: user1Id,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
@@ -142,7 +152,10 @@ describe('portfolio workflow exec log routes', () => {
       manualRebalance: false,
       useEarn: false,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     await insertLimitOrder({
       userId,
       planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
@@ -150,7 +163,9 @@ describe('portfolio workflow exec log routes', () => {
       reviewResultId,
       orderId: '3',
     });
-    const spy = vi.spyOn(binance, 'cancelOrder').mockResolvedValue({ status: 'FILLED' } as any);
+    const spy = vi
+      .spyOn(binance, 'cancelOrder')
+      .mockResolvedValue({ status: 'FILLED' } as any);
     const res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/3/cancel`,
@@ -233,7 +248,11 @@ describe('portfolio workflow exec log routes', () => {
     const workflowId = agent.id;
 
     for (let i = 0; i < 3; i++) {
-      await insertReviewRawLog({ portfolioWorkflowId: workflowId, prompt: `prompt-${i}`, response: `log-${i}` });
+      await insertReviewRawLog({
+        portfolioWorkflowId: workflowId,
+        prompt: `prompt-${i}`,
+        response: `log-${i}`,
+      });
       const parsed = parseExecLog(`log-${i}`);
       await insertReviewResult({
         portfolioWorkflowId: workflowId,
@@ -307,7 +326,11 @@ describe('portfolio workflow exec log routes', () => {
       ],
     });
 
-    await insertReviewRawLog({ portfolioWorkflowId: workflowId, prompt: 'p', response: aiLog });
+    await insertReviewRawLog({
+      portfolioWorkflowId: workflowId,
+      prompt: 'p',
+      response: aiLog,
+    });
     const parsedAi = parseExecLog(aiLog);
     await insertReviewResult({
       portfolioWorkflowId: workflowId,
@@ -361,8 +384,15 @@ describe('portfolio workflow exec log routes', () => {
       useEarn: true,
     });
     const workflowId = agent.id;
-    const entry = JSON.stringify({ prompt: { instructions: 'inst' }, response: 'ok' });
-    await insertReviewRawLog({ portfolioWorkflowId: workflowId, prompt: 'p', response: entry });
+    const entry = JSON.stringify({
+      prompt: { instructions: 'inst' },
+      response: 'ok',
+    });
+    await insertReviewRawLog({
+      portfolioWorkflowId: workflowId,
+      prompt: 'p',
+      response: entry,
+    });
     const parsedP = parseExecLog(entry);
     await insertReviewResult({
       portfolioWorkflowId: workflowId,
@@ -437,7 +467,9 @@ describe('portfolio workflow exec log routes', () => {
       pricePrecision: 8,
       minNotional: 0,
     } as any);
-    vi.spyOn(binance, 'createLimitOrder').mockResolvedValue({ orderId: 1 } as any);
+    vi.spyOn(binance, 'createLimitOrder').mockResolvedValue({
+      orderId: 1,
+    } as any);
     let res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/rebalance`,
@@ -685,8 +717,16 @@ describe('portfolio workflow exec log routes', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    await insertReviewResult({ portfolioWorkflowId: agent.id, log: 'no', rebalance: false });
-    await insertReviewResult({ portfolioWorkflowId: agent.id, log: 'yes', rebalance: true });
+    await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: 'no',
+      rebalance: false,
+    });
+    await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: 'yes',
+      rebalance: true,
+    });
     const res = await app.inject({
       method: 'GET',
       url: `/api/portfolio-workflows/${agent.id}/exec-log?rebalanceOnly=true`,

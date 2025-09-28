@@ -34,7 +34,8 @@ const translations: Record<Lang, Record<string, string>> = {
     twofa_enabled: 'Two-factor authentication is enabled.',
     code: 'Code',
     disable: 'Disable',
-    scan_qr_prompt: 'Scan this QR code with Google Authenticator and enter the code.',
+    scan_qr_prompt:
+      'Scan this QR code with Google Authenticator and enter the code.',
     secret: 'Secret',
     copy_secret: 'Copy secret',
     copied: 'Copied to clipboard',
@@ -50,8 +51,10 @@ const translations: Record<Lang, Record<string, string>> = {
     my_workflows: 'My Portfolios',
     only_active: 'Only Active',
     please_log_in_workflows: 'Please log in to view your portfolios.',
-    no_workflows_yet: 'Connect your Binance account to create your first Portfolio Workflow.',
-    no_workflows_yet_connected: 'Click the + above to create your first Portfolio Workflow.',
+    no_workflows_yet:
+      'Connect your Binance account to create your first Portfolio Workflow.',
+    no_workflows_yet_connected:
+      'Click the + above to create your first Portfolio Workflow.',
     tokens: 'Tokens',
     balance_usd: 'Balance (USD)',
     pnl_usd: 'PnL (USD)',
@@ -78,12 +81,14 @@ const translations: Record<Lang, Record<string, string>> = {
     api_key: 'API key',
     api_secret: 'API secret',
     video_guide: 'Video guide',
-    fields_required_min_length: 'All fields are required and must be at least 10 characters',
+    fields_required_min_length:
+      'All fields are required and must be at least 10 characters',
     update: 'Update',
     save: 'Save',
     edit: 'Edit',
     delete: 'Delete',
-    delete_key_confirm: 'Deleting this key will stop all active portfolio workflows. Continue?',
+    delete_key_confirm:
+      'Deleting this key will stop all active portfolio workflows. Continue?',
     shared_by_admin: 'Shared by admin',
     loading_balance: 'Loading balance...',
     total_balance: 'Total balance:',
@@ -200,7 +205,8 @@ const translations: Record<Lang, Record<string, string>> = {
     twofa_enabled: 'Двухфакторная аутентификация включена.',
     code: 'Код',
     disable: 'Отключить',
-    scan_qr_prompt: 'Отсканируйте этот QR-код в Google Authenticator и введите код.',
+    scan_qr_prompt:
+      'Отсканируйте этот QR-код в Google Authenticator и введите код.',
     secret: 'Секрет',
     copy_secret: 'Скопировать секрет',
     copied: 'Скопировано в буфер обмена',
@@ -215,9 +221,12 @@ const translations: Record<Lang, Record<string, string>> = {
     connect_binance_api: 'Подключите ваш Binance API',
     my_workflows: 'Мои портфолио',
     only_active: 'Только активные',
-    please_log_in_workflows: 'Пожалуйста, войдите, чтобы увидеть ваши портфолио.',
-    no_workflows_yet: 'Подключите ваш аккаунт Binance, чтобы создать первый Workflow портфолио.',
-    no_workflows_yet_connected: 'Нажмите на + выше, чтобы создать первый Workflow портфолио.',
+    please_log_in_workflows:
+      'Пожалуйста, войдите, чтобы увидеть ваши портфолио.',
+    no_workflows_yet:
+      'Подключите ваш аккаунт Binance, чтобы создать первый Workflow портфолио.',
+    no_workflows_yet_connected:
+      'Нажмите на + выше, чтобы создать первый Workflow портфолио.',
     tokens: 'Токены',
     balance_usd: 'Баланс (USD)',
     pnl_usd: 'PnL (USD)',
@@ -244,12 +253,14 @@ const translations: Record<Lang, Record<string, string>> = {
     api_key: 'API ключ',
     api_secret: 'API секрет',
     video_guide: 'Видео инструкция',
-    fields_required_min_length: 'Все поля обязательны и должны быть не менее 10 символов',
+    fields_required_min_length:
+      'Все поля обязательны и должны быть не менее 10 символов',
     update: 'Обновить',
     save: 'Сохранить',
     edit: 'Редактировать',
     delete: 'Удалить',
-    delete_key_confirm: 'Удаление этого ключа остановит все активные портфолио. Продолжить?',
+    delete_key_confirm:
+      'Удаление этого ключа остановит все активные портфолио. Продолжить?',
     shared_by_admin: 'Предоставлено администратором',
     loading_balance: 'Загрузка баланса...',
     total_balance: 'Общий баланс:',
@@ -371,4 +382,3 @@ export function useTranslation() {
   const { lang } = useLanguage();
   return (key: string) => translations[lang][key] ?? key;
 }
-

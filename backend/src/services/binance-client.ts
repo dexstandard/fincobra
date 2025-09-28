@@ -214,9 +214,10 @@ function appendSignature(secret: string, params: URLSearchParams) {
   return signature;
 }
 
-export function parseBinanceError(
-  err: unknown,
-): { code?: number; msg?: string } {
+export function parseBinanceError(err: unknown): {
+  code?: number;
+  msg?: string;
+} {
   if (err instanceof Error) {
     const match = err.message.match(/\{.+\}$/);
     if (match) {
@@ -237,8 +238,8 @@ export async function fetchAccount(id: string): Promise<BinanceAccount | null> {
     const params = createTimestampedParams();
     appendSignature(creds.secret, params);
     const accountRes = await fetch(
-        `https://api.binance.com/api/v3/account?${params.toString()}`,
-        { headers: { 'X-MBX-APIKEY': creds.key } },
+      `https://api.binance.com/api/v3/account?${params.toString()}`,
+      { headers: { 'X-MBX-APIKEY': creds.key } },
     );
     if (!accountRes.ok) throw new Error('failed to fetch account');
     return (await accountRes.json()) as BinanceAccount;
@@ -633,4 +634,3 @@ export async function fetchMarketTimeseries(symbol: string) {
     ),
   };
 }
-

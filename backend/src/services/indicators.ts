@@ -167,7 +167,9 @@ function calcStoch(
   return { k, d };
 }
 
-export async function fetchTokenIndicators(token: string): Promise<TokenIndicators> {
+export async function fetchTokenIndicators(
+  token: string,
+): Promise<TokenIndicators> {
   const pair = await fetchPairData(token, 'USDT');
   const symbol = `${token}USDT`.toUpperCase();
   const hourRes = await fetch(
@@ -199,7 +201,11 @@ export async function fetchTokenIndicators(token: string): Promise<TokenIndicato
   const volumeZ1h = volumeZ(hourVolumes, 24);
   const volumeZ24h = volumeZ(dayVolumes, 30);
   const oscRsi14 = calcRsi(dayCloses);
-  const { k: oscStochK, d: oscStochD } = calcStoch(dayHighs, dayLows, dayCloses);
+  const { k: oscStochK, d: oscStochD } = calcStoch(
+    dayHighs,
+    dayLows,
+    dayCloses,
+  );
   const corrBtc30d = correlation(
     dailyReturns(dayCloses, 30),
     dailyReturns(btcCloses, 30),
@@ -230,4 +236,3 @@ export async function fetchTokenIndicators(token: string): Promise<TokenIndicato
     oscStochD,
   };
 }
-

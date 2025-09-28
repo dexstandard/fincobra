@@ -78,4 +78,3 @@ describe('main trader step', () => {
     expect(callAiMock).toHaveBeenCalled();
   });
 });
-

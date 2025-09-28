@@ -38,9 +38,9 @@ function mapUserListEntry(entry: UserListEntry): AdminUserResponse {
 }
 
 async function setUserEnabledStatus(
-    reply: FastifyReply,
-    userId: string,
-    enabled: boolean,
+  reply: FastifyReply,
+  userId: string,
+  enabled: boolean,
 ): Promise<ToggleUserResponse | undefined> {
   const user = await getUser(userId);
   if (!user) {
@@ -50,7 +50,6 @@ async function setUserEnabledStatus(
   await setUserEnabled(userId, enabled);
   return { ok: true };
 }
-
 
 export default async function usersRoutes(app: FastifyInstance) {
   app.get(

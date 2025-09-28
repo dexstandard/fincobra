@@ -137,10 +137,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
             />
             {hasOpenAIKey && (models.length || workflow?.model) && (
               <div>
-                <label
-                  htmlFor="model"
-                  className="block text-md font-bold"
-                >
+                <label htmlFor="model" className="block text-md font-bold">
                   {t('model')}
                 </label>
                 <SelectInput
@@ -154,10 +151,10 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
                   }
                 />
               </div>
-              )}
-            </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
       <div className="mt-4 max-w-xl">
         <WarningSign>
@@ -177,7 +174,9 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
           <span>{t('manual_rebalancing')}</span>
         </label>
         {!user && (
-          <p className="text-sm text-gray-600 mb-2 mt-4">{t('log_in_to_continue')}</p>
+          <p className="text-sm text-gray-600 mb-2 mt-4">
+            {t('log_in_to_continue')}
+          </p>
         )}
         <div className="mt-4 flex gap-2">
           <Button
@@ -228,7 +227,10 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
             workflow={workflow}
             workflowData={{
               name,
-              tokens: values.tokens.map((t) => ({ token: t.token, minAllocation: t.minAllocation })),
+              tokens: values.tokens.map((t) => ({
+                token: t.token,
+                minAllocation: t.minAllocation,
+              })),
               risk: values.risk,
               reviewInterval: values.reviewInterval,
               agentInstructions: instructions,

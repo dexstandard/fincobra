@@ -13,8 +13,11 @@ export default function Settings() {
   const t = useTranslation();
   const { lang, setLang } = useLanguage();
   const [enabled, setEnabled] = useState<boolean | null>(null);
-  const [setup, setSetup] =
-    useState<{ secret: string; otpauthUrl: string; qr: string } | null>(null);
+  const [setup, setSetup] = useState<{
+    secret: string;
+    otpauthUrl: string;
+    qr: string;
+  } | null>(null);
   const [code, setCode] = useState('');
   const [loadingSetup, setLoadingSetup] = useState(false);
   const [loadingEnable, setLoadingEnable] = useState(false);

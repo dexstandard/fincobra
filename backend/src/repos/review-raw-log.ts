@@ -1,8 +1,13 @@
 import { db } from '../db/index.js';
 import { convertKeysToCamelCase } from '../util/object-case.js';
-import type { ReviewRawLogInsert, ReviewRawLog } from './review-raw-log.types.js';
+import type {
+  ReviewRawLogInsert,
+  ReviewRawLog,
+} from './review-raw-log.types.js';
 
-export async function insertReviewRawLog(entry: ReviewRawLogInsert): Promise<string> {
+export async function insertReviewRawLog(
+  entry: ReviewRawLogInsert,
+): Promise<string> {
   const { rows } = await db.query(
     'INSERT INTO review_raw_log (portfolio_workflow_id, prompt, response) VALUES ($1, $2, $3) RETURNING id',
     [

@@ -9,7 +9,10 @@ export type User = {
   role?: 'user' | 'admin';
 } | null;
 
-export const UserContext = createContext<{ user: User; setUser: (u: User) => void }>({
+export const UserContext = createContext<{
+  user: User;
+  setUser: (u: User) => void;
+}>({
   user: null,
   setUser: () => {},
 });

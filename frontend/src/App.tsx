@@ -19,7 +19,10 @@ export default function App() {
           <Route path="/keys" element={<Keys />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/users" element={<Users />} />
-          <Route path="/portfolio-workflow" element={<PortfolioWorkflowSetup />} />
+          <Route
+            path="/portfolio-workflow"
+            element={<PortfolioWorkflowSetup />}
+          />
           <Route path="/portfolio-workflows/:id" element={<WorkflowView />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />

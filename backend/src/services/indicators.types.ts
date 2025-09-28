@@ -21,4 +21,3 @@ export interface TokenIndicators {
   oscStochK: number;
   oscStochD: number;
 }
-
