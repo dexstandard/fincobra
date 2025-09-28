@@ -15,6 +15,16 @@ interface UserCreds {
   secret: string;
 }
 
+const ACCOUNT_CACHE_TTL_MS = 15_000;
+
+interface CachedAccountEntry {
+  account: BinanceAccount;
+  expiresAt: number;
+}
+
+const accountCache = new Map<string, CachedAccountEntry>();
+const pendingAccountFetches = new Map<string, Promise<BinanceAccount | null>>();
+
 export async function verifyBinanceKey(
   key: string,
   secret: string,
@@ -244,6 +254,40 @@ export async function fetchAccount(id: string): Promise<BinanceAccount | null> {
     if (!accountRes.ok) throw new Error('failed to fetch account');
     return (await accountRes.json()) as BinanceAccount;
   });
+}
+
+export async function fetchAccountCached(
+  id: string,
+): Promise<BinanceAccount | null> {
+  const cached = accountCache.get(id);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) {
+    return cached.account;
+  }
+
+  const existingFetch = pendingAccountFetches.get(id);
+  if (existingFetch) {
+    return existingFetch;
+  }
+
+  const fetchPromise = fetchAccount(id)
+    .then((account) => {
+      if (account) {
+        accountCache.set(id, {
+          account,
+          expiresAt: Date.now() + ACCOUNT_CACHE_TTL_MS,
+        });
+      } else {
+        accountCache.delete(id);
+      }
+      return account;
+    })
+    .finally(() => {
+      pendingAccountFetches.delete(id);
+    });
+
+  pendingAccountFetches.set(id, fetchPromise);
+  return fetchPromise;
 }
 
 export async function fetchEarnFlexibleBalance(id: string, asset: string) {
