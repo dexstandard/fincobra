@@ -18,7 +18,7 @@ describe('portfolio workflow start', () => {
     const userId = await insertUserWithKeys('1');
     const payload = {
       model: 'm',
-      name: 'Draft',
+      name: 'Inactive',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -27,7 +27,7 @@ describe('portfolio workflow start', () => {
       reviewInterval: '1h',
       agentInstructions: 'prompt',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
     const resCreate = await app.inject({
       method: 'POST',

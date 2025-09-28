@@ -41,7 +41,7 @@ describe('portfolio workflow creation', () => {
 
     const payload = {
       model: 'm',
-      name: 'Draft',
+      name: 'Workflow',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -92,7 +92,7 @@ describe('portfolio workflow creation', () => {
       reviewInterval: '1h',
       agentInstructions: 'prompt',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
 
     const res = await app.inject({

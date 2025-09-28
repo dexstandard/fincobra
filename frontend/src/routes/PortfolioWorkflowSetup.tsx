@@ -24,29 +24,29 @@ import PortfolioWorkflowFields from '../components/forms/PortfolioWorkflowFields
 import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 
 interface Props {
-  draft?: PortfolioWorkflow;
+  workflow?: PortfolioWorkflow;
 }
 
-export default function PortfolioWorkflowDraft({ draft }: Props) {
+export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const navigate = useNavigate();
   const { user } = useUser();
   const toast = useToast();
   const t = useTranslation();
 
-  const defaultValues = draft
+  const defaultValues = workflow
     ? {
         tokens: [
-          { token: draft.cashToken, minAllocation: 0 },
-          ...draft.tokens,
+          { token: workflow.cashToken, minAllocation: 0 },
+          ...workflow.tokens,
         ],
-        risk: draft.risk,
-        reviewInterval: draft.reviewInterval,
+        risk: workflow.risk,
+        reviewInterval: workflow.reviewInterval,
       }
     : portfolioReviewDefaults;
 
-  const [model, setModel] = useState(draft?.model || '');
+  const [model, setModel] = useState(workflow?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
-  const [useEarn, setUseEarn] = useState(draft?.useEarn ?? true);
+  const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? true);
   const [tokenSymbols, setTokenSymbols] = useState(
     defaultValues.tokens.map((t) => t.token),
   );
@@ -65,34 +65,34 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
   } = usePrerequisites(tokenSymbols);
 
   const [name, setName] = useState(
-    draft?.name || tokenSymbols.map((t) => t.toUpperCase()).join(' / '),
+    workflow?.name || tokenSymbols.map((t) => t.toUpperCase()).join(' / '),
   );
   const [instructions, setInstructions] = useState(
-    draft?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS,
+    workflow?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS,
   );
   const [manualRebalance, setManualRebalance] = useState(
-    draft?.manualRebalance || false,
+    workflow?.manualRebalance || false,
   );
-  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const values = methods.watch();
 
   useEffect(() => {
-    setModel(draft?.model || '');
-  }, [draft?.model]);
+    setModel(workflow?.model || '');
+  }, [workflow?.model]);
 
   useEffect(() => {
     if (!hasOpenAIKey) {
       setModel('');
     } else if (!model) {
-      setModel(draft?.model || models[0] || '');
+      setModel(workflow?.model || models[0] || '');
     }
-  }, [hasOpenAIKey, models, draft?.model, model]);
+  }, [hasOpenAIKey, models, workflow?.model, model]);
 
   useEffect(() => {
-    if (!draft) {
+    if (!workflow) {
       setName(tokenSymbols.map((t) => t.toUpperCase()).join(' / '));
     }
-  }, [tokenSymbols, draft]);
+  }, [tokenSymbols, workflow]);
 
   function WarningSign({ children }: { children: ReactNode }) {
     return (
@@ -105,7 +105,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-        <span>{t('workflow_draft')}:</span>
+        <span>{t('workflow_setup')}:</span>
         <WorkflowName
           name={name}
           onChange={setName}
@@ -121,7 +121,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
             accountLoading={isAccountLoading}
             useEarn={useEarn}
             onUseEarnChange={setUseEarn}
-            autoPopulateTopTokens={!draft}
+            autoPopulateTopTokens={!workflow}
           />
         </div>
       </FormProvider>
@@ -135,7 +135,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
               value={aiProvider}
               onChange={setAiProvider}
             />
-            {hasOpenAIKey && (models.length || draft?.model) && (
+            {hasOpenAIKey && (models.length || workflow?.model) && (
               <div>
                 <label
                   htmlFor="model"
@@ -148,8 +148,8 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
                   value={model}
                   onChange={setModel}
                   options={
-                    draft?.model && !models.length
-                      ? [{ value: draft.model, label: draft.model }]
+                    workflow?.model && !models.length
+                      ? [{ value: workflow.model, label: workflow.model }]
                       : models.map((m) => ({ value: m, label: m }))
                   }
                 />
@@ -181,11 +181,11 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
         )}
         <div className="mt-4 flex gap-2">
           <Button
-            disabled={isSavingDraft || !user}
-            loading={isSavingDraft}
+            disabled={isSaving || !user}
+            loading={isSaving}
             onClick={async () => {
               if (!user) return;
-              setIsSavingDraft(true);
+              setIsSaving(true);
               try {
                 const values = methods.getValues();
                 const [cashToken, ...positions] = values.tokens;
@@ -202,30 +202,30 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
                   agentInstructions: instructions,
                   manualRebalance,
                   useEarn,
-                  status: 'draft',
+                  status: 'inactive',
                 };
-                if (draft) {
-                  await api.put(`/portfolio-workflows/${draft.id}`, payload);
+                if (workflow) {
+                  await api.put(`/portfolio-workflows/${workflow.id}`, payload);
                 } else {
                   await api.post('/portfolio-workflows', payload);
                 }
-                setIsSavingDraft(false);
-                toast.show(t('draft_saved_successfully'), 'success');
+                setIsSaving(false);
+                toast.show(t('setup_saved_successfully'), 'success');
                 navigate('/');
               } catch (err) {
-                setIsSavingDraft(false);
+                setIsSaving(false);
                 if (axios.isAxiosError(err) && err.response?.data?.error) {
                   toast.show(err.response.data.error);
                 } else {
-                  toast.show(t('failed_save_draft'));
+                  toast.show(t('failed_save_setup'));
                 }
               }
             }}
           >
-            {draft ? t('update_draft') : t('save_draft')}
+            {workflow ? t('update_setup') : t('save_setup')}
           </Button>
           <WorkflowStartButton
-            draft={draft}
+            workflow={workflow}
             workflowData={{
               name,
               tokens: values.tokens.map((t) => ({ token: t.token, minAllocation: t.minAllocation })),

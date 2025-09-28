@@ -6,8 +6,8 @@ import type { PortfolioReviewFormValues } from './constants';
 export interface PortfolioWorkflow {
   id: string;
   userId: string;
-  model: string;
-  status: 'active' | 'inactive' | 'draft';
+  model: string | null;
+  status: 'active' | 'inactive' | 'retired';
   createdAt: number;
   name: string;
   cashToken: string;

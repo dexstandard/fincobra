@@ -138,7 +138,7 @@ describe('portfolio workflow routes', () => {
     expect(res.json()).toMatchObject({ total: 1, page: 1, pageSize: 10 });
     expect(res.json().items).toHaveLength(1);
 
-    const update = { ...payload, model: 'o3', status: 'draft' };
+    const update = { ...payload, model: 'o3', status: 'inactive' };
     res = await app.inject({
       method: 'PUT',
       url: `/api/portfolio-workflows/${id}`,
@@ -160,7 +160,7 @@ describe('portfolio workflow routes', () => {
 
     res = await app.inject({
       method: 'GET',
-      url: '/api/portfolio-workflows/paginated?page=1&pageSize=10&status=draft',
+      url: '/api/portfolio-workflows/paginated?page=1&pageSize=10&status=inactive',
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -233,7 +233,7 @@ describe('portfolio workflow routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'prompt',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
     const resCreate = await app.inject({
       method: 'POST',
@@ -257,9 +257,9 @@ describe('portfolio workflow routes', () => {
   it('starts and stops agent', async () => {
     const app = await buildServer();
     const starterId = await insertUserWithKeys('starter');
-    const draftPayload = {
+    const inactivePayload = {
       model: 'm',
-      name: 'Draft',
+      name: 'Inactive',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -268,13 +268,13 @@ describe('portfolio workflow routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'prompt',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
     const resCreate = await app.inject({
       method: 'POST',
       url: '/api/portfolio-workflows',
       cookies: authCookies(starterId),
-      payload: draftPayload,
+      payload: inactivePayload,
     });
     const id = resCreate.json().id as string;
 
@@ -431,13 +431,13 @@ describe('portfolio workflow routes', () => {
     (globalThis as any).fetch = originalFetch;
   });
 
-  it('handles drafts and api key validation', async () => {
+  it('handles inactive workflows and api key validation', async () => {
     const app = await buildServer();
     const u1Id = await insertUser('1');
 
     const basePayload = {
       model: 'm',
-      name: 'Draft1',
+      name: 'Inactive1',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -460,10 +460,10 @@ describe('portfolio workflow routes', () => {
       method: 'POST',
       url: '/api/portfolio-workflows',
       cookies: authCookies(u1Id),
-      payload: { ...basePayload, status: 'draft' },
+      payload: { ...basePayload, status: 'inactive' },
     });
     expect(res.statusCode).toBe(200);
-    const draftId = res.json().id as string;
+    const inactiveId = res.json().id as string;
 
     const u2Id = await insertUserWithKeys('2');
     const fetchMock = vi.fn();
@@ -502,17 +502,17 @@ describe('portfolio workflow routes', () => {
     expect(res.statusCode).toBe(200);
     const activeId = res.json().id as string;
 
-    const resDraft2 = await app.inject({
+    const resInactive2 = await app.inject({
       method: 'POST',
       url: '/api/portfolio-workflows',
       cookies: authCookies(u2Id),
-      payload: { ...basePayload, name: 'Draft2', status: 'draft' },
+      payload: { ...basePayload, name: 'Inactive2', status: 'inactive' },
     });
-    const draft2Id = resDraft2.json().id as string;
+    const inactive2Id = resInactive2.json().id as string;
 
     expect(await getActivePortfolioWorkflowById(activeId)).toBeDefined();
-    expect(await getActivePortfolioWorkflowById(draftId)).toBeUndefined();
-    expect(await getActivePortfolioWorkflowById(draft2Id)).toBeUndefined();
+    expect(await getActivePortfolioWorkflowById(inactiveId)).toBeUndefined();
+    expect(await getActivePortfolioWorkflowById(inactive2Id)).toBeUndefined();
 
     await app.close();
     (globalThis as any).fetch = originalFetch;
@@ -610,13 +610,13 @@ describe('portfolio workflow routes', () => {
     (globalThis as any).fetch = origFetch;
   });
 
-  it('detects identical drafts', async () => {
+  it('detects identical inactive workflows', async () => {
     const app = await buildServer();
-    const draftUserId = await insertUser('draftUser');
+    const inactiveUserId = await insertUser('inactiveUser');
 
-    const draftPayload = {
+    const inactivePayload = {
       model: 'm',
-      name: 'Draft',
+      name: 'Inactive',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -625,45 +625,45 @@ describe('portfolio workflow routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'p',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
 
     const res1 = await app.inject({
       method: 'POST',
       url: '/api/portfolio-workflows',
-      cookies: authCookies(draftUserId),
-      payload: draftPayload,
+      cookies: authCookies(inactiveUserId),
+      payload: inactivePayload,
     });
-    const draftId = res1.json().id as string;
+    const firstInactiveId = res1.json().id as string;
 
     const resDup = await app.inject({
       method: 'POST',
       url: '/api/portfolio-workflows',
-      cookies: authCookies(draftUserId),
-      payload: draftPayload,
+      cookies: authCookies(inactiveUserId),
+      payload: inactivePayload,
     });
     expect(resDup.statusCode).toBe(400);
-    expect(resDup.json().error).toContain('Draft');
-    expect(resDup.json().error).toContain(draftId);
+    expect(resDup.json().error).toContain('identical inactive workflow already exists');
+    expect(resDup.json().error).toContain(firstInactiveId);
 
     const resOk = await app.inject({
       method: 'POST',
       url: '/api/portfolio-workflows',
-      cookies: authCookies(draftUserId),
-      payload: { ...draftPayload, name: 'Draft2' },
+      cookies: authCookies(inactiveUserId),
+      payload: { ...inactivePayload, name: 'Inactive2' },
     });
     expect(resOk.statusCode).toBe(200);
 
     await app.close();
   });
 
-  it('rejects duplicate draft updates', async () => {
+  it('rejects duplicate inactive updates', async () => {
     const app = await buildServer();
     const updId = await insertUser('updUser');
 
     const base = {
       model: 'm1',
-      name: 'Draft1',
+      name: 'Inactive1',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -672,7 +672,7 @@ describe('portfolio workflow routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'p',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
 
     const res1 = await app.inject({
@@ -681,7 +681,7 @@ describe('portfolio workflow routes', () => {
       cookies: authCookies(updId),
       payload: base,
     });
-    const draft1 = res1.json().id as string;
+    const inactive1 = res1.json().id as string;
 
     const res2 = await app.inject({
       method: 'POST',
@@ -689,24 +689,24 @@ describe('portfolio workflow routes', () => {
       cookies: authCookies(updId),
       payload: {
         ...base,
-        name: 'Draft2',
+        name: 'Inactive2',
         tokens: [
           { token: 'BTC', minAllocation: 10 },
           { token: 'SOL', minAllocation: 20 },
         ],
       },
     });
-    const draft2 = res2.json().id as string;
+    const inactive2 = res2.json().id as string;
 
     const resUpd = await app.inject({
       method: 'PUT',
-      url: `/api/portfolio-workflows/${draft2}`,
+      url: `/api/portfolio-workflows/${inactive2}`,
       cookies: authCookies(updId),
       payload: { ...base },
     });
     expect(resUpd.statusCode).toBe(400);
-    expect(resUpd.json().error).toContain('Draft1');
-    expect(resUpd.json().error).toContain(draft1);
+    expect(resUpd.json().error).toContain('Inactive1');
+    expect(resUpd.json().error).toContain(inactive1);
 
     await app.close();
   });
@@ -716,7 +716,7 @@ describe('portfolio workflow routes', () => {
     const nomodelId = await insertUserWithKeys('nomodel');
     const payload = {
       model: '',
-      name: 'Draft',
+      name: 'Incomplete',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -725,7 +725,7 @@ describe('portfolio workflow routes', () => {
       reviewInterval: '1h',
       agentInstructions: 'prompt',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
     const resCreate = await app.inject({
       method: 'POST',
@@ -757,7 +757,7 @@ describe('portfolio workflow routes', () => {
       risk: 'low',
       reviewInterval: '1h',
       agentInstructions: 'p',
-      status: 'draft',
+      status: 'inactive',
     };
     const res = await app.inject({
       method: 'POST',
@@ -795,7 +795,7 @@ describe('portfolio workflow routes', () => {
       manualRebalance: false,
       useEarn: true,
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
     const res = await app.inject({
       method: 'POST',

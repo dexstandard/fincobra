@@ -5,7 +5,7 @@ import type {
 } from '../routes/portfolio-workflows.types.js';
 import {
   getUserApiKeys,
-  findIdenticalDraftWorkflow,
+  findIdenticalInactiveWorkflow,
   findActiveTokenConflicts,
 } from '../repos/portfolio-workflows.js';
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
@@ -27,7 +27,6 @@ function validateAllocations(tokens: PortfolioWorkflowTokenInput[]) {
 export enum PortfolioWorkflowStatus {
   Active = 'active',
   Inactive = 'inactive',
-  Draft = 'draft',
   Retired = 'retired',
 }
 
@@ -75,7 +74,7 @@ async function validateWorkflowInput(
     return { code: 400, body: errorResponse('invalid status') };
   }
   if (!body.model) {
-    if (body.status !== PortfolioWorkflowStatus.Draft) {
+    if (body.status === PortfolioWorkflowStatus.Active) {
       log.error('model required');
       return { code: 400, body: errorResponse('model required') };
     }
@@ -92,8 +91,8 @@ async function validateWorkflowInput(
       return { code: 400, body: errorResponse('model not allowed') };
     }
   }
-  if (body.status === PortfolioWorkflowStatus.Draft) {
-    const dupDraft = await findIdenticalDraftWorkflow(
+  if (body.status === PortfolioWorkflowStatus.Inactive) {
+    const dupInactive = await findIdenticalInactiveWorkflow(
       {
         userId,
         model: body.model,
@@ -108,12 +107,12 @@ async function validateWorkflowInput(
       },
       id,
     );
-    if (dupDraft) {
-      log.error({ workflowId: dupDraft.id }, 'identical draft exists');
+    if (dupInactive) {
+      log.error({ workflowId: dupInactive.id }, 'identical inactive exists');
       return {
         code: 400,
         body: errorResponse(
-          `identical draft already exists: ${dupDraft.name} (${dupDraft.id})`,
+          `identical inactive workflow already exists: ${dupInactive.name} (${dupInactive.id})`,
         ),
       };
     }
