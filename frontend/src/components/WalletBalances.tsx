@@ -3,6 +3,8 @@ import { useUser } from '../lib/useUser';
 import type { BalanceInfo } from '../lib/usePrerequisites';
 import { useTranslation } from '../lib/i18n';
 
+const SHOW_EARN_FEATURE = false;
+
 interface Props {
   balances: BalanceInfo[];
   hasBinanceKey: boolean;
@@ -26,7 +28,9 @@ export default function WalletBalances({ balances, hasBinanceKey }: Props) {
           <span className="break-all">
             {b.isLoading
               ? t('loading')
-              : `${b.walletBalance.toFixed(5)} (${t('earn')}: ${b.earnBalance.toFixed(5)})`}
+              : SHOW_EARN_FEATURE
+                ? `${b.walletBalance.toFixed(5)} (${t('earn')}: ${b.earnBalance.toFixed(5)})`
+                : b.walletBalance.toFixed(5)}
           </span>
         </p>
       ))}
