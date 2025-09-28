@@ -75,7 +75,7 @@ const workflowUpsertSchema = z
     reviewInterval: z.string(),
     agentInstructions: z.string(),
     manualRebalance: z.boolean().optional().default(false),
-    useEarn: z.boolean().optional().default(true),
+    useEarn: z.boolean().optional().default(false),
     status: z.nativeEnum(PortfolioWorkflowStatus),
   })
   .strip();

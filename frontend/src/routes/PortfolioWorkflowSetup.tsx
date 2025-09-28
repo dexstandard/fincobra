@@ -46,7 +46,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
 
   const [model, setModel] = useState(workflow?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
-  const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? true);
+  const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? false);
   const [tokenSymbols, setTokenSymbols] = useState(
     defaultValues.tokens.map((t) => t.token),
   );

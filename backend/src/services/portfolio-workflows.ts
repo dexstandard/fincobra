@@ -174,7 +174,7 @@ export async function preparePortfolioWorkflowForUpsert(
 > {
   try {
     body.manualRebalance = !!body.manualRebalance;
-    body.useEarn = body.useEarn !== false;
+    body.useEarn = body.useEarn === true;
     body.tokens = validateAllocations(body.tokens);
   } catch {
     log.error('invalid allocations');
