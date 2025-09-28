@@ -32,24 +32,24 @@ interface WorkflowPreviewDetails {
   useEarn: boolean;
 }
 
-interface WorkflowDraft extends WorkflowPreviewDetails {
+interface ExistingWorkflow extends WorkflowPreviewDetails {
   id: string;
   userId: string;
   model: string | null;
 }
 
 interface Props {
-  draft?: WorkflowDraft;
+  workflow?: ExistingWorkflow;
 }
 
-export default function PortfolioWorkflowPreview({ draft }: Props) {
+export default function PortfolioWorkflowPreview({ workflow }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const locationData = location.state as WorkflowPreviewDetails | undefined;
   const { user } = useUser();
   const toast = useToast();
   const t = useTranslation();
-  const data = draft ?? locationData;
+  const data = workflow ?? locationData;
   const [workflowData, setWorkflowData] =
     useState<WorkflowPreviewDetails | undefined>(data);
   useEffect(() => {
@@ -60,19 +60,19 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
     : [];
   const { hasOpenAIKey, hasBinanceKey, models, balances } =
     usePrerequisites(tokenSymbols);
-  const [model, setModel] = useState(draft?.model || '');
+  const [model, setModel] = useState(workflow?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
   useEffect(() => {
-    setModel(draft?.model || '');
-  }, [draft?.model]);
+    setModel(workflow?.model || '');
+  }, [workflow?.model]);
   useEffect(() => {
     if (!hasOpenAIKey) {
       setModel('');
     } else if (!model) {
-      setModel(draft?.model || models[0] || '');
+      setModel(workflow?.model || models[0] || '');
     }
-  }, [hasOpenAIKey, models, draft?.model, model]);
-  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  }, [hasOpenAIKey, models, workflow?.model, model]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleAddToken = () => {
     setWorkflowData((d) => {
@@ -107,14 +107,14 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
     );
   }
 
-  const isDraft = !!draft;
+  const hasExisting = !!workflow;
 
   if (!workflowData) return <div className="p-4">{t('no_preview_data')}</div>;
 
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-        <span>{isDraft ? t('workflow_draft') : t('workflow_preview')}:</span>
+        <span>{hasExisting ? t('workflow_setup') : t('workflow_preview')}:</span>
         <WorkflowName
           name={workflowData.name}
           onChange={(name) =>
@@ -273,7 +273,7 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
               value={aiProvider}
               onChange={setAiProvider}
             />
-            {hasOpenAIKey && (models.length || draft?.model) && (
+            {hasOpenAIKey && (models.length || workflow?.model) && (
               <div className="mt-2">
                 <h2 className="text-md font-bold">{t('model')}</h2>
                 <SelectInput
@@ -281,8 +281,8 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
                   value={model}
                   onChange={setModel}
                   options={
-                    draft?.model && !models.length
-                      ? [{ value: draft.model, label: draft.model }]
+                    workflow?.model && !models.length
+                      ? [{ value: workflow.model, label: workflow.model }]
                       : models.map((m) => ({ value: m, label: m }))
                   }
                 />
@@ -320,11 +320,11 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
         )}
         <div className="mt-4 flex gap-2">
           <Button
-            disabled={isSavingDraft || !user}
-            loading={isSavingDraft}
+            disabled={isSaving || !user}
+            loading={isSaving}
             onClick={async () => {
               if (!user) return;
-              setIsSavingDraft(true);
+              setIsSaving(true);
               try {
                 const [cashToken, ...positions] = workflowData.tokens;
                 const payload = {
@@ -339,30 +339,30 @@ export default function PortfolioWorkflowPreview({ draft }: Props) {
                   reviewInterval: workflowData.reviewInterval,
                   agentInstructions: workflowData.agentInstructions,
                   manualRebalance: workflowData.manualRebalance,
-                  status: 'draft',
+                  status: 'inactive',
                 };
-                if (isDraft) {
-                  await api.put(`/portfolio-workflows/${draft!.id}`, payload);
+                if (hasExisting) {
+                  await api.put(`/portfolio-workflows/${workflow!.id}`, payload);
                 } else {
                   await api.post('/portfolio-workflows', payload);
                 }
-                setIsSavingDraft(false);
-                toast.show(t('draft_saved_successfully'), 'success');
+                setIsSaving(false);
+                toast.show(t('setup_saved_successfully'), 'success');
                 navigate('/');
               } catch (err) {
-                setIsSavingDraft(false);
+                setIsSaving(false);
                 if (axios.isAxiosError(err) && err.response?.data?.error) {
                   toast.show(err.response.data.error);
                 } else {
-                  toast.show(t('failed_save_draft'));
+                  toast.show(t('failed_save_setup'));
                 }
               }
             }}
           >
-            {isDraft ? t('update_draft') : t('save_draft')}
+            {hasExisting ? t('update_setup') : t('save_setup')}
           </Button>
           <WorkflowStartButton
-            draft={draft}
+            workflow={workflow}
             workflowData={workflowData}
             model={model}
             disabled={!user || !hasOpenAIKey || !hasBinanceKey || !model}

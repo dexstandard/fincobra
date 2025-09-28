@@ -3,7 +3,7 @@ import { PortfolioWorkflowStatus } from '../services/portfolio-workflows.js';
 import { convertKeysToCamelCase } from '../util/object-case.js';
 import type {
   ActivePortfolioWorkflow,
-  PortfolioWorkflowDraftSearch,
+  PortfolioWorkflowInactiveSearch,
   PortfolioWorkflowInsert,
   PortfolioWorkflow,
   PortfolioWorkflowUpdate,
@@ -94,8 +94,8 @@ export async function getPortfolioWorkflowsPaginated(
   };
 }
 
-export async function findIdenticalDraftWorkflow(
-  data: PortfolioWorkflowDraftSearch,
+export async function findIdenticalInactiveWorkflow(
+  data: PortfolioWorkflowInactiveSearch,
   excludeId?: string,
 ) {
   const query = `SELECT pw.id, pw.name FROM portfolio_workflow pw
@@ -104,7 +104,7 @@ export async function findIdenticalDraftWorkflow(
              json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
         FROM portfolio_workflow_tokens GROUP BY portfolio_workflow_id
     ) t ON t.portfolio_workflow_id = pw.id
-    WHERE pw.user_id = $1 AND pw.status = 'draft' AND ($2::bigint IS NULL OR pw.id != $2)
+    WHERE pw.user_id = $1 AND pw.status = 'inactive' AND ($2::bigint IS NULL OR pw.id != $2)
       AND pw.model = $3 AND pw.name = $4 AND pw.cash_token = $5
       AND pw.risk = $6 AND pw.review_interval = $7 AND pw.agent_instructions = $8 AND pw.manual_rebalance = $9 AND pw.use_earn = $10
       AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $11::jsonb`;

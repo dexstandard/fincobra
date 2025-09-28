@@ -21,7 +21,7 @@ interface WorkflowSummary {
   id: string;
   userId: string;
   model: string;
-  status: 'active' | 'inactive' | 'draft';
+  status: 'active' | 'inactive' | 'retired';
   cashToken: string;
   tokens?: { token: string }[];
   startBalanceUsd?: number | null;
@@ -355,7 +355,7 @@ export default function Dashboard() {
                 <h2 className="text-xl font-bold">{t('my_workflows')}</h2>
                 {hasBinanceKey && (
                   <Link
-                    to="/portfolio-workflow-draft"
+                    to="/portfolio-workflow"
                     className="text-blue-600 inline-flex"
                     aria-label={t('create_workflow')}
                   >
