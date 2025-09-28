@@ -155,6 +155,7 @@ export default function WorkflowUpdateModal({
             accountLoading={isAccountLoading}
             useEarn={useEarn}
             onUseEarnChange={setUseEarn}
+            showEarnControls={false}
           />
         </div>
       </FormProvider>

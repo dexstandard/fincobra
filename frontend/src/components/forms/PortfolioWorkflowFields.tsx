@@ -29,7 +29,8 @@ interface Props {
   accountLoading: boolean;
   autoPopulateTopTokens?: boolean;
   useEarn: boolean;
-  onUseEarnChange: (v: boolean) => void;
+  onUseEarnChange?: (v: boolean) => void;
+  showEarnControls?: boolean;
 }
 
 export default function PortfolioWorkflowFields({
@@ -40,6 +41,7 @@ export default function PortfolioWorkflowFields({
   autoPopulateTopTokens = false,
   useEarn,
   onUseEarnChange,
+  showEarnControls = true,
 }: Props) {
   const { control, watch } = useFormContext<PortfolioReviewFormValues>();
   const { fields, append, remove, replace } = useFieldArray({
@@ -153,6 +155,9 @@ export default function PortfolioWorkflowFields({
     onTokensChange?.(newTokens);
   };
 
+  const handleUseEarnChange = onUseEarnChange ?? (() => {});
+  const showUseEarnToggle = showEarnControls && Boolean(onUseEarnChange);
+
   return (
     <>
       <div className="space-y-2 w-fit">
@@ -251,16 +256,24 @@ export default function PortfolioWorkflowFields({
           </button>
         )}
       </div>
-      <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2 mt-2">
+      <div
+        className={`grid items-center gap-x-4 gap-y-2 mt-2 ${
+          showUseEarnToggle ? 'grid-cols-4' : 'grid-cols-2'
+        }`}
+      >
         <span className="text-left text-md font-bold">Total $:</span>
         <span>{totalUsd.toFixed(2)}</span>
-        <span className="text-left text-md font-bold">{t('use_binance_earn')}</span>
-        <Toggle
-          label=""
-          checked={useEarn}
-          onChange={onUseEarnChange}
-          size="sm"
-        />
+        {showUseEarnToggle && (
+          <>
+            <span className="text-left text-md font-bold">{t('use_binance_earn')}</span>
+            <Toggle
+              label=""
+              checked={useEarn}
+              onChange={handleUseEarnChange}
+              size="sm"
+            />
+          </>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-2 mt-2">
         <FormField

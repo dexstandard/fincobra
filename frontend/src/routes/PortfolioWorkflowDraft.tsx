@@ -46,7 +46,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
 
   const [model, setModel] = useState(draft?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
-  const [useEarn, setUseEarn] = useState(draft?.useEarn ?? true);
+  const [useEarn, setUseEarn] = useState(draft?.useEarn ?? false);
   const [tokenSymbols, setTokenSymbols] = useState(
     defaultValues.tokens.map((t) => t.token),
   );
@@ -121,6 +121,7 @@ export default function PortfolioWorkflowDraft({ draft }: Props) {
             accountLoading={isAccountLoading}
             useEarn={useEarn}
             onUseEarnChange={setUseEarn}
+            showEarnControls={false}
             autoPopulateTopTokens={!draft}
           />
         </div>
