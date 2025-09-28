@@ -6,7 +6,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc && mkdir -p dist/src/db && cp src/db/schema.sql dist/src/db/schema.sql && cp -r src/db/migrations dist/src/db/migrations",
     "start": "node dist/scripts/start.js",
-    "test": "vitest run",
+    "test": "DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/fincobra_test} vitest run",
     "migrate": "node dist/src/db/migrate.js",
     "lint": "eslint ."
   },
