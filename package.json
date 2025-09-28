@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "./scripts/dev.sh",
-    "test": "DATABASE_URL=postgres://postgres:postgres@localhost:5432/fincobra_test npm --prefix backend test",
+    "test": "DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/fincobra_test} npm --prefix backend test",
     "build": "npm --prefix backend run build"
   },
   "engines": {
