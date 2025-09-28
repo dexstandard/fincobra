@@ -64,7 +64,7 @@ export default function WorkflowView() {
   });
 
   if (!workflow) return <div className="p-4">{t('loading')}</div>;
-  if (workflow.status === 'inactive' && !workflow.model) {
+  if (workflow.status === 'inactive') {
     return <PortfolioWorkflowSetup workflow={workflow} />;
   }
 
