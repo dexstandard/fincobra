@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import NodeCache from 'node-cache';
 
 import { getBinanceKey } from '../repos/exchange-api-keys.js';
 import { decryptKey } from '../util/crypto.js';
@@ -14,6 +15,14 @@ interface UserCreds {
   key: string;
   secret: string;
 }
+
+const ACCOUNT_CACHE_TTL_SEC = 15;
+
+const accountCache = new NodeCache({
+  stdTTL: ACCOUNT_CACHE_TTL_SEC,
+  checkperiod: Math.max(1, Math.ceil(ACCOUNT_CACHE_TTL_SEC / 3)),
+});
+const pendingAccountFetches = new Map<string, Promise<BinanceAccount | null>>();
 
 export async function verifyBinanceKey(
   key: string,
@@ -244,6 +253,34 @@ export async function fetchAccount(id: string): Promise<BinanceAccount | null> {
     if (!accountRes.ok) throw new Error('failed to fetch account');
     return (await accountRes.json()) as BinanceAccount;
   });
+}
+
+export async function fetchAccountCached(
+  id: string,
+): Promise<BinanceAccount | null> {
+  const cached = accountCache.get<BinanceAccount>(id);
+  if (cached) return cached;
+
+  const existingFetch = pendingAccountFetches.get(id);
+  if (existingFetch) {
+    return existingFetch;
+  }
+
+  const fetchPromise = fetchAccount(id)
+    .then((account) => {
+      if (account) {
+        accountCache.set(id, account);
+      } else {
+        accountCache.del(id);
+      }
+      return account;
+    })
+    .finally(() => {
+      pendingAccountFetches.delete(id);
+    });
+
+  pendingAccountFetches.set(id, fetchPromise);
+  return fetchPromise;
 }
 
 export async function fetchEarnFlexibleBalance(id: string, asset: string) {
