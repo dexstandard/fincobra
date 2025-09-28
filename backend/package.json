@@ -8,7 +8,9 @@
     "start": "node dist/scripts/start.js",
     "test": "DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/fincobra_test} vitest run",
     "migrate": "node dist/src/db/migrate.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "format": "prettier \"{src,test,scripts}/**/*.{ts,tsx,js,json}\" --write",
+    "format:check": "prettier \"{src,test,scripts}/**/*.{ts,tsx,js,json}\" --check"
   },
   "dependencies": {
     "@fastify/cookie": "9.4.0",
