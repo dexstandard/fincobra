@@ -164,6 +164,9 @@ const sampleMarketOverview = vi.hoisted(() => ({
 
 vi.mock('../src/services/indicators.js', () => ({
   fetchMarketOverview: vi.fn().mockResolvedValue(sampleMarketOverview),
+  createEmptyMarketOverview: vi
+    .fn()
+    .mockReturnValue(JSON.parse(JSON.stringify(sampleMarketOverview))),
 }));
 
 const createDecisionLimitOrders = vi.hoisted(() =>

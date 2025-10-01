@@ -21,6 +21,7 @@ import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { type RebalancePrompt } from '../agents/main-trader.types.js';
+import { createEmptyMarketOverview } from '../services/indicators.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
 
@@ -80,6 +81,50 @@ function filterRunningWorkflows(workflowRows: ActivePortfolioWorkflow[]) {
     }
   }
   return { toRun, skipped };
+}
+
+function buildFallbackPrompt(row: ActivePortfolioWorkflow): RebalancePrompt {
+  const floor: Record<string, number> = { [row.cashToken]: 0 };
+  const positions: RebalancePrompt['portfolio']['positions'] = [
+    {
+      sym: row.cashToken,
+      qty: 0,
+      priceUsdt: 1,
+      valueUsdt: 0,
+    },
+  ];
+
+  for (const token of row.tokens) {
+    floor[token.token] = token.minAllocation;
+    positions.push({
+      sym: token.token,
+      qty: 0,
+      priceUsdt: 0,
+      valueUsdt: 0,
+    });
+  }
+
+  const portfolio: RebalancePrompt['portfolio'] = {
+    ts: new Date().toISOString(),
+    positions,
+  };
+
+  if (row.startBalance !== null) {
+    portfolio.startBalanceUsd = row.startBalance;
+    portfolio.startBalanceTs = row.createdAt;
+  }
+
+  return {
+    instructions: row.agentInstructions,
+    reviewInterval: row.reviewInterval,
+    policy: { floor },
+    cash: row.cashToken,
+    portfolio,
+    routes: [],
+    marketData: { marketOverview: createEmptyMarketOverview() },
+    previousReports: [],
+    reports: row.tokens.map(({ token }) => ({ token, news: null })),
+  };
 }
 
 async function cleanupOpenOrders(
@@ -227,7 +272,8 @@ export async function executeWorkflow(
     }
     runLog.info('workflow run complete');
   } catch (err) {
-    await saveFailure(wf, String(err), prompt!);
+    const failurePrompt = prompt ?? buildFallbackPrompt(wf);
+    await saveFailure(wf, String(err), failurePrompt);
     runLog.error({ err }, 'workflow run failed');
   }
 }

@@ -115,6 +115,9 @@ vi.mock('../src/services/binance-client.js', () => ({
 
 vi.mock('../src/services/indicators.js', () => ({
   fetchMarketOverview: vi.fn().mockResolvedValue(sampleMarketOverview),
+  createEmptyMarketOverview: vi
+    .fn()
+    .mockReturnValue(JSON.parse(JSON.stringify(sampleMarketOverview))),
 }));
 
 vi.mock('../src/services/rebalance.js', () => ({
