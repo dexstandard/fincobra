@@ -10,6 +10,7 @@ import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import {
   setWorkflowStatus,
   getPortfolioWorkflowStatus,
+  insertPortfolioWorkflow,
 } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import {
