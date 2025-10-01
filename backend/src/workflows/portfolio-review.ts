@@ -10,7 +10,6 @@ import {
 } from '../agents/main-trader.js';
 import type { MainTraderDecision } from '../agents/main-trader.types.js';
 import { runNewsAnalyst } from '../agents/news-analyst.js';
-import { runTechnicalAnalyst } from '../agents/technical-analyst.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
 import { getOpenLimitOrdersForWorkflow } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
@@ -186,12 +185,7 @@ export async function executeWorkflow(
       apiKey: key,
       portfolioId: wf.id,
     };
-    await Promise.all([
-      runStep('runNewsAnalyst', () => runNewsAnalyst(params, prompt!)),
-      runStep('runTechnicalAnalyst', () =>
-        runTechnicalAnalyst(params, prompt!),
-      ),
-    ]);
+    await runStep('runNewsAnalyst', () => runNewsAnalyst(params, prompt!));
 
     const decision = await runStep('runMainTrader', () =>
       runMainTrader(params, prompt!),
@@ -233,7 +227,9 @@ export async function executeWorkflow(
     }
     runLog.info('workflow run complete');
   } catch (err) {
-    await saveFailure(wf, String(err), prompt!);
+    if (prompt) {
+      await saveFailure(wf, String(err), prompt);
+    }
     runLog.error({ err }, 'workflow run failed');
   }
 }

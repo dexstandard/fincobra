@@ -562,7 +562,7 @@ export async function fetchSymbolData(symbol: string) {
     fetch(`https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=5`),
     fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`),
     fetch(
-      `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=365`,
+      `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=366`,
     ),
   ]);
   const responses = {
