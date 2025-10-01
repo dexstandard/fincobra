@@ -50,6 +50,7 @@ const translations: Record<Lang, Record<string, string>> = {
     connect_binance_api: 'Connect your Binance API',
     my_workflows: 'My Portfolios',
     only_active: 'Only Active',
+    only_my: 'Only My',
     please_log_in_workflows: 'Please log in to view your portfolios.',
     no_workflows_yet:
       'Connect your Binance account to create your first Portfolio Workflow.',
@@ -221,6 +222,7 @@ const translations: Record<Lang, Record<string, string>> = {
     connect_binance_api: 'Подключите ваш Binance API',
     my_workflows: 'Мои портфолио',
     only_active: 'Только активные',
+    only_my: 'Только мои',
     please_log_in_workflows:
       'Пожалуйста, войдите, чтобы увидеть ваши портфолио.',
     no_workflows_yet:
