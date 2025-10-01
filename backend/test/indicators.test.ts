@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchMarketOverview } from '../src/services/indicators.js';
+
+import {
+  createEmptyMarketOverview,
+  fetchMarketOverview,
+} from '../src/services/indicators.js';
 import { fetchPairData } from '../src/services/binance-client.js';
 
 vi.mock('../src/services/binance-client.js', () => ({
@@ -8,77 +12,455 @@ vi.mock('../src/services/binance-client.js', () => ({
   fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
-function makeYear(mult = 1) {
-  return Array.from({ length: 400 }, (_, i) => {
-    const close = (i + 1) * mult;
-    return [0, close - 0.5, close + 0.5, close - 0.5, close, 1000 + i + 1];
+type NumericKline = [number, number, number, number, number, number];
+
+const HOUR_LIMIT = 1_000;
+const FOUR_HOUR_LIMIT = 210;
+const DAY_LIMIT = 150;
+const WEEK_LIMIT = 60;
+const RSI_PERIOD = 14;
+const ATR_PERIOD = 14;
+const VOLUME_LOOKBACK = 24 * 30;
+const VOL_WINDOW = 30;
+
+interface IntervalConfig {
+  closeStart: number;
+  closeStep: number;
+  volumeStart: number;
+  volumeStep: number;
+}
+
+interface SyntheticPair {
+  symbol: string;
+  currentPrice: number;
+  orderBook: { bids: [number, number][]; asks: [number, number][] };
+  year: NumericKline[];
+}
+
+function buildKlines(length: number, config: IntervalConfig): NumericKline[] {
+  return Array.from({ length }, (_, idx) => {
+    const close = config.closeStart + config.closeStep * idx;
+    const open = close - config.closeStep;
+    const high = close + config.closeStep / 2;
+    const low = close - config.closeStep / 2;
+    const volume = config.volumeStart + config.volumeStep * idx;
+    return [
+      idx,
+      Number(open.toFixed(6)),
+      Number(high.toFixed(6)),
+      Number(low.toFixed(6)),
+      Number(close.toFixed(6)),
+      Number(volume.toFixed(6)),
+    ];
   });
+}
+
+function buildYearSeries(length: number, start: number, step: number) {
+  return Array.from({ length }, (_, idx) => {
+    const close = start + step * idx;
+    return [
+      idx,
+      Number((close - step / 2).toFixed(6)),
+      Number((close + step / 2).toFixed(6)),
+      Number((close - step / 2).toFixed(6)),
+      Number(close.toFixed(6)),
+      1_000 + idx,
+    ];
+  });
+}
+
+function sliceMean(values: number[]) {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function calcReturn(series: number[], periodsAgo: number, current: number) {
+  const index = series.length - 1 - periodsAgo;
+  const past = index >= 0 ? series[index] : series[0];
+  return current / past - 1;
+}
+
+function calcSma(series: number[], period: number) {
+  const slice = series.slice(-Math.min(period, series.length));
+  return sliceMean(slice);
+}
+
+function computeTrendFrame(
+  closes: number[],
+  fast: number,
+  slow: number,
+  periods: [number, number],
+) {
+  const smaFast = calcSma(closes, fast);
+  const smaSlow = calcSma(closes, slow) || 1;
+  const gap = ((smaFast - smaSlow) / smaSlow) * 100;
+  let slope: 'up' | 'flat' | 'down' = 'flat';
+  if (gap > 0.5) slope = 'up';
+  else if (gap < -0.5) slope = 'down';
+  return { sma_periods: periods, gap_pct: gap, slope };
+}
+
+function calcAtr(highs: number[], lows: number[], closes: number[]) {
+  const start = Math.max(1, closes.length - ATR_PERIOD);
+  const ranges: number[] = [];
+  for (let i = start; i < closes.length; i++) {
+    const tr = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1]),
+    );
+    ranges.push(tr);
+  }
+  return sliceMean(ranges);
+}
+
+function calcRsi(closes: number[]) {
+  if (closes.length < RSI_PERIOD + 1) {
+    return 50;
+  }
+  let gainSum = 0;
+  let lossSum = 0;
+  for (let i = 1; i <= RSI_PERIOD; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gainSum += diff;
+    else lossSum -= diff;
+  }
+  let avgGain = gainSum / RSI_PERIOD;
+  let avgLoss = lossSum / RSI_PERIOD;
+  for (let i = RSI_PERIOD + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (RSI_PERIOD - 1) + gain) / RSI_PERIOD;
+    avgLoss = (avgLoss * (RSI_PERIOD - 1) + loss) / RSI_PERIOD;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - 100 / (1 + rs);
+}
+
+function volumeZ(volumes: number[], lookback: number) {
+  const window = Math.min(lookback, volumes.length - 1);
+  const slice = volumes.slice(volumes.length - 1 - window, volumes.length - 1);
+  const mean = sliceMean(slice);
+  const variance = sliceMean(slice.map((value) => (value - mean) ** 2));
+  const std = Math.sqrt(variance) || 1;
+  const last = volumes[volumes.length - 1];
+  return (last - mean) / std;
+}
+
+function logReturns(closes: number[]) {
+  const logs: number[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    logs.push(Math.log(closes[i] / closes[i - 1]));
+  }
+  return logs;
+}
+
+function stddev(values: number[]) {
+  if (values.length === 0) return 0;
+  const mean = sliceMean(values);
+  const variance = sliceMean(values.map((value) => (value - mean) ** 2));
+  return Math.sqrt(variance);
+}
+
+function realizedVol(logs: number[]) {
+  return stddev(logs) * Math.sqrt(365);
+}
+
+function percentileRank(series: number[], value: number) {
+  if (series.length === 0) return 0;
+  const count = series.filter((entry) => entry <= value).length;
+  return count / series.length;
+}
+
+function correlation(asset: number[], market: number[]) {
+  const length = Math.min(asset.length, market.length);
+  if (length === 0) return 0;
+  const a = asset.slice(asset.length - length);
+  const b = market.slice(market.length - length);
+  const meanA = sliceMean(a);
+  const meanB = sliceMean(b);
+  let numerator = 0;
+  let varianceA = 0;
+  let varianceB = 0;
+  for (let i = 0; i < length; i++) {
+    const da = a[i] - meanA;
+    const db = b[i] - meanB;
+    numerator += da * db;
+    varianceA += da * da;
+    varianceB += db * db;
+  }
+  if (varianceA === 0 || varianceB === 0) return 0;
+  return numerator / Math.sqrt(varianceA * varianceB);
+}
+
+function beta(asset: number[], market: number[]) {
+  const length = Math.min(asset.length, market.length);
+  if (length === 0) return 0;
+  const a = asset.slice(asset.length - length);
+  const b = market.slice(market.length - length);
+  const meanA = sliceMean(a);
+  const meanB = sliceMean(b);
+  let covariance = 0;
+  let varianceB = 0;
+  for (let i = 0; i < length; i++) {
+    const da = a[i] - meanA;
+    const db = b[i] - meanB;
+    covariance += da * db;
+    varianceB += db * db;
+  }
+  if (varianceB === 0) return 0;
+  return covariance / varianceB;
+}
+
+function computeRiskFlags(token: {
+  rsi14: number;
+  vol_atr_pct: number;
+  orderbook_spread_bps: number;
+  orderbook_depth_ratio: number;
+}) {
+  return {
+    overbought: token.rsi14 >= 75,
+    oversold: token.rsi14 <= 25,
+    vol_spike: token.vol_atr_pct >= 3,
+    thin_book:
+      token.orderbook_spread_bps > 10 || token.orderbook_depth_ratio < 0.5,
+  };
 }
 
 describe('fetchMarketOverview', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-09-20T06:15:00Z'));
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it('returns market overview payload with tokens', async () => {
+  it('computes every indicator using the synthetic dataset', async () => {
+    const syntheticIntervals: Record<string, Record<string, NumericKline[]>> = {
+      SOLUSDT: {
+        '1h': buildKlines(HOUR_LIMIT, {
+          closeStart: 100,
+          closeStep: 0.75,
+          volumeStart: 5_000,
+          volumeStep: 3,
+        }),
+        '4h': buildKlines(FOUR_HOUR_LIMIT, {
+          closeStart: 150,
+          closeStep: 1.1,
+          volumeStart: 1_000,
+          volumeStep: 2,
+        }),
+        '1d': buildKlines(DAY_LIMIT, {
+          closeStart: 200,
+          closeStep: 2.5,
+          volumeStart: 800,
+          volumeStep: 2,
+        }),
+        '1w': buildKlines(WEEK_LIMIT, {
+          closeStart: 260,
+          closeStep: 3,
+          volumeStart: 400,
+          volumeStep: 1,
+        }),
+      },
+      BTCUSDT: {
+        '1h': buildKlines(HOUR_LIMIT, {
+          closeStart: 300,
+          closeStep: 0.6,
+          volumeStart: 8_000,
+          volumeStep: 4,
+        }),
+        '4h': buildKlines(FOUR_HOUR_LIMIT, {
+          closeStart: 360,
+          closeStep: 0.9,
+          volumeStart: 1_200,
+          volumeStep: 1,
+        }),
+        '1d': buildKlines(DAY_LIMIT, {
+          closeStart: 420,
+          closeStep: 1.8,
+          volumeStart: 1_100,
+          volumeStep: 1,
+        }),
+        '1w': buildKlines(WEEK_LIMIT, {
+          closeStart: 470,
+          closeStep: 2.2,
+          volumeStart: 700,
+          volumeStep: 1,
+        }),
+      },
+    };
+
+    const syntheticPairs: Record<string, SyntheticPair> = {
+      SOL: {
+        symbol: 'SOLUSDT',
+        year: buildYearSeries(366, 50, 0.85),
+        currentPrice: Number((50 + 0.85 * (366 - 1)).toFixed(6)),
+        orderBook: {
+          bids: [[Number((50 + 0.85 * (366 - 1) - 0.5).toFixed(6)), 130]],
+          asks: [[Number((50 + 0.85 * (366 - 1) + 0.5).toFixed(6)), 140]],
+        },
+      },
+      BTC: {
+        symbol: 'BTCUSDT',
+        year: buildYearSeries(366, 100, 0.95),
+        currentPrice: Number((100 + 0.95 * (366 - 1)).toFixed(6)),
+        orderBook: {
+          bids: [[Number((100 + 0.95 * (366 - 1) - 0.5).toFixed(6)), 220]],
+          asks: [[Number((100 + 0.95 * (366 - 1) + 0.5).toFixed(6)), 200]],
+        },
+      },
+    };
+
     (fetchPairData as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       async (token: string) => {
-        if (token === 'BTC') {
-          return {
-            symbol: `${token}USDT`,
-            currentPrice: 400,
-            orderBook: { bids: [[399, 150]], asks: [[401, 200]] },
-            day: {},
-            year: makeYear(2),
-          };
-        }
-        return {
-          symbol: `${token}USDT`,
-          currentPrice: 200,
-          orderBook: { bids: [[199, 100]], asks: [[201, 120]] },
-          day: {},
-          year: makeYear(1),
-        };
+        const key = token.toUpperCase();
+        const pair = syntheticPairs[key];
+        if (!pair) throw new Error(`missing synthetic pair for ${token}`);
+        return pair;
       },
     );
 
     const fetchStub = vi.fn(async (url: string) => {
-      const u = new URL(url, 'https://api.binance.com');
-      const limit = Number(u.searchParams.get('limit') ?? '10');
-      const interval = u.searchParams.get('interval');
-      const base = interval === '1w' ? 50 : interval === '1d' ? 100 : 200;
-      const data = Array.from({ length: limit }, (_, i) => [
-        0,
-        base + i,
-        base + i + 1,
-        base + i - 1,
-        base + i,
-        1_000 + i,
-      ]);
+      const parsed = new URL(url, 'https://api.binance.com');
+      const symbol = parsed.searchParams.get('symbol');
+      const interval = parsed.searchParams.get('interval');
+      const limit = Number(parsed.searchParams.get('limit'));
+      if (!symbol || !interval) throw new Error('missing params');
+      const data = syntheticIntervals[symbol]?.[interval];
+      if (!data) throw new Error(`no data for ${symbol} ${interval}`);
+      expect(limit).toBe(data.length);
       return { ok: true, json: async () => data } as any;
     });
     vi.stubGlobal('fetch', fetchStub);
 
     const payload = await fetchMarketOverview(['SOL']);
+
     expect(payload.schema_version).toBe('market_overview.v2');
-    expect(payload.market_overview.SOL).toBeDefined();
-    expect(payload.market_overview.BTC).toBeDefined();
-    const sol = payload.market_overview.SOL;
-    expect(sol.trend_basis.sma_periods).toEqual([50, 200]);
-    expect(typeof sol.ret1h).toBe('number');
-    expect(sol.risk_flags).toEqual(
-      expect.objectContaining({
-        overbought: expect.any(Boolean),
-        oversold: expect.any(Boolean),
-        vol_spike: expect.any(Boolean),
-        thin_book: expect.any(Boolean),
-      }),
-    );
+    expect(payload.as_of).toBe('2025-09-20T06:15:00.000Z');
+    expect(Object.keys(payload.market_overview)).toEqual(['SOL', 'BTC']);
+
+    const btcDailyCloses = syntheticPairs.BTC.year.map((k) => Number(k[4]));
+    const btcDailyLogs = logReturns(btcDailyCloses);
+
+    for (const token of ['SOL', 'BTC'] as const) {
+      const symbol = syntheticPairs[token].symbol;
+      const overview = payload.market_overview[token];
+      const hourSeries = syntheticIntervals[symbol]['1h'];
+      const fourHourSeries = syntheticIntervals[symbol]['4h'];
+      const daySeries = syntheticIntervals[symbol]['1d'];
+      const weekSeries = syntheticIntervals[symbol]['1w'];
+      const hourCloses = hourSeries.map((kline) => Number(kline[4]));
+      const hourHighs = hourSeries.map((kline) => Number(kline[2]));
+      const hourLows = hourSeries.map((kline) => Number(kline[3]));
+      const hourVolumes = hourSeries.map((kline) => Number(kline[5]));
+      const fourHourCloses = fourHourSeries.map((kline) => Number(kline[4]));
+      const dayCloses = daySeries.map((kline) => Number(kline[4]));
+      const weekCloses = weekSeries.map((kline) => Number(kline[4]));
+      const dailyCloses = syntheticPairs[token].year.map((kline) => Number(kline[4]));
+      const latestHourClose = hourCloses[hourCloses.length - 1];
+
+      const ret1h = calcReturn(hourCloses, 1, latestHourClose);
+      const ret24h = calcReturn(hourCloses, 24, latestHourClose);
+      const sma50 = calcSma(hourCloses, 50);
+      const sma200 = calcSma(hourCloses, 200);
+      const gap = ((sma50 - sma200) / sma200) * 100;
+      const expectedTrendSlope = gap > 0.5 ? 'up' : gap < -0.5 ? 'down' : 'flat';
+      const atr = calcAtr(hourHighs, hourLows, hourCloses);
+      const volAtrPct = (atr / latestHourClose) * 100;
+      const volZ = volumeZ(hourVolumes, VOLUME_LOOKBACK);
+      const rsi = calcRsi(hourCloses);
+
+      const bid = syntheticPairs[token].orderBook.bids[0];
+      const ask = syntheticPairs[token].orderBook.asks[0];
+      const mid = (bid[0] + ask[0]) / 2;
+      const spreadBps = ((ask[0] - bid[0]) / mid) * 10_000;
+      const depthRatio = bid[1] / ask[1];
+
+      const ret30 = calcReturn(dailyCloses, 30, dailyCloses[dailyCloses.length - 1]);
+      const ret90 = calcReturn(dailyCloses, 90, dailyCloses[dailyCloses.length - 1]);
+      const ret180 = calcReturn(dailyCloses, 180, dailyCloses[dailyCloses.length - 1]);
+      const ret365 = calcReturn(dailyCloses, 365, dailyCloses[dailyCloses.length - 1]);
+
+      const trend4h = computeTrendFrame(fourHourCloses, 50, 200, [50, 200]);
+      const trend1d = computeTrendFrame(dayCloses, 20, 100, [20, 100]);
+      const trend1w = computeTrendFrame(weekCloses, 13, 52, [13, 52]);
+
+      const dailyLogs = logReturns(dailyCloses);
+      const volSeries: number[] = [];
+      for (let i = VOL_WINDOW; i <= dailyLogs.length; i++) {
+        volSeries.push(realizedVol(dailyLogs.slice(i - VOL_WINDOW, i)));
+      }
+      const currentVol =
+        volSeries[volSeries.length - 1] ?? realizedVol(dailyLogs);
+      const volRank = percentileRank(volSeries, currentVol);
+      let volState: 'depressed' | 'normal' | 'elevated' = 'normal';
+      if (volRank < 0.2) volState = 'depressed';
+      else if (volRank > 0.7) volState = 'elevated';
+
+      const assetLogs = dailyLogs.slice(-90);
+      const btcLogsSlice = btcDailyLogs.slice(-90);
+      const corr = correlation(assetLogs, btcLogsSlice);
+      const betaVal = beta(assetLogs, btcLogsSlice);
+
+      const riskFlags = computeRiskFlags({
+        rsi14: rsi,
+        vol_atr_pct: volAtrPct,
+        orderbook_spread_bps: spreadBps,
+        orderbook_depth_ratio: depthRatio,
+      });
+
+      expect(overview.trend_slope).toBe(expectedTrendSlope);
+      expect(overview.trend_basis.sma_periods).toEqual([50, 200]);
+      expect(overview.trend_basis.gap_pct).toBeCloseTo(gap, 10);
+      expect(overview.ret1h).toBeCloseTo(ret1h, 10);
+      expect(overview.ret24h).toBeCloseTo(ret24h, 10);
+      expect(overview.vol_atr_pct).toBeCloseTo(volAtrPct, 10);
+      expect(overview.vol_anomaly_z).toBeCloseTo(volZ, 10);
+      expect(overview.rsi14).toBeCloseTo(rsi, 10);
+      expect(overview.orderbook_spread_bps).toBeCloseTo(spreadBps, 10);
+      expect(overview.orderbook_depth_ratio).toBeCloseTo(depthRatio, 10);
+      expect(overview.risk_flags).toEqual(riskFlags);
+
+      expect(overview.htf.returns['30d']).toBeCloseTo(ret30, 10);
+      expect(overview.htf.returns['90d']).toBeCloseTo(ret90, 10);
+      expect(overview.htf.returns['180d']).toBeCloseTo(ret180, 10);
+      expect(overview.htf.returns['365d']).toBeCloseTo(ret365, 10);
+
+      expect(overview.htf.trend['4h'].gap_pct).toBeCloseTo(
+        trend4h.gap_pct,
+        10,
+      );
+      expect(overview.htf.trend['4h'].slope).toBe(trend4h.slope);
+      expect(overview.htf.trend['1d'].gap_pct).toBeCloseTo(
+        trend1d.gap_pct,
+        10,
+      );
+      expect(overview.htf.trend['1d'].slope).toBe(trend1d.slope);
+      expect(overview.htf.trend['1w'].gap_pct).toBeCloseTo(
+        trend1w.gap_pct,
+        10,
+      );
+      expect(overview.htf.trend['1w'].slope).toBe(trend1w.slope);
+
+      expect(overview.htf.regime.vol_state).toBe(volState);
+      expect(overview.htf.regime.vol_rank_1y).toBeCloseTo(volRank, 10);
+      expect(overview.htf.regime.corr_btc_90d).toBeCloseTo(corr, 10);
+      expect(overview.htf.regime.market_beta_90d).toBeCloseTo(betaVal, 10);
+    }
+
     expect(fetchStub).toHaveBeenCalled();
+  });
+
+  it('provides an empty overview when no tokens are requested', () => {
+    const payload = createEmptyMarketOverview(new Date('2024-01-01T00:00:00Z'));
+    expect(payload.market_overview).toEqual({});
+    expect(payload.as_of).toBe('2024-01-01T00:00:00.000Z');
   });
 });
