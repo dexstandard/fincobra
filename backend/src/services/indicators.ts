@@ -68,6 +68,19 @@ const SPEC: MarketOverviewPayload['_spec'] = {
   },
 };
 
+export function createEmptyMarketOverview(
+  asOf: Date = new Date(),
+): MarketOverviewPayload {
+  return {
+    schema_version: 'market_overview.v2',
+    as_of: asOf.toISOString(),
+    timeframe: TIMEFRAME,
+    derivations: DERIVATIONS,
+    _spec: SPEC,
+    market_overview: {},
+  };
+}
+
 async function fetchIntervalKlines(
   symbol: string,
   interval: string,
@@ -365,14 +378,7 @@ export async function fetchMarketOverview(
   tokens: string[],
 ): Promise<MarketOverviewPayload> {
   if (!tokens.length) {
-    return {
-      schema_version: 'market_overview.v2',
-      as_of: new Date().toISOString(),
-      timeframe: TIMEFRAME,
-      derivations: DERIVATIONS,
-      _spec: SPEC,
-      market_overview: {},
-    };
+    return createEmptyMarketOverview();
   }
 
   const dedupedSet = new Set(tokens.map((t) => t.toUpperCase()));

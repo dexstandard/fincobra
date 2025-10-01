@@ -1,7 +1,10 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { callAi } from '../services/openai-client.js';
 import { isStablecoin } from '../util/tokens.js';
-import { fetchMarketOverview } from '../services/indicators.js';
+import {
+  fetchMarketOverview,
+  createEmptyMarketOverview,
+} from '../services/indicators.js';
 import {
   fetchAccount,
   fetchPairInfo,
@@ -21,8 +24,9 @@ import type {
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
-  '- You lead a crypto analyst team (news, technical). Reports from each member are attached.',
+  '- You collaborate with the news analyst and personally interpret the shared market_overview.v2 dataset for technical context.',
   '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
+  '- Consult marketData.marketOverview (market_overview.v2) for price action, HTF trend, returns, and risk flags before sizing orders.',
   '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
   '- Make sure to size limit orders higher then minNotional values to avoid order cancellations.',
   '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
@@ -205,15 +209,15 @@ export async function collectPromptData(
     prompt.previousReports = previousReports;
   }
 
+  let marketOverview = createEmptyMarketOverview();
   if (nonStableTokens.length) {
     try {
-      prompt.marketData.marketOverview = await fetchMarketOverview(
-        nonStableTokens,
-      );
+      marketOverview = await fetchMarketOverview(nonStableTokens);
     } catch (err) {
       log.error({ err }, 'failed to fetch market overview');
     }
   }
+  prompt.marketData.marketOverview = marketOverview;
 
   return prompt;
 }
