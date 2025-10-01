@@ -1,56 +1,106 @@
 import { fetchPairData } from './binance-client.js';
 import type { Kline } from './binance-client.types.js';
-import type { TokenIndicators } from './indicators.types.js';
+import type {
+  MarketOverviewPayload,
+  MarketOverviewToken,
+  MarketOverviewTrendFrame,
+} from './indicators.types.js';
 
-function pctChange(current: number, past: number) {
-  return ((current - past) / past) * 100;
+const HOUR_INTERVAL_LIMIT = 1000;
+const HOUR_BASELINE = 24 * 30;
+
+const TIMEFRAME: MarketOverviewPayload['timeframe'] = {
+  candle_interval: '1h',
+  review_interval: '30m',
+  semantics:
+    'All base fields are computed on 1h candles for a 30m decision cadence. Higher-timeframe (HTF) context adds 4h/1d/1w trend and 30d/90d/180d/365d returns.',
+};
+
+const DERIVATIONS: MarketOverviewPayload['derivations'] = {
+  trend_slope_rule:
+    "Compute SMA50 and SMA200 on 1h candles. gap_pct = (SMA50 - SMA200) / SMA200 * 100. trend_slope = 'up' if gap_pct > +0.5, 'down' if gap_pct < -0.5, else 'flat'.",
+  ret1h_rule: 'ret1h = (last_price / price_1h_ago) - 1 (decimal).',
+  ret24h_rule: 'ret24h = (last_price / price_24h_ago) - 1 (decimal).',
+  vol_atr_pct_rule: 'vol_atr_pct = ATR(14) / last_price * 100 (percent).',
+  vol_anomaly_z_rule: 'Z-score of last 1h volume vs a 30-day hourly baseline.',
+  rsi14_rule: 'Standard 14-period RSI on 1h candles.',
+  orderbook_spread_bps_rule:
+    '((best_ask - best_bid) / mid_price) * 10_000 (basis points).',
+  orderbook_depth_ratio_rule:
+    'bid_top_qty / ask_top_qty (top-of-book sizes).',
+  htf_returns_rule:
+    'On daily closes (UTC): ret_30d = (close_t / close_t-30d) - 1, similarly for 90d/180d/365d (decimals).',
+  htf_trend_rule:
+    "For each frame f in {4h,1d,1w}, compute SMA_fast and SMA_slow on that frame and set: gap_pct_f = (SMA_fast - SMA_slow) / SMA_slow * 100. slope_f = 'up' if gap_pct_f > +0.5, 'down' if gap_pct_f < -0.5, else 'flat'. Recommended pairs: 4h:[50,200], 1d:[20,100], 1w:[13,52].",
+  regime_vol_state_rule:
+    "Compute realized volatility (stdev of log returns) on daily closes over a 30-day lookback. Rank it within a 365-day window to get vol_rank_1y in [0,1]. vol_state = 'depressed' if vol_rank_1y < 0.2, 'normal' if 0.2–0.7, 'elevated' if > 0.7.",
+  regime_corr_beta_rule:
+    'corr_btc_90d = Pearson correlation of daily log returns versus BTC over last 90 days. market_beta_90d from OLS: r_asset = alpha + beta * r_btc using daily log returns over last 90 days.',
+  risk_flags_rules: {
+    overbought: 'rsi14 >= 75',
+    oversold: 'rsi14 <= 25',
+    vol_spike: 'vol_atr_pct >= 3.0',
+    thin_book: 'orderbook_spread_bps > 10 OR orderbook_depth_ratio < 0.5',
+  },
+};
+
+const SPEC: MarketOverviewPayload['_spec'] = {
+  units: {
+    ret1h: 'decimal (e.g., -0.012 = -1.2%)',
+    ret24h: 'decimal',
+    vol_atr_pct: 'percent',
+    vol_anomaly_z: 'z-score',
+    rsi14: '0–100',
+    orderbook_spread_bps: 'basis points',
+    orderbook_depth_ratio: 'ratio',
+    'htf.returns.30d|90d|180d|365d': 'decimal',
+    'htf.trend.gap_pct_(4h|1d|1w)': 'percent',
+    "htf.trend.slope_(4h|1d|1w)": "enum('up','flat','down')",
+    'htf.regime.vol_state': "enum('depressed','normal','elevated')",
+    'htf.regime.vol_rank_1y': '0–1 (percentile)',
+    'htf.regime.corr_btc_90d': '[-1,1]',
+    'htf.regime.market_beta_90d': 'float',
+  },
+  interpretation: {
+    trend_slope: 'Multi-day trend on 1h timeframe (SMA50 vs SMA200).',
+    risk_flags: 'Boolean guards for sizing/filters; not trade triggers.',
+    htf: 'Condensed month/quarter/half-year/year context to gate strategies and sizing.',
+  },
+};
+
+async function fetchIntervalKlines(
+  symbol: string,
+  interval: string,
+  limit: number,
+): Promise<Kline[]> {
+  const res = await fetch(
+    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`failed to fetch ${interval} klines: ${res.status} ${body}`);
+  }
+  return (await res.json()) as Kline[];
 }
 
-function sliceMean(arr: number[]) {
-  return arr.reduce((s, v) => s + v, 0) / arr.length;
+function sliceMean(arr: number[]): number {
+  if (!arr.length) return 0;
+  return arr.reduce((sum, value) => sum + value, 0) / arr.length;
 }
 
-function calcRet(series: number[], periodsAgo: number, current: number) {
+function calcSma(series: number[], period: number): number {
+  if (series.length < period) {
+    return sliceMean(series);
+  }
+  const slice = series.slice(series.length - period);
+  return sliceMean(slice);
+}
+
+function calcReturn(series: number[], periodsAgo: number, current: number): number {
+  if (series.length <= periodsAgo) return 0;
   const past = series[series.length - 1 - periodsAgo];
-  return pctChange(current, past);
-}
-
-function calcSmaDist(series: number[], period: number, current: number) {
-  const slice = series.slice(-period);
-  const sma = sliceMean(slice);
-  return pctChange(current, sma);
-}
-
-function emaSeries(values: number[], period: number) {
-  const k = 2 / (period + 1);
-  const ema: number[] = [];
-  let prev = values[0];
-  ema.push(prev);
-  for (let i = 1; i < values.length; i++) {
-    const val = values[i] * k + prev * (1 - k);
-    ema.push(val);
-    prev = val;
-  }
-  return ema;
-}
-
-function calcMacdHist(closes: number[]) {
-  const ema12 = emaSeries(closes, 12);
-  const ema26 = emaSeries(closes, 26);
-  const macd = ema12.map((v, i) => v - ema26[i]);
-  const signal = emaSeries(macd, 9);
-  return macd[macd.length - 1] - signal[signal.length - 1];
-}
-
-function realizedVol(closes: number[], days: number) {
-  const returns: number[] = [];
-  for (let i = closes.length - days; i < closes.length; i++) {
-    const prev = closes[i - 1];
-    returns.push(Math.log(closes[i] / prev));
-  }
-  const mean = sliceMean(returns);
-  const variance = sliceMean(returns.map((r) => (r - mean) ** 2));
-  return Math.sqrt(variance) * Math.sqrt(365) * 100;
+  if (past === 0) return 0;
+  return current / past - 1;
 }
 
 function calcAtr(
@@ -58,9 +108,11 @@ function calcAtr(
   lows: number[],
   closes: number[],
   period = 14,
-) {
+): number {
+  if (highs.length < 2 || lows.length < 2 || closes.length < 2) return 0;
+  const start = Math.max(1, highs.length - period);
   const trs: number[] = [];
-  for (let i = closes.length - period; i < closes.length; i++) {
+  for (let i = start; i < highs.length; i++) {
     const h = highs[i];
     const l = lows[i];
     const prev = closes[i - 1];
@@ -70,29 +122,33 @@ function calcAtr(
   return sliceMean(trs);
 }
 
-function bollingerBandwidth(closes: number[], period: number) {
-  const slice = closes.slice(-period);
-  const sma = sliceMean(slice);
-  const variance = sliceMean(slice.map((v) => (v - sma) ** 2));
-  const std = Math.sqrt(variance);
-  const upper = sma + 2 * std;
-  const lower = sma - 2 * std;
-  return ((upper - lower) / sma) * 100;
+function calcRsi(closes: number[], period = 14): number {
+  if (closes.length < period + 1) return 50;
+  let gainSum = 0;
+  let lossSum = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gainSum += diff;
+    else lossSum -= diff;
+  }
+  let avgGain = gainSum / period;
+  let avgLoss = lossSum / period;
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - 100 / (1 + rs);
 }
 
-function donchian(
-  highs: number[],
-  lows: number[],
-  current: number,
-  period: number,
-) {
-  const h = Math.max(...highs.slice(-period));
-  const l = Math.min(...lows.slice(-period));
-  return ((h - l) / current) * 100;
-}
-
-function volumeZ(volumes: number[], lookback: number) {
-  const slice = volumes.slice(-lookback - 1, -1);
+function volumeZ(volumes: number[], lookback: number): number {
+  const window = Math.min(lookback, volumes.length - 1);
+  if (window <= 1) return 0;
+  const slice = volumes.slice(volumes.length - 1 - window, volumes.length - 1);
   const mean = sliceMean(slice);
   const variance = sliceMean(slice.map((v) => (v - mean) ** 2));
   const std = Math.sqrt(variance) || 1;
@@ -100,139 +156,279 @@ function volumeZ(volumes: number[], lookback: number) {
   return (last - mean) / std;
 }
 
-function dailyReturns(closes: number[], periods: number) {
+function logReturns(closes: number[]): number[] {
   const res: number[] = [];
-  for (let i = closes.length - periods - 1; i < closes.length - 1; i++) {
-    res.push((closes[i + 1] - closes[i]) / closes[i]);
+  for (let i = 1; i < closes.length; i++) {
+    const prev = closes[i - 1];
+    const current = closes[i];
+    if (prev === 0) res.push(0);
+    else res.push(Math.log(current / prev));
   }
   return res;
 }
 
-function correlation(a: number[], b: number[]) {
+function stddev(values: number[]): number {
+  if (!values.length) return 0;
+  const mean = sliceMean(values);
+  const variance = sliceMean(values.map((v) => (v - mean) ** 2));
+  return Math.sqrt(variance);
+}
+
+function realizedVol(logs: number[]): number {
+  if (!logs.length) return 0;
+  return stddev(logs) * Math.sqrt(365);
+}
+
+function percentileRank(series: number[], value: number): number {
+  if (!series.length) return 0;
+  const count = series.filter((v) => v <= value).length;
+  return count / series.length;
+}
+
+function computeTrendFrame(
+  closes: number[],
+  fast: number,
+  slow: number,
+  periods: [number, number],
+): MarketOverviewTrendFrame {
+  if (closes.length < slow) {
+    return { sma_periods: periods, gap_pct: 0, slope: 'flat' };
+  }
+  const smaFast = calcSma(closes, fast);
+  const smaSlow = calcSma(closes, slow) || 1;
+  const gap = ((smaFast - smaSlow) / smaSlow) * 100;
+  let slope: MarketOverviewTrendFrame['slope'] = 'flat';
+  if (gap > 0.5) slope = 'up';
+  else if (gap < -0.5) slope = 'down';
+  return { sma_periods: periods, gap_pct: gap, slope };
+}
+
+function calcCorrelation(asset: number[], market: number[]): number {
+  const n = Math.min(asset.length, market.length);
+  if (n === 0) return 0;
+  const a = asset.slice(asset.length - n);
+  const b = market.slice(market.length - n);
   const meanA = sliceMean(a);
   const meanB = sliceMean(b);
-  let num = 0,
-    denA = 0,
-    denB = 0;
-  for (let i = 0; i < a.length; i++) {
+  let num = 0;
+  let denA = 0;
+  let denB = 0;
+  for (let i = 0; i < n; i++) {
     const da = a[i] - meanA;
     const db = b[i] - meanB;
     num += da * db;
     denA += da * da;
     denB += db * db;
   }
+  if (denA === 0 || denB === 0) return 0;
   return num / Math.sqrt(denA * denB);
 }
 
-function calcRsi(closes: number[], period = 14) {
-  const gains: number[] = [];
-  const losses: number[] = [];
-  for (let i = 1; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff >= 0) {
-      gains.push(diff);
-      losses.push(0);
-    } else {
-      gains.push(0);
-      losses.push(-diff);
-    }
+function calcBeta(asset: number[], market: number[]): number {
+  const n = Math.min(asset.length, market.length);
+  if (n === 0) return 0;
+  const a = asset.slice(asset.length - n);
+  const b = market.slice(market.length - n);
+  const meanA = sliceMean(a);
+  const meanB = sliceMean(b);
+  let cov = 0;
+  let varB = 0;
+  for (let i = 0; i < n; i++) {
+    const da = a[i] - meanA;
+    const db = b[i] - meanB;
+    cov += da * db;
+    varB += db * db;
   }
-  let avgGain = sliceMean(gains.slice(0, period));
-  let avgLoss = sliceMean(losses.slice(0, period));
-  for (let i = period; i < gains.length; i++) {
-    avgGain = (avgGain * (period - 1) + gains[i]) / period;
-    avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
-  }
-  if (avgLoss === 0) return 100;
-  const rs = avgGain / avgLoss;
-  return 100 - 100 / (1 + rs);
+  if (varB === 0) return 0;
+  return cov / varB;
 }
 
-function calcStoch(
-  highs: number[],
-  lows: number[],
-  closes: number[],
-  period = 14,
-) {
-  const kVals: number[] = [];
-  for (let i = period - 1; i < closes.length; i++) {
-    const h = Math.max(...highs.slice(i - period + 1, i + 1));
-    const l = Math.min(...lows.slice(i - period + 1, i + 1));
-    const denom = h - l || 1;
-    const k = ((closes[i] - l) / denom) * 100;
-    kVals.push(k);
-  }
-  const k = kVals[kVals.length - 1];
-  const d = sliceMean(kVals.slice(-3));
-  return { k, d };
+function computeRiskFlags(token: MarketOverviewToken): MarketOverviewToken['risk_flags'] {
+  return {
+    overbought: token.rsi14 >= 75,
+    oversold: token.rsi14 <= 25,
+    vol_spike: token.vol_atr_pct >= 3,
+    thin_book:
+      token.orderbook_spread_bps > 10 || token.orderbook_depth_ratio < 0.5,
+  };
 }
 
-export async function fetchTokenIndicators(
-  token: string,
-): Promise<TokenIndicators> {
-  const pair = await fetchPairData(token, 'USDT');
-  const symbol = `${token}USDT`.toUpperCase();
-  const hourRes = await fetch(
-    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=200`,
-  );
-  if (!hourRes.ok) {
-    const body = await hourRes.text();
-    throw new Error(`failed to fetch hourly data: ${hourRes.status} ${body}`);
+function buildTokenOverview(
+  current: number,
+  hourKlines: Kline[],
+  h4Klines: Kline[],
+  dayKlines: Kline[],
+  weekKlines: Kline[],
+  dailyCloses: number[],
+  btcDailyLogs: number[],
+): MarketOverviewToken {
+  const closes1h = hourKlines.map((k) => Number(k[4]));
+  const highs1h = hourKlines.map((k) => Number(k[2]));
+  const lows1h = hourKlines.map((k) => Number(k[3]));
+  const volumes1h = hourKlines.map((k) => Number(k[5]));
+  const latestHourClose = closes1h[closes1h.length - 1] ?? current;
+  const ret1h = calcReturn(closes1h, 1, latestHourClose);
+  const ret24h = calcReturn(closes1h, 24, latestHourClose);
+  const sma50 = calcSma(closes1h, 50);
+  const sma200 = calcSma(closes1h, 200) || 1;
+  const gapPct = ((sma50 - sma200) / sma200) * 100;
+  let trendSlope: MarketOverviewToken['trend_slope'] = 'flat';
+  if (gapPct > 0.5) trendSlope = 'up';
+  else if (gapPct < -0.5) trendSlope = 'down';
+  const priceForVol = latestHourClose || current || 1;
+  const volAtrPct = priceForVol
+    ? (calcAtr(highs1h, lows1h, closes1h) / priceForVol) * 100
+    : 0;
+  const volAnomalyZ = volumeZ(volumes1h, HOUR_BASELINE);
+  const rsi14 = calcRsi(closes1h);
+
+  const latestDailyClose = dailyCloses[dailyCloses.length - 1] ?? current;
+
+  const token: MarketOverviewToken = {
+    trend_slope: trendSlope,
+    trend_basis: { sma_periods: [50, 200], gap_pct: gapPct },
+    ret1h,
+    ret24h,
+    vol_atr_pct: volAtrPct,
+    vol_anomaly_z: volAnomalyZ,
+    rsi14,
+    orderbook_spread_bps: 0,
+    orderbook_depth_ratio: 0,
+    risk_flags: { overbought: false, oversold: false, vol_spike: false, thin_book: false },
+    htf: {
+      returns: {
+        '30d': calcReturn(dailyCloses, 30, latestDailyClose),
+        '90d': calcReturn(dailyCloses, 90, latestDailyClose),
+        '180d': calcReturn(dailyCloses, 180, latestDailyClose),
+        '365d': calcReturn(dailyCloses, 365, latestDailyClose),
+      },
+      trend: {
+        '4h': computeTrendFrame(
+          h4Klines.map((k) => Number(k[4])),
+          50,
+          200,
+          [50, 200],
+        ),
+        '1d': computeTrendFrame(
+          dayKlines.map((k) => Number(k[4])),
+          20,
+          100,
+          [20, 100],
+        ),
+        '1w': computeTrendFrame(
+          weekKlines.map((k) => Number(k[4])),
+          13,
+          52,
+          [13, 52],
+        ),
+      },
+      regime: {
+        vol_state: 'normal',
+        vol_rank_1y: 0,
+        corr_btc_90d: 0,
+        market_beta_90d: 0,
+      },
+    },
+  };
+
+  const dailyLogs = logReturns(dailyCloses);
+  const volSeries: number[] = [];
+  const window = 30;
+  for (let i = window; i <= dailyLogs.length; i++) {
+    const slice = dailyLogs.slice(i - window, i);
+    volSeries.push(realizedVol(slice));
   }
-  const hourJson = (await hourRes.json()) as Kline[];
-  const hourCloses = hourJson.map((k) => Number(k[4]));
-  const hourVolumes = hourJson.map((k) => Number(k[5]));
+  const currentVol = volSeries[volSeries.length - 1] ?? realizedVol(dailyLogs);
+  const volRank = percentileRank(volSeries, currentVol);
+  let volState: MarketOverviewToken['htf']['regime']['vol_state'] = 'normal';
+  if (volRank < 0.2) volState = 'depressed';
+  else if (volRank > 0.7) volState = 'elevated';
 
-  const dayCloses = pair.year.map((k) => Number(k[4]));
-  const dayHighs = pair.year.map((k) => Number(k[2]));
-  const dayLows = pair.year.map((k) => Number(k[3]));
-  const dayVolumes = pair.year.map((k) => Number(k[5]));
-  const current = pair.currentPrice;
+  const assetLogs = dailyLogs.slice(-90);
+  const btcLogs = btcDailyLogs.slice(-90);
+  const corr = calcCorrelation(assetLogs, btcLogs);
+  const beta = calcBeta(assetLogs, btcLogs);
 
-  const btc = await fetchPairData('BTC', 'USDT');
-  const btcCloses = btc.year.map((k) => Number(k[4]));
+  token.htf.regime = {
+    vol_state: volState,
+    vol_rank_1y: volRank,
+    corr_btc_90d: corr,
+    market_beta_90d: beta,
+  };
 
-  const macdHist = calcMacdHist(dayCloses);
-  const volAtrPct = (calcAtr(dayHighs, dayLows, dayCloses) / current) * 100;
-  const volRv7d = realizedVol(dayCloses, 7);
-  const volRv30d = realizedVol(dayCloses, 30);
-  const rangeBbBw = bollingerBandwidth(dayCloses, 20);
-  const rangeDonchian20 = donchian(dayHighs, dayLows, current, 20);
-  const volumeZ1h = volumeZ(hourVolumes, 24);
-  const volumeZ24h = volumeZ(dayVolumes, 30);
-  const oscRsi14 = calcRsi(dayCloses);
-  const { k: oscStochK, d: oscStochD } = calcStoch(
-    dayHighs,
-    dayLows,
-    dayCloses,
+  token.risk_flags = computeRiskFlags(token);
+
+  return token;
+}
+
+export async function fetchMarketOverview(
+  tokens: string[],
+): Promise<MarketOverviewPayload> {
+  if (!tokens.length) {
+    return {
+      schema_version: 'market_overview.v2',
+      as_of: new Date().toISOString(),
+      timeframe: TIMEFRAME,
+      derivations: DERIVATIONS,
+      _spec: SPEC,
+      market_overview: {},
+    };
+  }
+
+  const dedupedSet = new Set(tokens.map((t) => t.toUpperCase()));
+  dedupedSet.add('BTC');
+  const deduped = Array.from(dedupedSet);
+  const btcPair = await fetchPairData('BTC', 'USDT');
+  const btcDailyCloses = btcPair.year.map((k) => Number(k[4]));
+  const btcDailyLogs = logReturns(btcDailyCloses);
+
+  const entries = await Promise.all(
+    deduped.map(async (token) => {
+      const pair = token === 'BTC' ? btcPair : await fetchPairData(token, 'USDT');
+      const symbol = pair.symbol;
+      const current = pair.currentPrice;
+      const [hourKlines, h4Klines, dayKlines, weekKlines] = await Promise.all([
+        fetchIntervalKlines(symbol, '1h', HOUR_INTERVAL_LIMIT),
+        fetchIntervalKlines(symbol, '4h', 210),
+        fetchIntervalKlines(symbol, '1d', 150),
+        fetchIntervalKlines(symbol, '1w', 60),
+      ]);
+      const tokenDailyCloses = pair.year.map((k) => Number(k[4]));
+      const overview = buildTokenOverview(
+        current,
+        hourKlines,
+        h4Klines,
+        dayKlines,
+        weekKlines,
+        tokenDailyCloses,
+        btcDailyLogs,
+      );
+
+      const bestBid = pair.orderBook.bids[0] as [number, number] | undefined;
+      const bestAsk = pair.orderBook.asks[0] as [number, number] | undefined;
+      const bidPrice = bestBid?.[0] ?? current;
+      const askPrice = bestAsk?.[0] ?? current;
+      const bidQty = bestBid?.[1] ?? 0;
+      const askQty = bestAsk?.[1] ?? 1;
+      const mid = (bidPrice + askPrice) / 2 || current || 1;
+      overview.orderbook_spread_bps = mid
+        ? ((askPrice - bidPrice) / mid) * 10_000
+        : 0;
+      overview.orderbook_depth_ratio = askQty === 0 ? 0 : bidQty / askQty;
+      overview.risk_flags = computeRiskFlags(overview);
+
+      return [token, overview] as const;
+    }),
   );
-  const corrBtc30d = correlation(
-    dailyReturns(dayCloses, 30),
-    dailyReturns(btcCloses, 30),
-  );
-  const regimeBtc = bollingerBandwidth(btcCloses, 20) < 10 ? 'range' : 'trend';
+
+  const marketOverview = Object.fromEntries(entries);
 
   return {
-    ret1h: calcRet(hourCloses, 1, current),
-    ret4h: calcRet(hourCloses, 4, current),
-    ret24h: calcRet(dayCloses, 1, current),
-    ret7d: calcRet(dayCloses, 7, current),
-    ret30d: calcRet(dayCloses, 30, current),
-    smaDist20: calcSmaDist(dayCloses, 20, current),
-    smaDist50: calcSmaDist(dayCloses, 50, current),
-    smaDist200: calcSmaDist(dayCloses, 200, current),
-    macdHist,
-    volRv7d,
-    volRv30d,
-    volAtrPct,
-    rangeBbBw,
-    rangeDonchian20,
-    volumeZ1h,
-    volumeZ24h,
-    corrBtc30d,
-    regimeBtc,
-    oscRsi14,
-    oscStochK,
-    oscStochD,
+    schema_version: 'market_overview.v2',
+    as_of: new Date().toISOString(),
+    timeframe: TIMEFRAME,
+    derivations: DERIVATIONS,
+    _spec: SPEC,
+    market_overview: marketOverview,
   };
 }

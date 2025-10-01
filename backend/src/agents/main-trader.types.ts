@@ -1,7 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { Analysis } from './news-analyst.types.js';
-import type { OrderBookSnapshot } from './technical-analyst.types.js';
-import type { TokenIndicators } from '../services/indicators.types.js';
+import type { MarketOverviewPayload } from '../services/indicators.types.js';
 
 export interface RunParams {
   log: FastifyBaseLogger;
@@ -46,7 +45,6 @@ export interface MarketTimeseries {
 export interface PromptReport {
   token: string;
   news: Analysis | null;
-  tech: Analysis | null;
 }
 
 export interface RebalancePrompt {
@@ -63,10 +61,9 @@ export interface RebalancePrompt {
   };
   routes: RoutePrice[];
   marketData: {
-    indicators?: Record<string, TokenIndicators>;
+    marketOverview?: MarketOverviewPayload;
     marketTimeseries?: Record<string, MarketTimeseries>;
     fearGreedIndex?: { value: number; classification: string };
-    orderBooks?: Record<string, OrderBookSnapshot>;
     openInterest?: number;
     fundingRate?: number;
   };

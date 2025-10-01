@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { callAi } from '../services/openai-client.js';
 import { isStablecoin } from '../util/tokens.js';
+import { fetchMarketOverview } from '../services/indicators.js';
 import {
   fetchAccount,
   fetchPairInfo,
@@ -188,6 +189,8 @@ export async function collectPromptData(
     previousReports.push(report);
   }
 
+  const nonStableTokens = tokens.filter((t) => !isStablecoin(t));
+
   const prompt: RebalancePrompt = {
     instructions: row.agentInstructions,
     reviewInterval: row.reviewInterval,
@@ -196,13 +199,22 @@ export async function collectPromptData(
     portfolio,
     routes,
     marketData: {},
-    reports: tokens
-      .filter((t) => !isStablecoin(t))
-      .map((token) => ({ token, news: null, tech: null })),
+    reports: nonStableTokens.map((token) => ({ token, news: null })),
   };
   if (previousReports.length) {
     prompt.previousReports = previousReports;
   }
+
+  if (nonStableTokens.length) {
+    try {
+      prompt.marketData.marketOverview = await fetchMarketOverview(
+        nonStableTokens,
+      );
+    } catch (err) {
+      log.error({ err }, 'failed to fetch market overview');
+    }
+  }
+
   return prompt;
 }
 

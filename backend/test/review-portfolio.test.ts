@@ -8,68 +8,12 @@ import { getPortfolioReviewRawPromptsResponses } from './repos/review-raw-log.js
 import { getRecentReviewResults } from '../src/repos/review-result.js';
 import * as mainTrader from '../src/agents/main-trader.js';
 import * as newsAnalyst from '../src/agents/news-analyst.js';
-import * as techAnalyst from '../src/agents/technical-analyst.js';
 
-const { sampleIndicators, sampleTimeseries } = vi.hoisted(() => ({
-  sampleIndicators: {
-    ret1h: 0,
-    ret4h: 0,
-    ret24h: 0,
-    ret7d: 0,
-    ret30d: 0,
-    smaDist20: 0,
-    smaDist50: 0,
-    smaDist200: 0,
-    macdHist: 0,
-    volRv7d: 0,
-    volRv30d: 0,
-    volAtrPct: 0,
-    rangeBbBw: 0,
-    rangeDonchian20: 0,
-    volumeZ1h: 0,
-    volumeZ24h: 0,
-    corrBtc30d: 0,
-    regimeBtc: 'range',
-    oscRsi14: 0,
-    oscStochK: 0,
-    oscStochD: 0,
-  },
-  sampleTimeseries: {
-    minute_60: [[1, 2, 3, 4]],
-    hourly_24h: [[5, 6, 7, 8]],
-    monthly_24m: [[9, 10, 11]],
-  },
+const sampleTimeseries = vi.hoisted(() => ({
+  minute_60: [[1, 2, 3, 4]],
+  hourly_24h: [[5, 6, 7, 8]],
+  monthly_24m: [[9, 10, 11]],
 }));
-
-const flatIndicators = {
-  ret1h: 0,
-  ret4h: 0,
-  ret24h: 0,
-  ret7d: 0,
-  ret30d: 0,
-  smaDist20: 0,
-  smaDist50: 0,
-  smaDist200: 0,
-  macdHist: 0,
-  volRv7d: 0,
-  volRv30d: 0,
-  volAtrPct: 0,
-  rangeBbBw: 0,
-  rangeDonchian20: 0,
-  volumeZ1h: 0,
-  volumeZ24h: 0,
-  corrBtc30d: 0,
-  regimeBtc: 'range',
-  oscRsi14: 0,
-  oscStochK: 0,
-  oscStochD: 0,
-};
-
-const flatTimeseries = {
-  ret60m: ((3 - 2) / 2) * 100,
-  ret24h: ((7 - 6) / 6) * 100,
-  ret24m: ((11 - 10) / 10) * 100,
-};
 
 const runMainTrader = vi.fn();
 vi.spyOn(mainTrader, 'run').mockImplementation(runMainTrader);
@@ -80,15 +24,6 @@ const runNewsAnalyst = vi.fn((_params: any, prompt: any) => {
   return Promise.resolve();
 });
 vi.spyOn(newsAnalyst, 'runNewsAnalyst').mockImplementation(runNewsAnalyst);
-
-const runTechnicalAnalyst = vi.fn((_params: any, prompt: any) => {
-  const report = prompt.reports?.find((r: any) => r.token === 'BTC');
-  if (report) report.tech = { comment: 'tech', score: 2 };
-  return Promise.resolve();
-});
-vi.spyOn(techAnalyst, 'runTechnicalAnalyst').mockImplementation(
-  runTechnicalAnalyst,
-);
 
 import {
   reviewWorkflowPortfolio,
@@ -132,8 +67,103 @@ vi.mock('../src/services/sentiment.js', () => ({
     .mockResolvedValue({ value: 50, classification: 'Neutral' }),
 }));
 
+const sampleMarketOverview = vi.hoisted(() => ({
+  schema_version: 'market_overview.v2' as const,
+  as_of: '2024-01-01T00:00:00Z',
+  timeframe: {
+    candle_interval: '1h',
+    review_interval: '30m',
+    semantics: '',
+  },
+  derivations: {
+    trend_slope_rule: '',
+    ret1h_rule: '',
+    ret24h_rule: '',
+    vol_atr_pct_rule: '',
+    vol_anomaly_z_rule: '',
+    rsi14_rule: '',
+    orderbook_spread_bps_rule: '',
+    orderbook_depth_ratio_rule: '',
+    htf_returns_rule: '',
+    htf_trend_rule: '',
+    regime_vol_state_rule: '',
+    regime_corr_beta_rule: '',
+    risk_flags_rules: {
+      overbought: '',
+      oversold: '',
+      vol_spike: '',
+      thin_book: '',
+    },
+  },
+  _spec: { units: {}, interpretation: {} },
+  market_overview: {
+    BTC: {
+      trend_slope: 'flat' as const,
+      trend_basis: { sma_periods: [50, 200] as [number, number], gap_pct: 0 },
+      ret1h: 0,
+      ret24h: 0,
+      vol_atr_pct: 0,
+      vol_anomaly_z: 0,
+      rsi14: 50,
+      orderbook_spread_bps: 0,
+      orderbook_depth_ratio: 1,
+      risk_flags: {
+        overbought: false,
+        oversold: false,
+        vol_spike: false,
+        thin_book: false,
+      },
+      htf: {
+        returns: { '30d': 0, '90d': 0, '180d': 0, '365d': 0 },
+        trend: {
+          '4h': { sma_periods: [50, 200], gap_pct: 0, slope: 'flat' },
+          '1d': { sma_periods: [20, 100], gap_pct: 0, slope: 'flat' },
+          '1w': { sma_periods: [13, 52], gap_pct: 0, slope: 'flat' },
+        },
+        regime: {
+          vol_state: 'normal' as const,
+          vol_rank_1y: 0,
+          corr_btc_90d: 0,
+          market_beta_90d: 0,
+        },
+      },
+    },
+    ETH: {
+      trend_slope: 'flat' as const,
+      trend_basis: { sma_periods: [50, 200] as [number, number], gap_pct: 0 },
+      ret1h: 0,
+      ret24h: 0,
+      vol_atr_pct: 0,
+      vol_anomaly_z: 0,
+      rsi14: 50,
+      orderbook_spread_bps: 0,
+      orderbook_depth_ratio: 1,
+      risk_flags: {
+        overbought: false,
+        oversold: false,
+        vol_spike: false,
+        thin_book: false,
+      },
+      htf: {
+        returns: { '30d': 0, '90d': 0, '180d': 0, '365d': 0 },
+        trend: {
+          '4h': { sma_periods: [50, 200], gap_pct: 0, slope: 'flat' },
+          '1d': { sma_periods: [20, 100], gap_pct: 0, slope: 'flat' },
+          '1w': { sma_periods: [13, 52], gap_pct: 0, slope: 'flat' },
+        },
+        regime: {
+          vol_state: 'normal' as const,
+          vol_rank_1y: 0,
+          corr_btc_90d: 0,
+          market_beta_90d: 0,
+        },
+      },
+    },
+  },
+}));
+
 vi.mock('../src/services/indicators.js', () => ({
-  fetchTokenIndicators: vi.fn().mockResolvedValue(sampleIndicators),
+  fetchMarketOverview: vi.fn().mockResolvedValue(sampleMarketOverview),
 }));
 
 const createDecisionLimitOrders = vi.hoisted(() =>
@@ -180,7 +210,6 @@ describe('reviewPortfolio', () => {
     await reviewWorkflowPortfolio(log, workflowId);
     expect(runMainTrader).toHaveBeenCalledTimes(1);
     expect(runNewsAnalyst).toHaveBeenCalled();
-    expect(runTechnicalAnalyst).toHaveBeenCalled();
     const rows = await getPortfolioReviewRawPromptsResponses(workflowId);
     const row = rows[0];
     expect(JSON.parse(row.response!)).toEqual(decision);
