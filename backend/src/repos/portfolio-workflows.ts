@@ -97,6 +97,47 @@ export async function getPortfolioWorkflowsPaginated(
   };
 }
 
+export async function getPortfolioWorkflowsPaginatedAdmin(
+  status: string | undefined,
+  limit: number,
+  offset: number,
+  userId?: string,
+) {
+  if (userId) {
+    return getPortfolioWorkflowsPaginated(userId, status, limit, offset);
+  }
+  if (status) {
+    if (status === PortfolioWorkflowStatus.Retired)
+      return { rows: [], total: 0 };
+    const where = 'WHERE pw.status = $1';
+    const totalRes = await db.query(
+      `SELECT COUNT(*) as count FROM portfolio_workflow pw ${where}`,
+      [status],
+    );
+    const { rows } = await db.query(
+      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $2 OFFSET $3`,
+      [status, limit, offset],
+    );
+    return {
+      rows: convertKeysToCamelCase(rows) as PortfolioWorkflow[],
+      total: Number(totalRes.rows[0].count),
+    };
+  }
+  const where = 'WHERE pw.status != $1';
+  const totalRes = await db.query(
+    `SELECT COUNT(*) as count FROM portfolio_workflow pw ${where}`,
+    [PortfolioWorkflowStatus.Retired],
+  );
+  const { rows } = await db.query(
+    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $2 OFFSET $3`,
+    [PortfolioWorkflowStatus.Retired, limit, offset],
+  );
+  return {
+    rows: convertKeysToCamelCase(rows) as PortfolioWorkflow[],
+    total: Number(totalRes.rows[0].count),
+  };
+}
+
 export async function findIdenticalInactiveWorkflow(
   data: PortfolioWorkflowInactiveSearch,
   excludeId?: string,

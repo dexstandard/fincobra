@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   getPortfolioWorkflow,
   getPortfolioWorkflowsPaginated,
+  getPortfolioWorkflowsPaginatedAdmin,
   toApi,
   insertPortfolioWorkflow,
   updatePortfolioWorkflow,
@@ -44,7 +45,7 @@ import type {
   MainTraderDecision,
   MainTraderOrder,
 } from '../agents/main-trader.types.js';
-import { getValidatedUserId } from './_shared/guards.js';
+import { adminOnlyPreHandlers, getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
@@ -84,6 +85,10 @@ const paginationQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).optional(),
   pageSize: z.string().regex(/^\d+$/).optional(),
   status: z.nativeEnum(PortfolioWorkflowStatus).optional(),
+});
+
+const adminPaginationQuerySchema = paginationQuerySchema.extend({
+  userId: z.string().regex(/^\d+$/).optional(),
 });
 
 const execLogQuerySchema = z.object({
@@ -231,6 +236,28 @@ function parsePaginationQuery(
   return { page: pageNumber, pageSize: pageSizeNumber, status };
 }
 
+function parseAdminPaginationQuery(
+  req: FastifyRequest,
+  reply: FastifyReply,
+):
+  | {
+      page: number;
+      pageSize: number;
+      status?: PortfolioWorkflowStatus;
+      userId?: string;
+    }
+  | undefined {
+  const result = adminPaginationQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    reply.code(400).send(errorResponse('invalid query parameter'));
+    return undefined;
+  }
+  const { page = '1', pageSize = '10', status, userId } = result.data;
+  const pageNumber = Math.max(Number.parseInt(page, 10), 1);
+  const pageSizeNumber = Math.max(Number.parseInt(pageSize, 10), 1);
+  return { page: pageNumber, pageSize: pageSizeNumber, status, userId };
+}
+
 function parseExecLogQuery(
   req: FastifyRequest,
   reply: FastifyReply,
@@ -285,6 +312,37 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         offset,
       );
       log.info('listed workflows');
+      return {
+        items: rows.map(toApi),
+        total,
+        page,
+        pageSize,
+      };
+    },
+  );
+
+  app.get(
+    '/portfolio-workflows/admin/paginated',
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: adminOnlyPreHandlers,
+    },
+    async (req, reply) => {
+      const pagination = parseAdminPaginationQuery(req, reply);
+      if (!pagination) return;
+      const { page, pageSize, status, userId } = pagination;
+      const offset = (page - 1) * pageSize;
+      const log = req.log.child({
+        userId: req.adminUserId,
+        targetUserId: userId,
+      });
+      const { rows, total } = await getPortfolioWorkflowsPaginatedAdmin(
+        status,
+        pageSize,
+        offset,
+        userId,
+      );
+      log.info('admin listed workflows');
       return {
         items: rows.map(toApi),
         total,
