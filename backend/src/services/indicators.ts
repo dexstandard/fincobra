@@ -92,13 +92,13 @@ interface CachedBtcContext {
   cacheKey: string;
 }
 
-const tokenOverviewCache = new NodeCache<CachedTokenOverview>({
+const tokenOverviewCache = new NodeCache({
   stdTTL: MARKET_OVERVIEW_CACHE_TTL_SEC,
   checkperiod: MARKET_OVERVIEW_CACHE_CHECK_PERIOD,
   useClones: false,
 });
 
-const btcContextCache = new NodeCache<CachedBtcContext>({
+const btcContextCache = new NodeCache({
   stdTTL: MARKET_OVERVIEW_CACHE_TTL_SEC,
   checkperiod: MARKET_OVERVIEW_CACHE_CHECK_PERIOD,
   useClones: false,
@@ -112,12 +112,12 @@ function buildTokenPendingKey(token: string, contextKey: string): string {
 }
 
 function setTokenCache(token: string, value: CachedTokenOverview) {
-  tokenOverviewCache.set(token, value);
+  tokenOverviewCache.set<CachedTokenOverview>(token, value);
 }
 
 async function getBtcContext(): Promise<CachedBtcContext> {
   const cacheKey = 'BTC_CONTEXT';
-  const cached = btcContextCache.get(cacheKey);
+  const cached = btcContextCache.get<CachedBtcContext>(cacheKey);
   if (cached) {
     return cached;
   }
@@ -134,7 +134,7 @@ async function getBtcContext(): Promise<CachedBtcContext> {
         generatedAt,
         cacheKey: `${generatedAt}:${pair.year[pair.year.length - 1]?.[0] ?? ''}`,
       };
-      btcContextCache.set(cacheKey, context);
+      btcContextCache.set<CachedBtcContext>(cacheKey, context);
       return context;
     })().finally(() => {
       pendingBtcContext = null;
@@ -192,7 +192,7 @@ async function loadTokenOverview(
   btcContext: CachedBtcContext,
 ): Promise<CachedTokenOverview> {
   const cacheKey = token.toUpperCase();
-  const cached = tokenOverviewCache.get(cacheKey);
+  const cached = tokenOverviewCache.get<CachedTokenOverview>(cacheKey);
   if (cached && cached.contextKey === btcContext.cacheKey) {
     return cached;
   }
