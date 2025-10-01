@@ -53,7 +53,10 @@ export default function ApiKeySection({
   const t = useTranslation();
   const defaultValues = useMemo(
     () =>
-      Object.fromEntries(fields.map((f) => [f.name, ''])) as Record<string, string>,
+      Object.fromEntries(fields.map((f) => [f.name, ''])) as Record<
+        string,
+        string
+      >,
     [fields],
   );
   const form = useForm<Record<string, string>>({
@@ -73,7 +76,8 @@ export default function ApiKeySection({
         const res = await api.get(getKeyPath(id));
         return res.data as KeyData;
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
         throw err;
       }
     },
@@ -162,7 +166,10 @@ export default function ApiKeySection({
               type="text"
               autoComplete="off"
               placeholder={f.placeholder}
-              {...form.register(f.name, { required: true, minLength: f.minLength ?? 10 })}
+              {...form.register(f.name, {
+                required: true,
+                minLength: f.minLength ?? 10,
+              })}
               className="border rounded px-2 py-1 w-full"
               style={form.watch(f.name) ? textSecurityStyle : undefined}
               data-lpignore="true"
@@ -196,24 +203,25 @@ export default function ApiKeySection({
               {query.data ? t('update') : t('save')}
             </Button>
             {query.data && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setEditing(false);
-                    const data = fields.reduce(
-                      (acc, f) => ({
-                        ...acc,
-                        [f.name]: (query.data?.[f.name] as string | undefined) ?? '',
-                      }),
-                      {} as Record<string, string>,
-                    );
-                    form.reset(data);
-                  }}
-                  disabled={saveMut.isPending}
-                >
-                  {t('cancel')}
-                </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setEditing(false);
+                  const data = fields.reduce(
+                    (acc, f) => ({
+                      ...acc,
+                      [f.name]:
+                        (query.data?.[f.name] as string | undefined) ?? '',
+                    }),
+                    {} as Record<string, string>,
+                  );
+                  form.reset(data);
+                }}
+                disabled={saveMut.isPending}
+              >
+                {t('cancel')}
+              </Button>
             )}
           </div>
         </div>
@@ -286,7 +294,9 @@ export default function ApiKeySection({
                     }
                   }}
                   disabled={
-                    delMut.isPending || shareMut.isPending || revokeMut.isPending
+                    delMut.isPending ||
+                    shareMut.isPending ||
+                    revokeMut.isPending
                   }
                 >
                   {t('share')}
@@ -299,7 +309,9 @@ export default function ApiKeySection({
                     if (email) revokeMut.mutate(email);
                   }}
                   disabled={
-                    delMut.isPending || shareMut.isPending || revokeMut.isPending
+                    delMut.isPending ||
+                    shareMut.isPending ||
+                    revokeMut.isPending
                   }
                 >
                   {t('revoke')}
@@ -307,15 +319,14 @@ export default function ApiKeySection({
               </>
             )}
           </div>
-          {balanceQueryKey && (
-            balanceQuery.isLoading ? (
+          {balanceQueryKey &&
+            (balanceQuery.isLoading ? (
               <p>{t('loading_balance')}</p>
             ) : balanceQuery.data ? (
               <p className="text-sm text-gray-600">
-              {t('total_balance')} ${balanceQuery.data.totalUsd.toFixed(2)}
+                {t('total_balance')} ${balanceQuery.data.totalUsd.toFixed(2)}
               </p>
-            ) : null
-          )}
+            ) : null)}
         </div>
       )}
       {whitelistHost && (
@@ -340,4 +351,3 @@ export default function ApiKeySection({
     </div>
   );
 }
-

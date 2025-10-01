@@ -13,49 +13,45 @@ vi.mock('../src/services/binance-client.js', () => ({
       { asset: 'ETH', free: '5', locked: '0' },
     ],
   }),
-  fetchPairPrice: vi
-    .fn()
-    .mockImplementation((t1: string, t2: string) => {
-      if (t1 === 'USDT') {
-        return Promise.resolve({ symbol: `${t2}USDT`, currentPrice: 20000 });
-      }
-      if (t2 === 'USDT') {
-        return Promise.resolve({ symbol: `${t1}USDT`, currentPrice: 20000 });
-      }
-      return Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 });
-    }),
-  fetchPairInfo: vi
-    .fn()
-    .mockImplementation((t1: string, t2: string) => {
-      if (t1 === 'USDT') {
-        return Promise.resolve({
-          symbol: `${t2}USDT`,
-          baseAsset: t2,
-          quoteAsset: 'USDT',
-          quantityPrecision: 8,
-          pricePrecision: 2,
-          minNotional: 10,
-        });
-      }
-      if (t2 === 'USDT') {
-        return Promise.resolve({
-          symbol: `${t1}USDT`,
-          baseAsset: t1,
-          quoteAsset: 'USDT',
-          quantityPrecision: 8,
-          pricePrecision: 2,
-          minNotional: 10,
-        });
-      }
+  fetchPairPrice: vi.fn().mockImplementation((t1: string, t2: string) => {
+    if (t1 === 'USDT') {
+      return Promise.resolve({ symbol: `${t2}USDT`, currentPrice: 20000 });
+    }
+    if (t2 === 'USDT') {
+      return Promise.resolve({ symbol: `${t1}USDT`, currentPrice: 20000 });
+    }
+    return Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 });
+  }),
+  fetchPairInfo: vi.fn().mockImplementation((t1: string, t2: string) => {
+    if (t1 === 'USDT') {
       return Promise.resolve({
-        symbol: `${t1}${t2}`,
-        baseAsset: t1,
-        quoteAsset: t2,
+        symbol: `${t2}USDT`,
+        baseAsset: t2,
+        quoteAsset: 'USDT',
         quantityPrecision: 8,
         pricePrecision: 2,
         minNotional: 10,
       });
-    }),
+    }
+    if (t2 === 'USDT') {
+      return Promise.resolve({
+        symbol: `${t1}USDT`,
+        baseAsset: t1,
+        quoteAsset: 'USDT',
+        quantityPrecision: 8,
+        pricePrecision: 2,
+        minNotional: 10,
+      });
+    }
+    return Promise.resolve({
+      symbol: `${t1}${t2}`,
+      baseAsset: t1,
+      quoteAsset: t2,
+      quantityPrecision: 8,
+      pricePrecision: 2,
+      minNotional: 10,
+    });
+  }),
   fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -70,18 +66,24 @@ vi.mock('../src/repos/review-result.js', () => ({
 }));
 
 vi.mock('../src/repos/limit-orders.js', () => ({
-  getLimitOrdersByReviewResult: vi.fn().mockImplementation(async (_workflowId, reviewId) => {
-    const i = Number(reviewId.slice(1));
-    return [
-      {
-        plannedJson: JSON.stringify({ symbol: 'BTCUSDT', side: 'BUY', quantity: i }),
-        status: LimitOrderStatus.Filled,
-        createdAt: new Date(`2025-01-0${i}T00:00:00.000Z`),
-        orderId: String(i),
-        cancellationReason: 'price limit',
-      },
-    ];
-  }),
+  getLimitOrdersByReviewResult: vi
+    .fn()
+    .mockImplementation(async (_workflowId, reviewId) => {
+      const i = Number(reviewId.slice(1));
+      return [
+        {
+          plannedJson: JSON.stringify({
+            symbol: 'BTCUSDT',
+            side: 'BUY',
+            quantity: i,
+          }),
+          status: LimitOrderStatus.Filled,
+          createdAt: new Date(`2025-01-0${i}T00:00:00.000Z`),
+          orderId: String(i),
+          cancellationReason: 'price limit',
+        },
+      ];
+    }),
 }));
 
 describe('collectPromptData', () => {
@@ -217,4 +219,3 @@ describe('collectPromptData', () => {
     expect(usdt?.qty).toBe(1000);
   });
 });
-

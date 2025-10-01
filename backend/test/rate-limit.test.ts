@@ -13,7 +13,12 @@ interface Endpoint {
 }
 
 const endpoints: Endpoint[] = [
-  { name: 'health', method: 'GET', url: '/api/health', limit: RATE_LIMITS.LAX.max },
+  {
+    name: 'health',
+    method: 'GET',
+    url: '/api/health',
+    limit: RATE_LIMITS.LAX.max,
+  },
   {
     name: 'login',
     method: 'POST',
@@ -26,17 +31,42 @@ const endpoints: Endpoint[] = [
       } as any);
     },
   },
-  { name: 'portfolio-workflows', method: 'GET', url: '/api/portfolio-workflows/paginated', limit: RATE_LIMITS.RELAXED.max },
-  { name: 'api-keys', method: 'GET', url: '/api/users/1/ai-key', limit: RATE_LIMITS.MODERATE.max },
+  {
+    name: 'portfolio-workflows',
+    method: 'GET',
+    url: '/api/portfolio-workflows/paginated',
+    limit: RATE_LIMITS.RELAXED.max,
+  },
+  {
+    name: 'api-keys',
+    method: 'GET',
+    url: '/api/users/1/ai-key',
+    limit: RATE_LIMITS.MODERATE.max,
+  },
   {
     name: 'binance-balance',
     method: 'GET',
     url: '/api/users/1/binance-balance',
     limit: RATE_LIMITS.MODERATE.max,
   },
-  { name: 'models', method: 'GET', url: '/api/users/1/models', limit: RATE_LIMITS.MODERATE.max },
-  { name: 'twofa-status', method: 'GET', url: '/api/2fa/status', limit: RATE_LIMITS.MODERATE.max },
-  { name: 'twofa-setup', method: 'GET', url: '/api/2fa/setup', limit: RATE_LIMITS.TIGHT.max },
+  {
+    name: 'models',
+    method: 'GET',
+    url: '/api/users/1/models',
+    limit: RATE_LIMITS.MODERATE.max,
+  },
+  {
+    name: 'twofa-status',
+    method: 'GET',
+    url: '/api/2fa/status',
+    limit: RATE_LIMITS.MODERATE.max,
+  },
+  {
+    name: 'twofa-setup',
+    method: 'GET',
+    url: '/api/2fa/setup',
+    limit: RATE_LIMITS.TIGHT.max,
+  },
 ];
 
 describe('rate limiting', () => {
@@ -70,4 +100,3 @@ describe('rate limiting', () => {
     });
   }
 });
-

@@ -33,7 +33,9 @@ export async function getUser(id: string): Promise<UserDetails | undefined> {
   return result;
 }
 
-export async function getUserAuthInfo(id: string): Promise<UserAuthInfo | undefined> {
+export async function getUserAuthInfo(
+  id: string,
+): Promise<UserAuthInfo | undefined> {
   const { rows } = await db.query(
     'SELECT email_enc, role, is_enabled FROM users WHERE id = $1',
     [id],
@@ -46,7 +48,9 @@ export async function getUserAuthInfo(id: string): Promise<UserAuthInfo | undefi
     isEnabled: boolean;
   };
   const result: UserAuthInfo = {
-    email: entity.emailEnc ? decrypt(entity.emailEnc, env.KEY_PASSWORD) : undefined,
+    email: entity.emailEnc
+      ? decrypt(entity.emailEnc, env.KEY_PASSWORD)
+      : undefined,
     role: entity.role,
     isEnabled: entity.isEnabled,
   };
@@ -61,28 +65,38 @@ export async function insertUser(emailEnc: string | null): Promise<string> {
   return rows[0].id as string;
 }
 
-export async function setUserEmail(id: string, emailEnc: string): Promise<void> {
-  await db.query('UPDATE users SET email_enc = $1 WHERE id = $2', [emailEnc, id]);
+export async function setUserEmail(
+  id: string,
+  emailEnc: string,
+): Promise<void> {
+  await db.query('UPDATE users SET email_enc = $1 WHERE id = $2', [
+    emailEnc,
+    id,
+  ]);
 }
 
 export async function listUsers(): Promise<UserListEntry[]> {
   const { rows } = await db.query(
-    "SELECT u.id, u.role, u.is_enabled, u.email_enc, u.created_at, " +
-      "(ak.id IS NOT NULL OR oak.id IS NOT NULL) AS has_ai_key, " +
-      "(ek.id IS NOT NULL) AS has_binance_key " +
-      "FROM users u " +
+    'SELECT u.id, u.role, u.is_enabled, u.email_enc, u.created_at, ' +
+      '(ak.id IS NOT NULL OR oak.id IS NOT NULL) AS has_ai_key, ' +
+      '(ek.id IS NOT NULL) AS has_binance_key ' +
+      'FROM users u ' +
       "LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' " +
-      "LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id " +
+      'LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id ' +
       "LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' " +
       "LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance'",
   );
-  return rows.map((row) =>
-    convertKeysToCamelCase(row) as UserListEntry,
-  );
+  return rows.map((row) => convertKeysToCamelCase(row) as UserListEntry);
 }
 
-export async function setUserEnabled(id: string, enabled: boolean): Promise<void> {
-  await db.query('UPDATE users SET is_enabled = $1 WHERE id = $2', [enabled, id]);
+export async function setUserEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<void> {
+  await db.query('UPDATE users SET is_enabled = $1 WHERE id = $2', [
+    enabled,
+    id,
+  ]);
 }
 
 export async function getUserTotpStatus(id: string) {
@@ -96,7 +110,10 @@ export async function getUserTotpStatus(id: string) {
   return !!entity.isTotpEnabled;
 }
 
-export async function setUserTotpSecret(id: string, secret: string): Promise<void> {
+export async function setUserTotpSecret(
+  id: string,
+  secret: string,
+): Promise<void> {
   const enc = encrypt(secret, env.KEY_PASSWORD);
   await db.query(
     'UPDATE users SET totp_secret_enc = $1, is_totp_enabled = true WHERE id = $2',
@@ -123,7 +140,9 @@ export async function clearUserTotp(id: string): Promise<void> {
   );
 }
 
-export async function findUserByEmail(email: string): Promise<UserDetailsWithId | undefined> {
+export async function findUserByEmail(
+  email: string,
+): Promise<UserDetailsWithId | undefined> {
   const { rows } = await db.query(
     'SELECT id, role, is_enabled, totp_secret_enc, is_totp_enabled, email_enc FROM users',
   );

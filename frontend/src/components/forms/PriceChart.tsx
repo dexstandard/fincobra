@@ -5,7 +5,13 @@ import axios from 'axios';
 import { createChart, LineSeries } from 'lightweight-charts';
 import type { ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 
-type PricePoint = { time: number; open: number; high: number; low: number; close: number };
+type PricePoint = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
 
 function generateStablecoinData(): PricePoint[] {
   const now = Date.now();
@@ -23,7 +29,7 @@ type Kline = [number, string, string, string, string, ...unknown[]];
 async function fetchHistory(token: string): Promise<PricePoint[]> {
   const symbol = token.toUpperCase();
   const res = await axios.get<Kline[]>(
-    `https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=365`
+    `https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=365`,
   );
   return res.data.map((d) => ({
     time: d[0],
@@ -44,14 +50,12 @@ export default function PriceChart({ tokens }: { tokens: string[] }) {
   const query = useQuery<{ [key: string]: PricePoint[] }>({
     queryKey: ['price-history', token1, token2],
     queryFn: async () => {
-      const data1 =
-        ['USDT', 'USDC'].includes(token1)
-          ? generateStablecoinData()
-          : await fetchHistory(token1);
-      const data2 =
-        ['USDT', 'USDC'].includes(token2)
-          ? generateStablecoinData()
-          : await fetchHistory(token2);
+      const data1 = ['USDT', 'USDC'].includes(token1)
+        ? generateStablecoinData()
+        : await fetchHistory(token1);
+      const data2 = ['USDT', 'USDC'].includes(token2)
+        ? generateStablecoinData()
+        : await fetchHistory(token2);
       return { [token1]: data1, [token2]: data2 };
     },
   });
@@ -97,13 +101,13 @@ export default function PriceChart({ tokens }: { tokens: string[] }) {
       query.data[token1].map((d) => ({
         time: (d.time / 1000) as UTCTimestamp,
         value: d.close,
-      }))
+      })),
     );
     seriesBRef.current.setData(
       query.data[token2].map((d) => ({
         time: (d.time / 1000) as UTCTimestamp,
         value: d.close,
-      }))
+      })),
     );
   }, [query.data, token1, token2]);
 

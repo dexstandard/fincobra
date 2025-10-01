@@ -4,10 +4,9 @@ import { insertUser } from './repos/users.js';
 import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { authCookies } from './helpers.js';
 
-const reviewWorkflowPortfolioMock = vi.fn<(
-  log: unknown,
-  workflowId: string,
-) => Promise<unknown>>(() => Promise.resolve());
+const reviewWorkflowPortfolioMock = vi.fn<
+  (log: unknown, workflowId: string) => Promise<unknown>
+>(() => Promise.resolve());
 vi.mock('../src/workflows/portfolio-review.js', () => ({
   reviewWorkflowPortfolio: reviewWorkflowPortfolioMock,
 }));
@@ -75,7 +74,9 @@ describe('portfolio workflow manual review endpoint', () => {
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ error: 'Agent is already reviewing portfolio' });
+    expect(res.json()).toEqual({
+      error: 'Agent is already reviewing portfolio',
+    });
     await app.close();
   });
 });

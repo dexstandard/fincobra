@@ -27,11 +27,16 @@ export async function insertAdminUser(sub?: string, emailEnc?: string | null) {
 }
 
 export async function getUserEmailEnc(id: string) {
-  const { rows } = await db.query('SELECT email_enc FROM users WHERE id = $1', [id]);
+  const { rows } = await db.query('SELECT email_enc FROM users WHERE id = $1', [
+    id,
+  ]);
   return rows[0] as { email_enc?: string } | undefined;
 }
 
-export async function insertUserWithKeys(sub?: string, emailEnc?: string | null) {
+export async function insertUserWithKeys(
+  sub?: string,
+  emailEnc?: string | null,
+) {
   const userId = await insertUser(sub, emailEnc ?? null);
   const ai = encrypt('aikey', process.env.KEY_PASSWORD!);
   const bk = encrypt('bkey', process.env.KEY_PASSWORD!);

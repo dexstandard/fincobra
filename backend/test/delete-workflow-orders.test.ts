@@ -20,16 +20,13 @@ const { cancelOrder } = vi.hoisted(() => ({
 }));
 
 vi.mock('../src/services/binance-client.js', async () => {
-  const actual = await vi.importActual<typeof import('../src/services/binance-client.js')>(
-    '../src/services/binance-client.js',
-  );
+  const actual = await vi.importActual<
+    typeof import('../src/services/binance-client.js')
+  >('../src/services/binance-client.js');
   return { ...actual, cancelOrder };
 });
 
-const cancelOrdersSpy = vi.spyOn(
-  orderOrchestrator,
-  'cancelOrdersForWorkflow',
-);
+const cancelOrdersSpy = vi.spyOn(orderOrchestrator, 'cancelOrdersForWorkflow');
 
 describe('delete workflow cancels all orders', () => {
   it('cancels open orders for all symbols', async () => {
@@ -53,7 +50,10 @@ describe('delete workflow cancels all orders', () => {
       manualRebalance: false,
       useEarn: false,
     });
-    const rrId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const rrId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     await insertLimitOrder({
       userId,
       planned: { symbol: 'BTCETH' },
@@ -92,7 +92,10 @@ describe('delete workflow cancels all orders', () => {
       }),
     );
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders.map((o) => o.status)).toEqual([LimitOrderStatus.Canceled, LimitOrderStatus.Canceled]);
+    expect(orders.map((o) => o.status)).toEqual([
+      LimitOrderStatus.Canceled,
+      LimitOrderStatus.Canceled,
+    ]);
     await app.close();
   });
 });

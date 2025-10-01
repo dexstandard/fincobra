@@ -23,8 +23,7 @@ export default function Button({
       'border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed',
     danger:
       'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed border-transparent',
-    link:
-      'text-blue-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-none',
+    link: 'text-blue-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-none',
   };
   return (
     <button

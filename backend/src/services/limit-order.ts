@@ -1,4 +1,8 @@
-import { cancelOrder, fetchOrder, parseBinanceError } from './binance-client.js';
+import {
+  cancelOrder,
+  fetchOrder,
+  parseBinanceError,
+} from './binance-client.js';
 import { updateLimitOrderStatus } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 
@@ -12,7 +16,11 @@ export async function cancelLimitOrder(
       orderId: Number(opts.orderId),
     });
     if (res && res.status === 'FILLED') {
-      await updateLimitOrderStatus(userId, opts.orderId, LimitOrderStatus.Filled);
+      await updateLimitOrderStatus(
+        userId,
+        opts.orderId,
+        LimitOrderStatus.Filled,
+      );
       return LimitOrderStatus.Filled;
     }
     await updateLimitOrderStatus(
@@ -32,7 +40,11 @@ export async function cancelLimitOrder(
         });
         const status = order?.status?.toUpperCase();
         if (status === 'FILLED') {
-          await updateLimitOrderStatus(userId, opts.orderId, LimitOrderStatus.Filled);
+          await updateLimitOrderStatus(
+            userId,
+            opts.orderId,
+            LimitOrderStatus.Filled,
+          );
           return LimitOrderStatus.Filled;
         }
         if (

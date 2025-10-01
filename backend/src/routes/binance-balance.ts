@@ -1,17 +1,27 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { RATE_LIMITS } from '../rate-limit.js';
-import { fetchAccount, fetchTotalBalanceUsd } from '../services/binance-client.js';
+import {
+  fetchAccount,
+  fetchAccountCached,
+  fetchTotalBalanceUsd,
+} from '../services/binance-client.js';
 import type { BinanceAccount } from '../services/binance-client.types.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
-import { parseRequestParams, userTokenParamsSchema } from './_shared/validation.js';
+import {
+  parseRequestParams,
+  userTokenParamsSchema,
+} from './_shared/validation.js';
+
+type AccountFetcher = (userId: string) => Promise<BinanceAccount | null>;
 
 async function loadAccount(
   userId: string,
   reply: FastifyReply,
+  fetcher: AccountFetcher = fetchAccount,
 ): Promise<BinanceAccount | undefined> {
   try {
-    const account = await fetchAccount(userId);
+    const account = await fetcher(userId);
     if (!account) {
       reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
       return undefined;
@@ -73,14 +83,14 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
   app.get(
     '/users/:id/binance-balance/:token',
     {
-      config: { rateLimit: RATE_LIMITS.RELAXED },
+      config: { rateLimit: RATE_LIMITS.LAX },
       preHandler: userPreHandlers,
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);
       const params = parseRequestParams(userTokenParamsSchema, req, reply);
       if (!params) return;
-      const account = await loadAccount(userId, reply);
+      const account = await loadAccount(userId, reply, fetchAccountCached);
       if (!account) return;
       const symbol = params.token.toUpperCase();
       const balance = account.balances.find((entry) => entry.asset === symbol);

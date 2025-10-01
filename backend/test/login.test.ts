@@ -37,7 +37,10 @@ describe('login route', () => {
       getPayload: () => ({ sub: '2', email: 'user2@example.com' }),
     } as any);
     const secret = authenticator.generateSecret();
-    const id = await insertUser('2', encrypt('user2@example.com', env.KEY_PASSWORD));
+    const id = await insertUser(
+      '2',
+      encrypt('user2@example.com', env.KEY_PASSWORD),
+    );
     await setUserTotpSecret(id, secret);
 
     const res1 = await app.inject({
@@ -67,7 +70,10 @@ describe('login route', () => {
     vi.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
       getPayload: () => ({ sub: '3', email: 'u3@example.com' }),
     } as any);
-    const id = await insertUser('3', encrypt('u3@example.com', env.KEY_PASSWORD));
+    const id = await insertUser(
+      '3',
+      encrypt('u3@example.com', env.KEY_PASSWORD),
+    );
     await setUserEnabled(id, false);
 
     const res = await app.inject({
@@ -96,9 +102,14 @@ describe('login route', () => {
     expect(res1.statusCode).toBe(403);
 
     // Get CSRF token & cookie
-    const tokenRes = await app.inject({ method: 'GET', url: '/api/login/csrf' });
+    const tokenRes = await app.inject({
+      method: 'GET',
+      url: '/api/login/csrf',
+    });
     const csrfToken = (tokenRes.json() as any).csrfToken;
-    const cookieHeader = (tokenRes.headers['set-cookie'] as string).split(';')[0];
+    const cookieHeader = (tokenRes.headers['set-cookie'] as string).split(
+      ';',
+    )[0];
 
     // With CSRF -> should succeed
     const res2 = await app.inject({

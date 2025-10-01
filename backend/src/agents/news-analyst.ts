@@ -45,8 +45,7 @@ export async function getTokenNewsSummary(
   if (!items.length) return { analysis: null };
   const headlines = items.map((i) => `- ${i.title} (${i.link})`).join('\n');
   const prompt = { headlines };
-  const instructions =
-    `You are a crypto market news analyst. Given the headlines, estimate the overall news tone for ${token}. Include a bullishness score from 0-10 and highlight key events. - shortReport ≤255 chars.`;
+  const instructions = `You are a crypto market news analyst. Given the headlines, estimate the overall news tone for ${token}. Include a bullishness score from 0-10 and highlight key events. - shortReport ≤255 chars.`;
   const fallback: Analysis = { comment: 'Analysis unavailable', score: 0 };
   try {
     const res = await callAi(
@@ -59,8 +58,15 @@ export async function getTokenNewsSummary(
     );
     const analysis = extractJson<Analysis>(res);
     if (!analysis) {
-      log.error({ token, response: res }, 'news analyst returned invalid response');
-      return { analysis: fallback, prompt: { instructions, input: prompt }, response: res };
+      log.error(
+        { token, response: res },
+        'news analyst returned invalid response',
+      );
+      return {
+        analysis: fallback,
+        prompt: { instructions, input: prompt },
+        response: res,
+      };
     }
     return { analysis, prompt: { instructions, input: prompt }, response: res };
   } catch (err) {
@@ -78,10 +84,17 @@ export async function runNewsAnalyst(
     prompt.reports.map(async (report) => {
       const { token } = report;
       if (isStablecoin(token)) return;
-      const { analysis, prompt: p, response } =
-        await getTokenNewsSummaryCached(token, model, apiKey, log);
+      const {
+        analysis,
+        prompt: p,
+        response,
+      } = await getTokenNewsSummaryCached(token, model, apiKey, log);
       if (p && response)
-        await insertReviewRawLog({ portfolioWorkflowId: portfolioId, prompt: p, response });
+        await insertReviewRawLog({
+          portfolioWorkflowId: portfolioId,
+          prompt: p,
+          response,
+        });
       report.news = analysis;
     }),
   );

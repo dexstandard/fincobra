@@ -2,6 +2,10 @@ import type { FastifyBaseLogger } from 'fastify';
 import { callAi } from '../services/openai-client.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
+  fetchMarketOverview,
+  createEmptyMarketOverview,
+} from '../services/indicators.js';
+import {
   fetchAccount,
   fetchPairInfo,
   fetchPairPrice,
@@ -20,8 +24,9 @@ import type {
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
-  '- You lead a crypto analyst team (news, technical). Reports from each member are attached.',
+  '- You collaborate with the news analyst and personally interpret the shared market_overview.v2 dataset for technical context.',
   '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
+  '- Consult marketData.marketOverview (market_overview.v2) for price action, HTF trend, returns, and risk flags before sizing orders.',
   '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
   '- Make sure to size limit orders higher then minNotional values to avoid order cancellations.',
   '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
@@ -188,6 +193,8 @@ export async function collectPromptData(
     previousReports.push(report);
   }
 
+  const nonStableTokens = tokens.filter((t) => !isStablecoin(t));
+
   const prompt: RebalancePrompt = {
     instructions: row.agentInstructions,
     reviewInterval: row.reviewInterval,
@@ -196,21 +203,34 @@ export async function collectPromptData(
     portfolio,
     routes,
     marketData: {},
-    reports: tokens
-      .filter((t) => !isStablecoin(t))
-      .map((token) => ({ token, news: null, tech: null })),
+    reports: nonStableTokens.map((token) => ({ token, news: null })),
   };
   if (previousReports.length) {
     prompt.previousReports = previousReports;
   }
+
+  let marketOverview = createEmptyMarketOverview();
+  if (nonStableTokens.length) {
+    try {
+      marketOverview = await fetchMarketOverview(nonStableTokens);
+    } catch (err) {
+      log.error({ err }, 'failed to fetch market overview');
+    }
+  }
+  prompt.marketData.marketOverview = marketOverview;
+
   return prompt;
 }
 
 function extractResult(res: string): MainTraderDecision | null {
   try {
     const json = JSON.parse(res);
-    const outputs = Array.isArray((json as any).output) ? (json as any).output : [];
-    const msg = outputs.find((o: any) => o.type === 'message' || o.id?.startsWith('msg_'));
+    const outputs = Array.isArray((json as any).output)
+      ? (json as any).output
+      : [];
+    const msg = outputs.find(
+      (o: any) => o.type === 'message' || o.id?.startsWith('msg_'),
+    );
     const text = msg?.content?.[0]?.text;
     if (typeof text !== 'string') return null;
     const parsed = JSON.parse(text);
@@ -239,4 +259,3 @@ export async function run(
   }
   return decision;
 }
-

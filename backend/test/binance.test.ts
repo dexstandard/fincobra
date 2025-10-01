@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchPairData, fetchPairInfo } from '../src/services/binance-client.js';
+import {
+  fetchPairData,
+  fetchPairInfo,
+} from '../src/services/binance-client.js';
 
 describe('fetchPairData', () => {
   afterEach(() => {
@@ -11,7 +14,10 @@ describe('fetchPairData', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ price: '1' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ bids: [], asks: [] }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ bids: [], asks: [] }),
+      })
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
       .mockResolvedValueOnce({ ok: true, json: async () => yearData });
     vi.stubGlobal('fetch', fetchMock as any);
@@ -93,9 +99,23 @@ describe('fetchPairInfo', () => {
     } as any;
     const okRes = {
       ok: true,
-      json: async () => ({ symbols: [{ symbol: 'ETHBTC', baseAsset: 'ETH', quoteAsset: 'BTC', quantityPrecision: 3, pricePrecision: 5, filters: [] }] }),
+      json: async () => ({
+        symbols: [
+          {
+            symbol: 'ETHBTC',
+            baseAsset: 'ETH',
+            quoteAsset: 'BTC',
+            quantityPrecision: 3,
+            pricePrecision: 5,
+            filters: [],
+          },
+        ],
+      }),
     } as any;
-    const fetchMock = vi.fn().mockResolvedValueOnce(errRes).mockResolvedValueOnce(okRes);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(errRes)
+      .mockResolvedValueOnce(okRes);
     vi.stubGlobal('fetch', fetchMock);
     const info = await fetchPairInfo('BTC', 'ETH');
     expect(info.symbol).toBe('ETHBTC');

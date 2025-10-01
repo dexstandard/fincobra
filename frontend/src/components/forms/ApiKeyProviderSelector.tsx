@@ -77,7 +77,8 @@ export default function ApiKeyProviderSelector({
           const res = await api.get(cfg.getKeyPath(user!.id));
           return res.data.key as string;
         } catch (err) {
-          if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+          if (axios.isAxiosError(err) && err.response?.status === 404)
+            return null;
           throw err;
         }
       },

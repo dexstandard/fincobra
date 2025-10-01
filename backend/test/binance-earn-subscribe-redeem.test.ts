@@ -85,4 +85,3 @@ describe('binance earn subscribe/redeem helpers', () => {
     expect(params.get('amount')).toBe('2');
   });
 });
-

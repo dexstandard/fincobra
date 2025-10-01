@@ -52,7 +52,7 @@ function setSessionCookie(reply: FastifyReply, id: string) {
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7
+    maxAge: 60 * 60 * 24 * 7,
   });
 }
 
@@ -138,7 +138,8 @@ export default async function loginRoutes(app: FastifyInstance) {
         req.log.info({ err }, 'invalid google id token');
         return reply.code(400).send(errorResponse('invalid token'));
       }
-      if (!payload?.sub) return reply.code(400).send(errorResponse('invalid token'));
+      if (!payload?.sub)
+        return reply.code(400).send(errorResponse('invalid token'));
 
       const emailEnc = payload.email
         ? encrypt(payload.email, env.KEY_PASSWORD)
@@ -173,8 +174,7 @@ export default async function loginRoutes(app: FastifyInstance) {
       if (!id) return;
 
       const info = await getUserAuthInfo(id);
-      if (!info)
-        return reply.code(404).send(errorResponse('user not found'));
+      if (!info) return reply.code(404).send(errorResponse('user not found'));
       if (!info.isEnabled)
         return reply.code(403).send(errorResponse('user disabled'));
 

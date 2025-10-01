@@ -9,16 +9,24 @@ import {
 export const insertPortfolioWorkflow = (
   data: Parameters<typeof insertWorkflowProd>[0],
 ) => insertWorkflowProd({ cashToken: 'USDT', ...data });
-export { startPortfolioWorkflow, stopPortfolioWorkflow, deletePortfolioWorkflow };
+export {
+  startPortfolioWorkflow,
+  stopPortfolioWorkflow,
+  deletePortfolioWorkflow,
+};
 
 export async function setWorkflowStatus(id: string, status: string) {
-  await db.query('UPDATE portfolio_workflow SET status = $1 WHERE id = $2', [status, id]);
+  await db.query('UPDATE portfolio_workflow SET status = $1 WHERE id = $2', [
+    status,
+    id,
+  ]);
 }
 
 export async function getPortfolioWorkflowStatus(id: string) {
-  const { rows } = await db.query('SELECT status FROM portfolio_workflow WHERE id = $1', [
-    id,
-  ]);
+  const { rows } = await db.query(
+    'SELECT status FROM portfolio_workflow WHERE id = $1',
+    [id],
+  );
   return rows[0]?.status as string | undefined;
 }
 

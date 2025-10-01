@@ -46,16 +46,14 @@ function logDisabledWorkflows(
 }
 
 async function verifyAndSave(
-    key: string,
-    secret: string,
-    reply: FastifyReply,
-    userId: string
+  key: string,
+  secret: string,
+  reply: FastifyReply,
+  userId: string,
 ) {
   const verRes = await verifyBinanceKey(key, secret);
   if (!verRes.ok) {
-    return reply
-      .code(400)
-      .send(errorResponse(formatVerificationError(verRes)));
+    return reply.code(400).send(errorResponse(formatVerificationError(verRes)));
   }
   const encKey = encryptKey(key);
   const encSecret = encryptKey(secret);
@@ -64,7 +62,7 @@ async function verifyAndSave(
     apiKeyEnc: encKey,
     apiSecretEnc: encSecret,
   });
-  return {key: REDACTED_KEY, secret: REDACTED_KEY};
+  return { key: REDACTED_KEY, secret: REDACTED_KEY };
 }
 
 export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
@@ -80,7 +78,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       if (!body) return;
       const { key, secret } = body;
       const existingKey = await getBinanceKey(userId);
-      if (existingKey) return reply.code(409).send(errorResponse('key already exists'));
+      if (existingKey)
+        return reply.code(409).send(errorResponse('key already exists'));
       return await verifyAndSave(key, secret, reply, userId);
     },
   );
@@ -94,7 +93,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const userId = getValidatedUserId(req);
       const binanceKey = await getBinanceKey(userId);
-      if (!binanceKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!binanceKey)
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
       return { key: REDACTED_KEY, secret: REDACTED_KEY };
     },
   );
@@ -126,7 +126,8 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const userId = getValidatedUserId(req);
       const existingKey = await getBinanceKey(userId);
-      if (!existingKey) return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      if (!existingKey)
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
 
       const disableSummary = await disableUserWorkflowsByExchangeKey(
         req.log,

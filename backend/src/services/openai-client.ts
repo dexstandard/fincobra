@@ -89,12 +89,16 @@ export function extractJson<T>(res: string): T | null {
       console.error('Invalid OpenAI response payload', json);
       return null;
     }
-    const msg = json.output.find((item) => item.type === 'message' || item.id?.startsWith('msg_'));
+    const msg = json.output.find(
+      (item) => item.type === 'message' || item.id?.startsWith('msg_'),
+    );
     if (!msg) {
       console.error('OpenAI response missing assistant message', json);
       return null;
     }
-    const text = msg.content?.find((entry) => typeof entry.text === 'string')?.text;
+    const text = msg.content?.find(
+      (entry) => typeof entry.text === 'string',
+    )?.text;
     if (typeof text !== 'string') {
       console.error('OpenAI response missing assistant text content', json);
       return null;
@@ -109,7 +113,10 @@ export function extractJson<T>(res: string): T | null {
 function filterSupportedModels(models: OpenAiModel[]): string[] {
   return models
     .map((m) => m.id)
-    .filter((id) => id.startsWith('gpt-5') || id.startsWith('o3') || id.includes('search'));
+    .filter(
+      (id) =>
+        id.startsWith('gpt-5') || id.startsWith('o3') || id.includes('search'),
+    );
 }
 
 export async function verifyAiKey(key: string): Promise<boolean> {
@@ -123,7 +130,9 @@ export async function verifyAiKey(key: string): Promise<boolean> {
   }
 }
 
-export async function fetchSupportedModels(apiKey: string): Promise<string[] | null> {
+export async function fetchSupportedModels(
+  apiKey: string,
+): Promise<string[] | null> {
   try {
     const res = await fetch(OPENAI_MODELS_URL, {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -135,4 +144,3 @@ export async function fetchSupportedModels(apiKey: string): Promise<string[] | n
     return null;
   }
 }
-

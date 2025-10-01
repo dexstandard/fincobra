@@ -23,7 +23,9 @@ const responseJson = JSON.stringify({
 
 describe('news analyst', () => {
   it('returns summary and raw data', async () => {
-    await insertNews([{ title: 't', link: 'l', pubDate: new Date(), tokens: ['BTC'] }]);
+    await insertNews([
+      { title: 't', link: 'l', pubDate: new Date(), tokens: ['BTC'] },
+    ]);
     const fetchMock = vi
       .fn()
       .mockResolvedValue({ ok: true, text: async () => responseJson });
@@ -48,7 +50,9 @@ describe('news analyst', () => {
   });
 
   it('falls back when AI response is malformed', async () => {
-    await insertNews([{ title: 't2', link: 'l2', pubDate: new Date(), tokens: ['BTC'] }]);
+    await insertNews([
+      { title: 't2', link: 'l2', pubDate: new Date(), tokens: ['BTC'] },
+    ]);
     const fetchMock = vi
       .fn()
       .mockResolvedValue({ ok: true, text: async () => '{"output":[]}' });
@@ -61,7 +65,9 @@ describe('news analyst', () => {
   });
 
   it('falls back when AI request fails', async () => {
-    await insertNews([{ title: 't3', link: 'l3', pubDate: new Date(), tokens: ['BTC'] }]);
+    await insertNews([
+      { title: 't3', link: 'l3', pubDate: new Date(), tokens: ['BTC'] },
+    ]);
     const orig = globalThis.fetch;
     const fetchMock = vi.fn().mockRejectedValue(new Error('network'));
     (globalThis as any).fetch = fetchMock;
@@ -72,7 +78,9 @@ describe('news analyst', () => {
   });
 
   it('caches token reviews and dedupes concurrent calls', async () => {
-    await insertNews([{ title: 't4', link: 'l4', pubDate: new Date(), tokens: ['BTC'] }]);
+    await insertNews([
+      { title: 't4', link: 'l4', pubDate: new Date(), tokens: ['BTC'] },
+    ]);
     const orig = globalThis.fetch;
     const fetchMock = vi
       .fn()
@@ -86,4 +94,3 @@ describe('news analyst', () => {
     (globalThis as any).fetch = orig;
   });
 });
-

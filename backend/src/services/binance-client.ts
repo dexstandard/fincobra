@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import NodeCache from 'node-cache';
 
 import { getBinanceKey } from '../repos/exchange-api-keys.js';
 import { decryptKey } from '../util/crypto.js';
@@ -14,6 +15,14 @@ interface UserCreds {
   key: string;
   secret: string;
 }
+
+const ACCOUNT_CACHE_TTL_SEC = 15;
+
+const accountCache = new NodeCache({
+  stdTTL: ACCOUNT_CACHE_TTL_SEC,
+  checkperiod: Math.max(1, Math.ceil(ACCOUNT_CACHE_TTL_SEC / 3)),
+});
+const pendingAccountFetches = new Map<string, Promise<BinanceAccount | null>>();
 
 export async function verifyBinanceKey(
   key: string,
@@ -214,9 +223,10 @@ function appendSignature(secret: string, params: URLSearchParams) {
   return signature;
 }
 
-export function parseBinanceError(
-  err: unknown,
-): { code?: number; msg?: string } {
+export function parseBinanceError(err: unknown): {
+  code?: number;
+  msg?: string;
+} {
   if (err instanceof Error) {
     const match = err.message.match(/\{.+\}$/);
     if (match) {
@@ -237,12 +247,40 @@ export async function fetchAccount(id: string): Promise<BinanceAccount | null> {
     const params = createTimestampedParams();
     appendSignature(creds.secret, params);
     const accountRes = await fetch(
-        `https://api.binance.com/api/v3/account?${params.toString()}`,
-        { headers: { 'X-MBX-APIKEY': creds.key } },
+      `https://api.binance.com/api/v3/account?${params.toString()}`,
+      { headers: { 'X-MBX-APIKEY': creds.key } },
     );
     if (!accountRes.ok) throw new Error('failed to fetch account');
     return (await accountRes.json()) as BinanceAccount;
   });
+}
+
+export async function fetchAccountCached(
+  id: string,
+): Promise<BinanceAccount | null> {
+  const cached = accountCache.get<BinanceAccount>(id);
+  if (cached) return cached;
+
+  const existingFetch = pendingAccountFetches.get(id);
+  if (existingFetch) {
+    return existingFetch;
+  }
+
+  const fetchPromise = fetchAccount(id)
+    .then((account) => {
+      if (account) {
+        accountCache.set(id, account);
+      } else {
+        accountCache.del(id);
+      }
+      return account;
+    })
+    .finally(() => {
+      pendingAccountFetches.delete(id);
+    });
+
+  pendingAccountFetches.set(id, fetchPromise);
+  return fetchPromise;
 }
 
 export async function fetchEarnFlexibleBalance(id: string, asset: string) {
@@ -524,7 +562,7 @@ export async function fetchSymbolData(symbol: string) {
     fetch(`https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=5`),
     fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`),
     fetch(
-      `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=365`,
+      `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=366`,
     ),
   ]);
   const responses = {
@@ -633,4 +671,3 @@ export async function fetchMarketTimeseries(symbol: string) {
     ),
   };
 }
-

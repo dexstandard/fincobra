@@ -1,4 +1,9 @@
-import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type {
+  FastifyBaseLogger,
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+} from 'fastify';
 import { z } from 'zod';
 import {
   getPortfolioWorkflow,
@@ -44,7 +49,10 @@ import { parseBody, parseRequestParams } from './_shared/validation.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
 const logIdParams = z.object({ logId: z.string().regex(/^\d+$/) });
-const orderIdParams = z.object({ logId: z.string().regex(/^\d+$/), orderId: z.string() });
+const orderIdParams = z.object({
+  logId: z.string().regex(/^\d+$/),
+  orderId: z.string(),
+});
 
 const workflowTokenSchema = z.object({
   token: z.string(),
@@ -53,15 +61,21 @@ const workflowTokenSchema = z.object({
 
 const workflowUpsertSchema = z
   .object({
-    model: z.string().optional().transform((value) => value ?? ''),
+    model: z
+      .string()
+      .optional()
+      .transform((value) => value ?? ''),
     name: z.string(),
-    cash: z.string().optional().transform((value) => value ?? ''),
+    cash: z
+      .string()
+      .optional()
+      .transform((value) => value ?? ''),
     tokens: z.array(workflowTokenSchema),
     risk: z.string(),
     reviewInterval: z.string(),
     agentInstructions: z.string(),
     manualRebalance: z.boolean().optional().default(false),
-    useEarn: z.boolean().optional().default(true),
+    useEarn: z.boolean().optional().default(false),
     status: z.nativeEnum(PortfolioWorkflowStatus),
   })
   .strip();
@@ -145,8 +159,9 @@ async function loadManualDecision(
   log: FastifyBaseLogger,
   workflowId: string,
   logId: string,
-): Promise<{ decision: MainTraderDecision } | { code: number; body: { error: string } }>
-{
+): Promise<
+  { decision: MainTraderDecision } | { code: number; body: { error: string } }
+> {
   const existing = await getLimitOrdersByReviewResult(workflowId, logId);
   if (existing.length) {
     log.error({ execLogId: logId }, 'manual order exists');
@@ -174,9 +189,10 @@ async function loadManualDecision(
       log.error({ execLogId: logId }, 'decision contains no orders');
       return { code: 400, body: errorResponse('decision contains no orders') };
     }
-    const shortReport = typeof maybeDecision.shortReport === 'string'
-      ? maybeDecision.shortReport
-      : '';
+    const shortReport =
+      typeof maybeDecision.shortReport === 'string'
+        ? maybeDecision.shortReport
+        : '';
     return { decision: { orders, shortReport } };
   } catch {
     log.error({ execLogId: logId }, 'failed to parse decision');
@@ -201,7 +217,9 @@ function isValidManualOrder(value: unknown): value is MainTraderOrder {
 function parsePaginationQuery(
   req: FastifyRequest,
   reply: FastifyReply,
-): { page: number; pageSize: number; status?: PortfolioWorkflowStatus } | undefined {
+):
+  | { page: number; pageSize: number; status?: PortfolioWorkflowStatus }
+  | undefined {
   const result = paginationQuerySchema.safeParse(req.query);
   if (!result.success) {
     reply.code(400).send(errorResponse('invalid query parameter'));
@@ -225,7 +243,11 @@ function parseExecLogQuery(
   const { page = '1', pageSize = '10', rebalanceOnly } = result.data;
   const pageNumber = Math.max(Number.parseInt(page, 10), 1);
   const pageSizeNumber = Math.max(Number.parseInt(pageSize, 10), 1);
-  return { page: pageNumber, pageSize: pageSizeNumber, rebalanceOnly: rebalanceOnly === 'true' };
+  return {
+    page: pageNumber,
+    pageSize: pageSizeNumber,
+    rebalanceOnly: rebalanceOnly === 'true',
+  };
 }
 
 function parseManualPreviewQuery(
@@ -256,7 +278,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { page, pageSize, status } = pagination;
       const offset = (page - 1) * pageSize;
       const log = req.log.child({ userId });
-      const { rows, total } = await getPortfolioWorkflowsPaginated(userId, status, pageSize, offset);
+      const { rows, total } = await getPortfolioWorkflowsPaginated(
+        userId,
+        status,
+        pageSize,
+        offset,
+      );
       log.info('listed workflows');
       return {
         items: rows.map(toApi),
@@ -264,7 +291,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         page,
         pageSize,
       };
-    }
+    },
   );
 
   app.post(
@@ -302,7 +329,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         );
       log.info({ workflowId: row.id }, 'created workflow');
       return toApi(row);
-    }
+    },
   );
 
   app.get(
@@ -357,7 +384,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         page,
         pageSize,
       };
-    }
+    },
   );
 
   app.get(
@@ -375,9 +402,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const prompt = await getPromptForReviewResult(id, lp.logId);
       if (!prompt) {
         log.error({ execLogId: lp.logId }, 'prompt not found');
-        return reply
-          .code(404)
-          .send(errorResponse(ERROR_MESSAGES.notFound));
+        return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
       }
       log.info({ execLogId: lp.logId }, 'fetched exec prompt');
       return { prompt: JSON.parse(prompt) };
@@ -429,9 +454,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { id, userId, log, workflow } = ctx;
       if (!workflow.manualRebalance) {
         log.error('workflow not in manual mode');
-        return reply
-          .code(400)
-          .send(errorResponse('manual rebalance disabled'));
+        return reply.code(400).send(errorResponse('manual rebalance disabled'));
       }
       const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
@@ -443,12 +466,18 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if (!body) return;
       const { decision } = decisionResult;
       const orderIndex = body.orderIndex ?? 0;
-      if (!Number.isInteger(orderIndex) || orderIndex < 0 || orderIndex >= decision.orders.length) {
+      if (
+        !Number.isInteger(orderIndex) ||
+        orderIndex < 0 ||
+        orderIndex >= decision.orders.length
+      ) {
         log.error({ execLogId: logId, orderIndex }, 'invalid order index');
         return reply.code(400).send(errorResponse('invalid order index'));
       }
       const baseOrder = decision.orders[orderIndex];
-      const updatedOrder = { ...baseOrder } as MainTraderOrder & { manuallyEdited?: boolean };
+      const updatedOrder = { ...baseOrder } as MainTraderOrder & {
+        manuallyEdited?: boolean;
+      };
       let manuallyEdited = body.manuallyEdited ?? false;
       if (body.price !== undefined) {
         if (!Number.isFinite(body.price) || body.price <= 0) {
@@ -482,14 +511,15 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           .send(errorResponse('failed to create limit order'));
       }
       const latest = orders[orders.length - 1];
-      if (latest.status === LimitOrderStatus.Canceled && latest.cancellationReason) {
+      if (
+        latest.status === LimitOrderStatus.Canceled &&
+        latest.cancellationReason
+      ) {
         log.error(
           { execLogId: logId, reason: latest.cancellationReason },
           'manual order canceled',
         );
-        return reply
-          .code(400)
-          .send(errorResponse(latest.cancellationReason));
+        return reply.code(400).send(errorResponse(latest.cancellationReason));
       }
       log.info({ execLogId: logId }, 'created manual order');
       return reply.code(201).send({ ok: true });
@@ -531,7 +561,9 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       } catch (err) {
         log.error({ err, execLogId: logId, orderId }, 'failed to cancel order');
         const { msg } = parseBinanceError(err);
-        return reply.code(500).send(errorResponse(msg || 'failed to cancel order'));
+        return reply
+          .code(500)
+          .send(errorResponse(msg || 'failed to cancel order'));
       }
     },
   );
@@ -548,9 +580,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { id, userId, log, workflow } = ctx;
       if (!workflow.manualRebalance) {
         log.error('workflow not in manual mode');
-        return reply
-          .code(400)
-          .send(errorResponse('manual rebalance disabled'));
+        return reply.code(400).send(errorResponse('manual rebalance disabled'));
       }
       const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
@@ -562,7 +592,11 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const previewQuery = parseManualPreviewQuery(req, reply);
       if (!previewQuery) return;
       const { orderIndex } = previewQuery;
-      if (!Number.isInteger(orderIndex) || orderIndex < 0 || orderIndex >= decision.orders.length) {
+      if (
+        !Number.isInteger(orderIndex) ||
+        orderIndex < 0 ||
+        orderIndex >= decision.orders.length
+      ) {
         log.error({ execLogId: logId, orderIndex }, 'invalid order index');
         return reply.code(400).send(errorResponse('invalid order index'));
       }
@@ -590,7 +624,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { log, workflow: row } = ctx;
       log.info('fetched workflow');
       return toApi(row);
-    }
+    },
   );
 
   app.put(
@@ -605,7 +639,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { userId, id, log } = ctx;
       const body = parseBody(workflowUpsertSchema, req, reply);
       if (!body) return;
-      const res = await preparePortfolioWorkflowForUpsert(log, userId, body, id);
+      const res = await preparePortfolioWorkflowForUpsert(
+        log,
+        userId,
+        body,
+        id,
+      );
       if ('code' in res) return reply.code(res.code).send(res.body);
       const { body: validated, startBalance } = res;
       const status = validated.status;
@@ -628,7 +667,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         await reviewWorkflowPortfolio(req.log, id);
       log.info('updated workflow');
       return toApi(row);
-    }
+    },
   );
 
   app.delete(
@@ -650,7 +689,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       });
       log.info('deleted workflow');
       return { ok: true };
-    }
+    },
   );
 
   app.post(
@@ -668,12 +707,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('model required'));
       }
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
-      const conflict = await validateTokenConflicts(
-        log,
-        userId,
-        tokens,
-        id,
-      );
+      const conflict = await validateTokenConflicts(log, userId, tokens, id);
       if (conflict) return reply.code(conflict.code).send(conflict.body);
       const keyErr = await ensureApiKeys(log, userId);
       if (keyErr) return reply.code(keyErr.code).send(keyErr.body);
@@ -681,12 +715,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if (typeof bal !== 'number') return reply.code(bal.code).send(bal.body);
       await repoStartWorkflow(id, bal);
       reviewWorkflowPortfolio(req.log, id).catch((err) =>
-        log.error({ err }, 'initial review failed')
+        log.error({ err }, 'initial review failed'),
       );
       const row = (await getPortfolioWorkflow(id))!;
       log.info('started workflow');
       return toApi(row);
-    }
+    },
   );
 
   app.post(
@@ -712,7 +746,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const row = (await getPortfolioWorkflow(id))!;
       log.info('stopped workflow');
       return toApi(row);
-    }
+    },
   );
 
   app.post(
@@ -727,20 +761,17 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const { id, log, workflow } = ctx;
       if (workflow.status !== PortfolioWorkflowStatus.Active) {
         log.error('workflow not active');
-        return reply
-          .code(400)
-          .send(errorResponse('workflow not active'));
+        return reply.code(400).send(errorResponse('workflow not active'));
       }
       try {
         await reviewWorkflowPortfolio(req.log, id);
       } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : 'manual review failed';
+        const msg = err instanceof Error ? err.message : 'manual review failed';
         log.error({ err: msg }, 'manual review failed');
         return reply.code(400).send(errorResponse(msg));
       }
       log.info('manual review triggered');
       return { ok: true };
-    }
+    },
   );
 }

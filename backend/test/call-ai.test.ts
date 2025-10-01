@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { callAi } from '../src/services/openai-client.js';
-import { developerInstructions, rebalanceResponseSchema } from '../src/agents/main-trader.js';
+import {
+  developerInstructions,
+  rebalanceResponseSchema,
+} from '../src/agents/main-trader.js';
 import { type RebalancePrompt } from '../src/agents/main-trader.types.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 
@@ -16,9 +19,7 @@ describe('callAi structured output', () => {
       policy: { floor: { USDT: 20 } },
       portfolio: {
         ts: new Date().toISOString(),
-        positions: [
-          { sym: 'USDT', qty: 1, priceUsdt: 1, valueUsdt: 1 },
-        ],
+        positions: [{ sym: 'USDT', qty: 1, priceUsdt: 1, valueUsdt: 1 }],
       },
       routes: [],
       marketData: {},
@@ -40,7 +41,13 @@ describe('callAi structured output', () => {
         },
       ],
     };
-    await callAi('gpt-test', developerInstructions, rebalanceResponseSchema, prompt, 'key');
+    await callAi(
+      'gpt-test',
+      developerInstructions,
+      rebalanceResponseSchema,
+      prompt,
+      'key',
+    );
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, opts] = fetchMock.mock.calls[0];
     const body = JSON.parse(opts.body);

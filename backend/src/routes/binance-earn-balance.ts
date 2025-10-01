@@ -4,7 +4,10 @@ import { RATE_LIMITS } from '../rate-limit.js';
 import { fetchEarnFlexibleBalance } from '../services/binance-client.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
-import {parseRequestParams, userTokenParamsSchema} from './_shared/validation.js';
+import {
+  parseRequestParams,
+  userTokenParamsSchema,
+} from './_shared/validation.js';
 
 async function loadEarnFlexibleBalance(
   userId: string,

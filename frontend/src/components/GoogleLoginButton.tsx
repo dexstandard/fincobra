@@ -22,7 +22,7 @@ declare global {
           }) => void;
           renderButton: (
             elem: HTMLElement,
-            options: { theme: string; size: string; text: string }
+            options: { theme: string; size: string; text: string },
           ) => void;
           disableAutoSelect?: () => void;
         };
@@ -59,7 +59,7 @@ export default function GoogleLoginButton() {
             await api.post(
               '/login',
               { token: resp.credential },
-              { headers: { 'x-csrf-token': csrf } }
+              { headers: { 'x-csrf-token': csrf } },
             );
             const session = await api.get('/login/session');
             setUser(session.data);
@@ -88,12 +88,12 @@ export default function GoogleLoginButton() {
       initialize();
     } else {
       const script = document.querySelector<HTMLScriptElement>(
-        'script[src="https://accounts.google.com/gsi/client"]'
+        'script[src="https://accounts.google.com/gsi/client"]',
       );
       script?.addEventListener('load', initialize);
       return () => script?.removeEventListener('load', initialize);
     }
-    }, [user, setUser, csrf, toast, t]);
+  }, [user, setUser, csrf, toast, t]);
 
   if (user) {
     const email = user.email ?? '';
@@ -154,7 +154,7 @@ export default function GoogleLoginButton() {
                     token: pendingCred,
                     otp,
                   },
-                  { headers: { 'x-csrf-token': csrf } }
+                  { headers: { 'x-csrf-token': csrf } },
                 );
                 setUser(res2.data);
                 if (btnRef.current) btnRef.current.innerHTML = '';

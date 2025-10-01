@@ -74,19 +74,23 @@ export async function clearAiKey(id: string): Promise<void> {
 
 export async function shareAiKey(entry: AiApiKeyShareUpsert): Promise<void> {
   await db.query(
-    "INSERT INTO ai_api_key_shares (owner_user_id, target_user_id, model) VALUES ($1, $2, $3) ON CONFLICT (target_user_id) DO UPDATE SET owner_user_id = EXCLUDED.owner_user_id, model = EXCLUDED.model",
+    'INSERT INTO ai_api_key_shares (owner_user_id, target_user_id, model) VALUES ($1, $2, $3) ON CONFLICT (target_user_id) DO UPDATE SET owner_user_id = EXCLUDED.owner_user_id, model = EXCLUDED.model',
     [entry.ownerUserId, entry.targetUserId, entry.model],
   );
 }
 
-export async function revokeAiKeyShare(entry: AiApiKeyShareDelete): Promise<void> {
+export async function revokeAiKeyShare(
+  entry: AiApiKeyShareDelete,
+): Promise<void> {
   await db.query(
     'DELETE FROM ai_api_key_shares WHERE owner_user_id = $1 AND target_user_id = $2',
     [entry.ownerUserId, entry.targetUserId],
   );
 }
 
-export async function hasAiKeyShare(entry: AiApiKeyShareLookup): Promise<boolean> {
+export async function hasAiKeyShare(
+  entry: AiApiKeyShareLookup,
+): Promise<boolean> {
   const { rowCount } = await db.query(
     'SELECT 1 FROM ai_api_key_shares WHERE owner_user_id = $1 AND target_user_id = $2',
     [entry.ownerUserId, entry.targetUserId],

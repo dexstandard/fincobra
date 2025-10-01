@@ -39,12 +39,8 @@ export default function ExchangeApiKeySection({ exchange, label }: Props) {
   });
 
   return exchange === 'binance' ? (
-    <ApiKeySection
-      {...commonProps}
-      whitelistHost={whitelistQuery.data}
-    />
+    <ApiKeySection {...commonProps} whitelistHost={whitelistQuery.data} />
   ) : (
     <ApiKeySection {...commonProps} />
   );
 }
-

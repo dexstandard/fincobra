@@ -32,7 +32,10 @@ function sanitize(obj: unknown): unknown {
 }
 
 export default async function buildServer(
-  routesDir: string = path.join(new URL('.', import.meta.url).pathname, 'routes'),
+  routesDir: string = path.join(
+    new URL('.', import.meta.url).pathname,
+    'routes',
+  ),
 ): Promise<FastifyInstance> {
   await migrate();
   const app = Fastify({
@@ -48,7 +51,6 @@ export default async function buildServer(
 
   app.decorate('isStarted', false);
 
-
   await app.register(cookie);
   await app.register(csrf, {
     getToken: (req) => req.headers['x-csrf-token'] as string,
@@ -62,7 +64,11 @@ export default async function buildServer(
         scriptSrc: ["'self'", 'https://accounts.google.com'],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
         imgSrc: ["'self'", 'data:', 'https://accounts.google.com'],
-        connectSrc: ["'self'", 'https://api.binance.com', 'https://accounts.google.com'],
+        connectSrc: [
+          "'self'",
+          'https://api.binance.com',
+          'https://accounts.google.com',
+        ],
         fontSrc: ["'self'", 'data:'],
         frameSrc: ['https://accounts.google.com'],
         objectSrc: ["'none'"],
@@ -78,7 +84,9 @@ export default async function buildServer(
     ...RATE_LIMITS.LAX,
     errorResponseBuilder: (_req, context) => ({
       statusCode: 429,
-      ...errorResponse(`Too many requests, please try again in ${context.after}.`),
+      ...errorResponse(
+        `Too many requests, please try again in ${context.after}.`,
+      ),
     }),
   });
 
@@ -88,17 +96,37 @@ export default async function buildServer(
     if (fs.statSync(path.join(routesDir, file)).isDirectory()) continue;
 
     const isScript = /\.([tj])s$/.test(file);
-    const isTypes  = /\.d\.([tj])s$/.test(file) || /\.types\.([tj])s$/.test(file);
-    const isTest   = /\.(spec|test)\.([tj])s$/.test(file);
+    const isTypes =
+      /\.d\.([tj])s$/.test(file) || /\.types\.([tj])s$/.test(file);
+    const isTest = /\.(spec|test)\.([tj])s$/.test(file);
     if (!isScript || isTypes || isTest) continue;
 
-    const mod = await import(pathToFileURL(path.join(routesDir, file)).href);
-    const plugin = typeof mod === 'function' ? mod : mod.default;
-    if (typeof plugin !== 'function') {
-      app.log.warn({ file, exports: Object.keys(mod) }, 'skipping non-plugin module');
-      continue;
+    let plugin: unknown;
+    try {
+      const mod = await import(pathToFileURL(path.join(routesDir, file)).href);
+      plugin = typeof mod === 'function' ? mod : mod.default;
+      if (typeof plugin !== 'function') {
+        const available =
+          mod && typeof mod === 'object'
+            ? Object.keys(mod as Record<string, unknown>)
+            : [];
+        app.log.error(
+          { file, exports: available },
+          'route module must export a Fastify plugin',
+        );
+        throw new Error(`Route ${file} does not export a Fastify plugin.`);
+      }
+    } catch (err) {
+      app.log.error({ err, file }, 'failed to load route module');
+      throw err instanceof Error ? err : new Error(String(err));
     }
-    app.register(plugin, { prefix: '/api' });
+
+    try {
+      await app.register(plugin as any, { prefix: '/api' });
+    } catch (err) {
+      app.log.error({ err, file }, 'failed to register route module');
+      throw err instanceof Error ? err : new Error(String(err));
+    }
   }
 
   app.addHook('preHandler', (req, _reply, done) => {
@@ -109,7 +137,11 @@ export default async function buildServer(
       (req.query as any)?.workflowId;
     const route = req.routerPath ? `/api${req.routerPath}` : req.raw.url;
     (req as any).logContext = { userId, workflowId, route };
-    const params = sanitize({ params: req.params, query: req.query, body: req.body });
+    const params = sanitize({
+      params: req.params,
+      query: req.query,
+      body: req.body,
+    });
     req.log.info({ userId, workflowId, route, params }, 'request start');
     done();
   });

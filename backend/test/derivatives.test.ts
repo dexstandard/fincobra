@@ -3,15 +3,13 @@ import { fetchOrderBook } from '../src/services/binance-client.js';
 
 describe('fetchOrderBook', () => {
   it('uses spot order book endpoint', async () => {
-    const mock = vi
-      .spyOn(global, 'fetch')
-      .mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          bids: [['1', '1']],
-          asks: [['2', '1']],
-        }),
-      } as any);
+    const mock = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        bids: [['1', '1']],
+        asks: [['2', '1']],
+      }),
+    } as any);
 
     await fetchOrderBook('BTCUSDT');
 
@@ -22,4 +20,3 @@ describe('fetchOrderBook', () => {
     mock.mockRestore();
   });
 });
-

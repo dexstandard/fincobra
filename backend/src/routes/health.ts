@@ -12,6 +12,6 @@ export default async function healthRoute(app: FastifyInstance) {
         return reply.status(503).send({ ok: false });
       }
       return { ok: true, ts: Date.now() };
-    }
+    },
   );
 }

@@ -33,10 +33,7 @@ Tables:
 Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
 
 ### Testing
-  - IMPORTANT: AGENT MUST RUN LOCAL PG SERVER TO BE ABLE TO RUN TEST!
-  - Check `psql` or `pg_isready` to confirm PostgreSQL is installed; install it if missing.
-  - Run tests with
-    `DATABASE_URL=postgres://postgres:postgres@localhost:5432/fincobra_test npm --prefix backend test`.
+  - Run backend tests with `npm t` from either the repository root or the `backend` directory.
   - `npm run build`
 
 ### Guidelines

@@ -54,4 +54,3 @@ export default function ExecSuccessItem({ response, promptIcon }: Props) {
     </div>
   );
 }
-

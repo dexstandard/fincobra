@@ -3,44 +3,44 @@ import { z } from 'zod';
 import RiskDisplay from '../components/RiskDisplay';
 
 export const tokens = [
-    {value: 'BTC', label: 'BTC'},
-    {value: 'BNB', label: 'BNB'},
-    {value: 'DOGE', label: 'DOGE'},
-    {value: 'ETH', label: 'ETH'},
-    {value: 'HBAR', label: 'HBAR'},
-    {value: 'PEPE', label: 'PEPE'},
-    {value: 'SHIB', label: 'SHIB'},
-    {value: 'SOL', label: 'SOL'},
-    {value: 'TON', label: 'TON'},
-    {value: 'TRX', label: 'TRX'},
-    {value: 'XRP', label: 'XRP'},
-    {value: 'USDT', label: 'USDT'},
-    {value: 'USDC', label: 'USDC'},
+  { value: 'BTC', label: 'BTC' },
+  { value: 'BNB', label: 'BNB' },
+  { value: 'DOGE', label: 'DOGE' },
+  { value: 'ETH', label: 'ETH' },
+  { value: 'HBAR', label: 'HBAR' },
+  { value: 'PEPE', label: 'PEPE' },
+  { value: 'SHIB', label: 'SHIB' },
+  { value: 'SOL', label: 'SOL' },
+  { value: 'TON', label: 'TON' },
+  { value: 'TRX', label: 'TRX' },
+  { value: 'XRP', label: 'XRP' },
+  { value: 'USDT', label: 'USDT' },
+  { value: 'USDC', label: 'USDC' },
 ];
 
 export const stableCoins = ['USDT', 'USDC'];
 
 export const riskOptions = [
-    {value: 'low', label: createElement(RiskDisplay, {risk: 'low'})},
-    {value: 'medium', label: createElement(RiskDisplay, {risk: 'medium'})},
-    {value: 'high', label: createElement(RiskDisplay, {risk: 'high'})},
+  { value: 'low', label: createElement(RiskDisplay, { risk: 'low' }) },
+  { value: 'medium', label: createElement(RiskDisplay, { risk: 'medium' }) },
+  { value: 'high', label: createElement(RiskDisplay, { risk: 'high' }) },
 ];
 
 export const reviewIntervalOptions = (t: (key: string) => string) => [
-    {value: '10m', label: t('review_interval_10m')},
-    {value: '15m', label: t('review_interval_15m')},
-    {value: '30m', label: t('review_interval_30m')},
-    {value: '1h', label: t('review_interval_1h')},
-    {value: '3h', label: t('review_interval_3h')},
-    {value: '5h', label: t('review_interval_5h')},
-    {value: '12h', label: t('review_interval_12h')},
-    {value: '24h', label: t('review_interval_24h')},
-    {value: '3d', label: t('review_interval_3d')},
-    {value: '1w', label: t('review_interval_1w')},
+  { value: '10m', label: t('review_interval_10m') },
+  { value: '15m', label: t('review_interval_15m') },
+  { value: '30m', label: t('review_interval_30m') },
+  { value: '1h', label: t('review_interval_1h') },
+  { value: '3h', label: t('review_interval_3h') },
+  { value: '5h', label: t('review_interval_5h') },
+  { value: '12h', label: t('review_interval_12h') },
+  { value: '24h', label: t('review_interval_24h') },
+  { value: '3d', label: t('review_interval_3d') },
+  { value: '1w', label: t('review_interval_1w') },
 ];
 
 export const DEFAULT_AGENT_INSTRUCTIONS =
-    'Day trade this pair and determine the target allocation yourself. Monitor real-time market data and news, trimming positions after rallies and adding to them after dips to stay within policy floors while exploiting intraday swings.';
+  'Day trade this pair and determine the target allocation yourself. Monitor real-time market data and news, trimming positions after rallies and adding to them after dips to stay within policy floors while exploiting intraday swings.';
 
 export const portfolioReviewSchema = z
   .object({
@@ -70,13 +70,16 @@ export const portfolioReviewSchema = z
       '1w',
     ]),
   })
-  .refine((data) => {
-    const tokens = data.tokens.map((t) => t.token.toUpperCase());
-    return new Set(tokens).size === tokens.length;
-  }, {
-    message: 'Tokens must be different',
-    path: ['tokens'],
-  })
+  .refine(
+    (data) => {
+      const tokens = data.tokens.map((t) => t.token.toUpperCase());
+      return new Set(tokens).size === tokens.length;
+    },
+    {
+      message: 'Tokens must be different',
+      path: ['tokens'],
+    },
+  )
   .refine(
     (data) => {
       const total = data.tokens.reduce((sum, t) => sum + t.minAllocation, 0);
@@ -95,4 +98,3 @@ export const portfolioReviewDefaults: PortfolioReviewFormValues = {
   risk: 'low',
   reviewInterval: '30m',
 };
-

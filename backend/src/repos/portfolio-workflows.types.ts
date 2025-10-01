@@ -52,7 +52,7 @@ export interface PortfolioWorkflowUpdate {
   useEarn: boolean;
 }
 
-export interface PortfolioWorkflowDraftSearch {
+export interface PortfolioWorkflowInactiveSearch {
   userId: string;
   model: string | null;
   name: string;

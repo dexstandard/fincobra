@@ -8,7 +8,6 @@ import { useWorkflowActions } from '../lib/useWorkflowActions';
 import api from '../lib/axios';
 import Button from '../components/ui/Button';
 import { useToast } from '../lib/useToast';
-import PortfolioWorkflowDraft from './PortfolioWorkflowDraft';
 import ExecLogItem, { type ExecLog } from '../components/ExecLogItem';
 import FormattedDate from '../components/ui/FormattedDate';
 import WorkflowUpdateModal from '../components/WorkflowUpdateModal';
@@ -64,10 +63,6 @@ export default function WorkflowView() {
   });
 
   if (!workflow) return <div className="p-4">{t('loading')}</div>;
-  if (workflow.status === 'draft') {
-    return <PortfolioWorkflowDraft draft={workflow} />;
-  }
-
   const isActive = workflow.status === 'active';
   return (
     <div className="p-4">
@@ -76,7 +71,7 @@ export default function WorkflowView() {
       </div>
       <div className="md:hidden">
         <WorkflowDetailsMobile workflow={workflow} />
-        </div>
+      </div>
       {isActive ? (
         <div className="mt-4 flex gap-2">
           <Button onClick={() => setShowUpdate(true)}>
@@ -116,101 +111,105 @@ export default function WorkflowView() {
           )}
         </div>
       )}
-        {logData && (
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-bold">{t('execution_log')}</h2>
-                <Toggle
-                  label={t('only_rebalances')}
-                  checked={onlyRebalance}
-                  onChange={setOnlyRebalance}
-                />
-              </div>
-              {logData.items.length === 0 ? (
-                  <p>{t('no_logs_yet')}</p>
-              ) : (
-                  <>
-                    <table className="w-full mb-2 table-fixed hidden md:table">
-                      <colgroup>
-                        <col className="w-40" />
-                        <col />
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th className="text-left">{t('time')}</th>
-                          <th className="text-left">{t('log')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {logData.items.map((log) => (
-                          <tr key={log.id}>
-                            <td className="align-top pr-2 whitespace-nowrap">
-                              <FormattedDate date={log.createdAt} />
-                            </td>
-                            <td className="w-full">
-                              <ExecLogItem
-                                log={log}
-                                workflowId={id!}
-                                manualRebalance={workflow.manualRebalance}
-                                tokens={[
-                                  workflow.tokens[0]?.token,
-                                  workflow.cashToken,
-                                ].filter(Boolean) as string[]}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="md:hidden mb-2">
-                      {logData.items.map((log) => (
-                        <div key={log.id} className="mb-2">
-                          <div className="text-xs text-gray-500 mb-1">
-                            <FormattedDate date={log.createdAt} />
-                          </div>
-                          <ExecLogItem
-                            log={log}
-                            workflowId={id!}
-                            manualRebalance={workflow.manualRebalance}
-                            tokens={[
+      {logData && (
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xl font-bold">{t('execution_log')}</h2>
+            <Toggle
+              label={t('only_rebalances')}
+              checked={onlyRebalance}
+              onChange={setOnlyRebalance}
+            />
+          </div>
+          {logData.items.length === 0 ? (
+            <p>{t('no_logs_yet')}</p>
+          ) : (
+            <>
+              <table className="w-full mb-2 table-fixed hidden md:table">
+                <colgroup>
+                  <col className="w-40" />
+                  <col />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="text-left">{t('time')}</th>
+                    <th className="text-left">{t('log')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logData.items.map((log) => (
+                    <tr key={log.id}>
+                      <td className="align-top pr-2 whitespace-nowrap">
+                        <FormattedDate date={log.createdAt} />
+                      </td>
+                      <td className="w-full">
+                        <ExecLogItem
+                          log={log}
+                          workflowId={id!}
+                          manualRebalance={workflow.manualRebalance}
+                          tokens={
+                            [
                               workflow.tokens[0]?.token,
                               workflow.cashToken,
-                            ].filter(Boolean) as string[]}
-                          />
-                        </div>
-                      ))}
+                            ].filter(Boolean) as string[]
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="md:hidden mb-2">
+                {logData.items.map((log) => (
+                  <div key={log.id} className="mb-2">
+                    <div className="text-xs text-gray-500 mb-1">
+                      <FormattedDate date={log.createdAt} />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                          disabled={logPage === 1}
-                          onClick={() => setLogPage((p) => Math.max(p - 1, 1))}
-                      >
-                        {t('prev')}
-                      </Button>
-                      <span>
+                    <ExecLogItem
+                      log={log}
+                      workflowId={id!}
+                      manualRebalance={workflow.manualRebalance}
+                      tokens={
+                        [workflow.tokens[0]?.token, workflow.cashToken].filter(
+                          Boolean,
+                        ) as string[]
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  disabled={logPage === 1}
+                  onClick={() => setLogPage((p) => Math.max(p - 1, 1))}
+                >
+                  {t('prev')}
+                </Button>
+                <span>
                   Page {logData.page} of{' '}
-                        {Math.ceil(logData.total / logData.pageSize)}
+                  {Math.ceil(logData.total / logData.pageSize)}
                 </span>
-                      <Button
-                          disabled={logData.page * logData.pageSize >= logData.total}
-                          onClick={() => setLogPage((p) => p + 1)}
-                      >
-                        {t('next')}
-                      </Button>
-                    </div>
-                  </>
-              )}
-            </div>
-        )}
+                <Button
+                  disabled={logData.page * logData.pageSize >= logData.total}
+                  onClick={() => setLogPage((p) => p + 1)}
+                >
+                  {t('next')}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
       <WorkflowUpdateModal
         workflow={workflow}
         open={showUpdate}
         onClose={() => setShowUpdate(false)}
         onUpdated={() =>
-          queryClient.invalidateQueries({ queryKey: ['workflow', id, user?.id] })
+          queryClient.invalidateQueries({
+            queryKey: ['workflow', id, user?.id],
+          })
         }
       />
     </div>
   );
 }
-

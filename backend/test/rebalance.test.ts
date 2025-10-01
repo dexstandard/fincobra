@@ -64,7 +64,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -127,7 +130,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -191,7 +197,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -255,7 +264,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -315,7 +327,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -372,7 +387,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -422,7 +440,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -474,7 +495,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -503,7 +527,9 @@ describe('createDecisionLimitOrders', () => {
     const rows = await getLimitOrders();
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
-    expect(rows[0].cancellation_reason).toBe('Malformed maxPriceDivergencePct: 0');
+    expect(rows[0].cancellation_reason).toBe(
+      'Malformed maxPriceDivergencePct: 0',
+    );
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
 
@@ -526,7 +552,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -577,7 +606,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'DOGEUSDT',
       baseAsset: 'DOGE',
@@ -637,7 +669,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -646,7 +681,10 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      currentPrice: 115000,
+    });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -698,7 +736,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -707,7 +748,10 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      currentPrice: 115000,
+    });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -750,7 +794,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
@@ -759,7 +806,10 @@ describe('createDecisionLimitOrders', () => {
       pricePrecision: 2,
       minNotional: 5,
     });
-    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({ symbol: 'BTCUSDT', currentPrice: 115000 });
+    vi.mocked(fetchSymbolPrice).mockResolvedValueOnce({
+      symbol: 'BTCUSDT',
+      currentPrice: 115000,
+    });
     await createDecisionLimitOrders({
       userId,
       orders: [
@@ -813,7 +863,10 @@ describe('createDecisionLimitOrders', () => {
       manualRebalance: false,
       useEarn: true,
     });
-    const reviewResultId = await insertReviewResult({ portfolioWorkflowId: agent.id, log: '' });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
     vi.mocked(fetchPairInfo).mockResolvedValueOnce({
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',

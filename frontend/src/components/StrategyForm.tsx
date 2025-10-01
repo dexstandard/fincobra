@@ -2,7 +2,12 @@ import TokenSelect from './forms/TokenSelect';
 import TextInput from './forms/TextInput';
 import SelectInput from './forms/SelectInput';
 import FormField from './forms/FormField';
-import { tokens, riskOptions, reviewIntervalOptions, stableCoins } from '../lib/constants';
+import {
+  tokens,
+  riskOptions,
+  reviewIntervalOptions,
+  stableCoins,
+} from '../lib/constants';
 import { useTranslation } from '../lib/i18n';
 
 interface StrategyData {
@@ -13,12 +18,18 @@ interface StrategyData {
 
 interface Props {
   data: StrategyData;
-  onChange: <K extends keyof StrategyData>(key: K, value: StrategyData[K]) => void;
+  onChange: <K extends keyof StrategyData>(
+    key: K,
+    value: StrategyData[K],
+  ) => void;
   disabled?: boolean;
 }
 
-
-export default function StrategyForm({ data, onChange, disabled = false }: Props) {
+export default function StrategyForm({
+  data,
+  onChange,
+  disabled = false,
+}: Props) {
   const t = useTranslation();
   const { tokens: tokenData, risk, reviewInterval } = data;
   const token1 = tokenData[0];
@@ -32,17 +43,16 @@ export default function StrategyForm({ data, onChange, disabled = false }: Props
             id="token1"
             value={token1.token}
             onChange={(v) =>
-              onChange('tokens', [
-                { ...token1, token: v },
-                token2,
-              ])
+              onChange('tokens', [{ ...token1, token: v }, token2])
             }
             options={tokens.filter(
               (t) =>
                 t.value === token1.token ||
                 (t.value !== token2.token &&
-                  !(stableCoins.includes(t.value) &&
-                    stableCoins.includes(token2.token)))
+                  !(
+                    stableCoins.includes(t.value) &&
+                    stableCoins.includes(token2.token)
+                  )),
             )}
             disabled={disabled}
           />
@@ -52,17 +62,16 @@ export default function StrategyForm({ data, onChange, disabled = false }: Props
             id="token2"
             value={token2.token}
             onChange={(v) =>
-              onChange('tokens', [
-                token1,
-                { ...token2, token: v },
-              ])
+              onChange('tokens', [token1, { ...token2, token: v }])
             }
             options={tokens.filter(
               (t) =>
                 t.value === token2.token ||
                 (t.value !== token1.token &&
-                  !(stableCoins.includes(t.value) &&
-                    stableCoins.includes(token1.token)))
+                  !(
+                    stableCoins.includes(t.value) &&
+                    stableCoins.includes(token1.token)
+                  )),
             )}
             disabled={disabled}
           />
@@ -70,7 +79,10 @@ export default function StrategyForm({ data, onChange, disabled = false }: Props
       </div>
       <div className="grid grid-cols-2 gap-4">
         <FormField
-          label={t('min_token_allocation').replace('{token}', token1.token.toUpperCase())}
+          label={t('min_token_allocation').replace(
+            '{token}',
+            token1.token.toUpperCase(),
+          )}
           htmlFor="minToken1Allocation"
         >
           <TextInput
@@ -89,7 +101,10 @@ export default function StrategyForm({ data, onChange, disabled = false }: Props
           />
         </FormField>
         <FormField
-          label={t('min_token_allocation').replace('{token}', token2.token.toUpperCase())}
+          label={t('min_token_allocation').replace(
+            '{token}',
+            token2.token.toUpperCase(),
+          )}
           htmlFor="minToken2Allocation"
         >
           <TextInput
@@ -135,4 +150,3 @@ export default function StrategyForm({ data, onChange, disabled = false }: Props
     </div>
   );
 }
-

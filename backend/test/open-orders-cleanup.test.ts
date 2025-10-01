@@ -11,28 +11,64 @@ import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { setAiKey } from '../src/repos/ai-api-key.js';
 import { reviewWorkflowPortfolio } from '../src/workflows/portfolio-review.js';
 
-const sampleIndicators = vi.hoisted(() => ({
-  ret1h: 0,
-  ret4h: 0,
-  ret24h: 0,
-  ret7d: 0,
-  ret30d: 0,
-  smaDist20: 0,
-  smaDist50: 0,
-  smaDist200: 0,
-  macdHist: 0,
-  volRv7d: 0,
-  volRv30d: 0,
-  volAtrPct: 0,
-  rangeBbBw: 0,
-  rangeDonchian20: 0,
-  volumeZ1h: 0,
-  volumeZ24h: 0,
-  corrBtc30d: 0,
-  regimeBtc: 'range',
-  oscRsi14: 0,
-  oscStochK: 0,
-  oscStochD: 0,
+const sampleMarketOverview = vi.hoisted(() => ({
+  schema_version: 'market_overview.v2' as const,
+  as_of: '2024-01-01T00:00:00Z',
+  timeframe: { candle_interval: '1h', review_interval: '30m', semantics: '' },
+  derivations: {
+    trend_slope_rule: '',
+    ret1h_rule: '',
+    ret24h_rule: '',
+    vol_atr_pct_rule: '',
+    vol_anomaly_z_rule: '',
+    rsi14_rule: '',
+    orderbook_spread_bps_rule: '',
+    orderbook_depth_ratio_rule: '',
+    htf_returns_rule: '',
+    htf_trend_rule: '',
+    regime_vol_state_rule: '',
+    regime_corr_beta_rule: '',
+    risk_flags_rules: {
+      overbought: '',
+      oversold: '',
+      vol_spike: '',
+      thin_book: '',
+    },
+  },
+  _spec: { units: {}, interpretation: {} },
+  market_overview: {
+    BTC: {
+      trend_slope: 'flat' as const,
+      trend_basis: { sma_periods: [50, 200] as [number, number], gap_pct: 0 },
+      ret1h: 0,
+      ret24h: 0,
+      vol_atr_pct: 0,
+      vol_anomaly_z: 0,
+      rsi14: 50,
+      orderbook_spread_bps: 0,
+      orderbook_depth_ratio: 1,
+      risk_flags: {
+        overbought: false,
+        oversold: false,
+        vol_spike: false,
+        thin_book: false,
+      },
+      htf: {
+        returns: { '30d': 0, '90d': 0, '180d': 0, '365d': 0 },
+        trend: {
+          '4h': { sma_periods: [50, 200], gap_pct: 0, slope: 'flat' },
+          '1d': { sma_periods: [20, 100], gap_pct: 0, slope: 'flat' },
+          '1w': { sma_periods: [13, 52], gap_pct: 0, slope: 'flat' },
+        },
+        regime: {
+          vol_state: 'normal' as const,
+          vol_rank_1y: 0,
+          corr_btc_90d: 0,
+          market_beta_90d: 0,
+        },
+      },
+    },
+  },
 }));
 
 vi.mock('../src/services/openai-client.js', () => ({
@@ -55,9 +91,15 @@ vi.mock('../src/services/binance-client.js', () => ({
       { asset: 'ETH', free: '1', locked: '0' },
     ],
   }),
-  fetchPairData: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
-  fetchPairPrice: vi.fn().mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
-  fetchMarketTimeseries: vi.fn().mockResolvedValue({ minute_60: [], hourly_24h: [], monthly_24m: [] }),
+  fetchPairData: vi
+    .fn()
+    .mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
+  fetchPairPrice: vi
+    .fn()
+    .mockResolvedValue({ symbol: 'BTCETH', currentPrice: 100 }),
+  fetchMarketTimeseries: vi
+    .fn()
+    .mockResolvedValue({ minute_60: [], hourly_24h: [], monthly_24m: [] }),
   fetchPairInfo: vi.fn().mockResolvedValue({
     symbol: 'BTCETH',
     baseAsset: 'BTC',
@@ -72,7 +114,10 @@ vi.mock('../src/services/binance-client.js', () => ({
 }));
 
 vi.mock('../src/services/indicators.js', () => ({
-  fetchTokenIndicators: vi.fn().mockResolvedValue(sampleIndicators),
+  fetchMarketOverview: vi.fn().mockResolvedValue(sampleMarketOverview),
+  createEmptyMarketOverview: vi
+    .fn()
+    .mockReturnValue(JSON.parse(JSON.stringify(sampleMarketOverview))),
 }));
 
 vi.mock('../src/services/rebalance.js', () => ({
@@ -182,7 +227,9 @@ describe('cleanup open orders', () => {
     resolves.forEach((r) => r());
     await runPromise;
     const orders = await getLimitOrdersByReviewResult(agent.id, rrId);
-    expect(orders.map((o) => ({ orderId: o.orderId, status: o.status }))).toEqual([
+    expect(
+      orders.map((o) => ({ orderId: o.orderId, status: o.status })),
+    ).toEqual([
       { orderId: '123', status: LimitOrderStatus.Canceled },
       { orderId: '456', status: LimitOrderStatus.Canceled },
     ]);

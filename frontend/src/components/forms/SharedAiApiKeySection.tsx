@@ -20,7 +20,8 @@ export default function SharedAiApiKeySection({ label }: { label: ReactNode }) {
         const res = await api.get(`/users/${user!.id}/ai-key/shared`);
         return res.data as { key: string; model?: string };
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
         throw err;
       }
     },

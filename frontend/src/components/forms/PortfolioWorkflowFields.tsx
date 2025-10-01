@@ -22,6 +22,8 @@ import Toggle from '../ui/Toggle';
 import SelectInput from './SelectInput';
 import FormField from './FormField';
 
+const SHOW_EARN_FEATURE = false;
+
 interface Props {
   onTokensChange?: (tokens: string[]) => void;
   balances: BalanceInfo[];
@@ -61,9 +63,7 @@ export default function PortfolioWorkflowFields({
     .map((b) => ({ token: b.asset.toUpperCase(), total: b.free + b.locked }))
     .filter(
       (b) =>
-        b.total > 0 &&
-        !stableCoins.includes(b.token) &&
-        tokenSet.has(b.token),
+        b.total > 0 && !stableCoins.includes(b.token) && tokenSet.has(b.token),
     )
     .sort((a, b) => b.total - a.total)
     .slice(0, 3)
@@ -108,9 +108,7 @@ export default function PortfolioWorkflowFields({
 
   useEffect(() => {
     onTokensChange?.(
-      tokensWatch
-        .map((t) => t.token)
-        .filter((t): t is string => Boolean(t)),
+      tokensWatch.map((t) => t.token).filter((t): t is string => Boolean(t)),
     );
   }, [tokensWatch, onTokensChange]);
 
@@ -127,6 +125,8 @@ export default function PortfolioWorkflowFields({
     return sum + usd;
   }, 0);
 
+  const summaryGridCols = SHOW_EARN_FEATURE ? 'grid-cols-4' : 'grid-cols-2';
+
   const handleAddToken = () => {
     const available = tokens.filter(
       (t) =>
@@ -136,9 +136,7 @@ export default function PortfolioWorkflowFields({
     const newToken = available[0]?.value || tokens[0].value;
     append({ token: newToken, minAllocation: 0 });
     onTokensChange?.([
-      ...tokensWatch
-        .map((t) => t.token)
-        .filter((t): t is string => Boolean(t)),
+      ...tokensWatch.map((t) => t.token).filter((t): t is string => Boolean(t)),
       newToken,
     ]);
   };
@@ -158,7 +156,7 @@ export default function PortfolioWorkflowFields({
       <div className="space-y-2 w-fit">
         <div className={`grid ${colTemplate} gap-2 text-md font-bold`}>
           <div className="text-left">Token</div>
-          <div className="text-left">{useEarn ? 'Spot + Earn' : 'Spot'}</div>
+          <div className="text-left">Spot</div>
           <div className="text-left">Min %</div>
           <div />
         </div>
@@ -185,9 +183,7 @@ export default function PortfolioWorkflowFields({
                       if (index === 0) {
                         return stableCoins.includes(t.value) && !isSelected;
                       }
-                      return (
-                        !stableCoins.includes(t.value) && !isSelected
-                      );
+                      return !stableCoins.includes(t.value) && !isSelected;
                     })}
                   />
                 )}
@@ -217,9 +213,7 @@ export default function PortfolioWorkflowFields({
                         if (value < 0) value = 0;
                         const totalOthers = tokensWatch.reduce(
                           (sum, t, i) =>
-                            i === index
-                              ? sum
-                              : sum + (t.minAllocation || 0),
+                            i === index ? sum : sum + (t.minAllocation || 0),
                           0,
                         );
                         const maxAllowed = Math.max(0, 95 - totalOthers);
@@ -251,16 +245,24 @@ export default function PortfolioWorkflowFields({
           </button>
         )}
       </div>
-      <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2 mt-2">
+      <div
+        className={`grid ${summaryGridCols} items-center gap-x-4 gap-y-2 mt-2`}
+      >
         <span className="text-left text-md font-bold">Total $:</span>
         <span>{totalUsd.toFixed(2)}</span>
-        <span className="text-left text-md font-bold">{t('use_binance_earn')}</span>
-        <Toggle
-          label=""
-          checked={useEarn}
-          onChange={onUseEarnChange}
-          size="sm"
-        />
+        {SHOW_EARN_FEATURE && (
+          <>
+            <span className="text-left text-md font-bold">
+              {t('use_binance_earn')}
+            </span>
+            <Toggle
+              label=""
+              checked={useEarn}
+              onChange={onUseEarnChange}
+              size="sm"
+            />
+          </>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-2 mt-2">
         <FormField
@@ -300,6 +302,6 @@ export default function PortfolioWorkflowFields({
           />
         </FormField>
       </div>
-      </>
-    );
-  }
+    </>
+  );
+}

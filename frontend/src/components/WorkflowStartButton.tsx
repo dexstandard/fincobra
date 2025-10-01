@@ -19,21 +19,21 @@ interface WorkflowPreviewDetails {
   useEarn: boolean;
 }
 
-interface WorkflowDraft extends WorkflowPreviewDetails {
+interface ExistingWorkflow extends WorkflowPreviewDetails {
   id: string;
   userId: string;
   model: string | null;
 }
 
 interface Props {
-  draft?: WorkflowDraft;
+  workflow?: ExistingWorkflow;
   workflowData: WorkflowPreviewDetails;
   model: string;
   disabled: boolean;
 }
 
 export default function WorkflowStartButton({
-  draft,
+  workflow,
   workflowData,
   model,
   disabled,
@@ -55,8 +55,8 @@ export default function WorkflowStartButton({
     setConfirmOpen(false);
     setIsCreating(true);
     try {
-      if (draft) {
-        await api.post(`/portfolio-workflows/${draft.id}/start`);
+      if (workflow) {
+        await api.post(`/portfolio-workflows/${workflow.id}/start`);
         queryClient.invalidateQueries({ queryKey: ['workflows'] });
         toast.show(t('workflow_started_success'), 'success');
         navigate('/');
@@ -108,4 +108,3 @@ export default function WorkflowStartButton({
     </>
   );
 }
-

@@ -53,9 +53,7 @@ export default function WorkflowUpdateModal({
     },
   });
   const { reset, handleSubmit } = methods;
-  const [instructions, setInstructions] = useState(
-    workflow.agentInstructions,
-  );
+  const [instructions, setInstructions] = useState(workflow.agentInstructions);
   const [useEarn, setUseEarn] = useState(workflow.useEarn);
   const [tokenSymbols, setTokenSymbols] = useState<string[]>([
     workflow.cashToken,
@@ -137,9 +135,8 @@ export default function WorkflowUpdateModal({
     },
   });
 
-  const [formValues, setFormValues] = useState<PortfolioReviewFormValues | null>(
-    null,
-  );
+  const [formValues, setFormValues] =
+    useState<PortfolioReviewFormValues | null>(null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -158,10 +155,7 @@ export default function WorkflowUpdateModal({
           />
         </div>
       </FormProvider>
-      <AgentInstructions
-        value={instructions}
-        onChange={setInstructions}
-      />
+      <AgentInstructions value={instructions} onChange={setInstructions} />
       <div className="mt-4 max-w-2xl">
         <div className="grid grid-cols-2 gap-4">
           <div>

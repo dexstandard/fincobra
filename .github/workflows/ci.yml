@@ -18,7 +18,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: promptswap_test
+          POSTGRES_DB: fincobra_test
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 3s
@@ -62,7 +62,7 @@ jobs:
         run: |
           set -e
           npm --prefix frontend run lint & pid1=$!
-          DATABASE_URL=postgres://postgres:postgres@localhost:5432/promptswap_test npm --prefix backend test & pid2=$!
+          npm test & pid2=$!
           wait $pid1
           wait $pid2
         shell: bash

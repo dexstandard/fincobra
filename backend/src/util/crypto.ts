@@ -1,4 +1,9 @@
-import { randomBytes, scryptSync, createCipheriv, createDecipheriv } from 'node:crypto';
+import {
+  randomBytes,
+  scryptSync,
+  createCipheriv,
+  createDecipheriv,
+} from 'node:crypto';
 
 import { env } from './env.js';
 
@@ -12,7 +17,10 @@ export function encrypt(text: string, password: string): string {
   const salt = randomBytes(SALT_LENGTH);
   const key = scryptSync(password, salt, 32);
   const cipher = createCipheriv(ALGORITHM, key, iv);
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(text, 'utf8'),
+    cipher.final(),
+  ]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([salt, iv, tag, encrypted]).toString('base64');
 }
@@ -30,7 +38,10 @@ export function decrypt(payload: string, password: string): string {
   const decipher = createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(tag);
   try {
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]);
     return decrypted.toString('utf8');
   } catch {
     throw new Error('Failed to decrypt payload');

@@ -11,14 +11,13 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
 import buildServer from '../src/server.js';
 import { authCookies } from './helpers.js';
 
-
 describe('portfolio workflow start', () => {
   it('does not await initial review', async () => {
     const app = await buildServer();
     const userId = await insertUserWithKeys('1');
     const payload = {
       model: 'm',
-      name: 'Draft',
+      name: 'Inactive',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -27,7 +26,7 @@ describe('portfolio workflow start', () => {
       reviewInterval: '1h',
       agentInstructions: 'prompt',
       cash: 'USDT',
-      status: 'draft',
+      status: 'inactive',
     };
     const resCreate = await app.inject({
       method: 'POST',
@@ -56,7 +55,10 @@ describe('portfolio workflow start', () => {
         ok: true,
         json: async () => ({ price: '40' }),
       } as any)
-      .mockResolvedValue({ ok: true, json: async () => ({ price: '1' }) } as any);
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ price: '1' }),
+      } as any);
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
 
@@ -67,7 +69,9 @@ describe('portfolio workflow start', () => {
     });
     const res = await Promise.race([
       startPromise,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 1000),
+      ),
     ]);
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: 'active' });
