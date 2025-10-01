@@ -1,3 +1,5 @@
+import NodeCache from 'node-cache';
+
 import { fetchPairData } from './binance-client.js';
 import type { Kline } from './binance-client.types.js';
 import type {
@@ -67,6 +69,153 @@ const SPEC: MarketOverviewPayload['_spec'] = {
     htf: 'Condensed month/quarter/half-year/year context to gate strategies and sizing.',
   },
 };
+
+const MARKET_OVERVIEW_CACHE_TTL_SEC = 60;
+const MARKET_OVERVIEW_CACHE_CHECK_PERIOD = Math.max(
+  1,
+  Math.ceil(MARKET_OVERVIEW_CACHE_TTL_SEC / 2),
+);
+
+interface CachedTokenOverview {
+  overview: MarketOverviewToken;
+  generatedAt: string;
+  contextKey: string;
+}
+
+type PairData = Awaited<ReturnType<typeof fetchPairData>>;
+
+interface CachedBtcContext {
+  pair: PairData;
+  dailyCloses: number[];
+  dailyLogs: number[];
+  generatedAt: string;
+  cacheKey: string;
+}
+
+const tokenOverviewCache = new NodeCache<CachedTokenOverview>({
+  stdTTL: MARKET_OVERVIEW_CACHE_TTL_SEC,
+  checkperiod: MARKET_OVERVIEW_CACHE_CHECK_PERIOD,
+  useClones: false,
+});
+
+const btcContextCache = new NodeCache<CachedBtcContext>({
+  stdTTL: MARKET_OVERVIEW_CACHE_TTL_SEC,
+  checkperiod: MARKET_OVERVIEW_CACHE_CHECK_PERIOD,
+  useClones: false,
+});
+
+const pendingTokenFetches = new Map<string, Promise<CachedTokenOverview>>();
+let pendingBtcContext: Promise<CachedBtcContext> | null = null;
+
+function buildTokenPendingKey(token: string, contextKey: string): string {
+  return `${token}|${contextKey}`;
+}
+
+function setTokenCache(token: string, value: CachedTokenOverview) {
+  tokenOverviewCache.set(token, value);
+}
+
+async function getBtcContext(): Promise<CachedBtcContext> {
+  const cacheKey = 'BTC_CONTEXT';
+  const cached = btcContextCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  if (!pendingBtcContext) {
+    pendingBtcContext = (async () => {
+      const pair = await fetchPairData('BTC', 'USDT');
+      const dailyCloses = pair.year.map((k) => Number(k[4]));
+      const dailyLogs = logReturns(dailyCloses);
+      const generatedAt = new Date().toISOString();
+      const context: CachedBtcContext = {
+        pair,
+        dailyCloses,
+        dailyLogs,
+        generatedAt,
+        cacheKey: `${generatedAt}:${pair.year[pair.year.length - 1]?.[0] ?? ''}`,
+      };
+      btcContextCache.set(cacheKey, context);
+      return context;
+    })().finally(() => {
+      pendingBtcContext = null;
+    });
+  }
+  return pendingBtcContext!;
+}
+
+async function computeTokenOverview(
+  token: string,
+  btcContext: CachedBtcContext,
+): Promise<CachedTokenOverview> {
+  const pair =
+    token === 'BTC' ? btcContext.pair : await fetchPairData(token, 'USDT');
+  const symbol = pair.symbol;
+  const [hourKlines, h4Klines, dayKlines, weekKlines] = await Promise.all([
+    fetchIntervalKlines(symbol, '1h', HOUR_INTERVAL_LIMIT),
+    fetchIntervalKlines(symbol, '4h', 210),
+    fetchIntervalKlines(symbol, '1d', 150),
+    fetchIntervalKlines(symbol, '1w', 60),
+  ]);
+  const tokenDailyCloses = pair.year.map((k) => Number(k[4]));
+  const overview = buildTokenOverview(
+    pair.currentPrice,
+    hourKlines,
+    h4Klines,
+    dayKlines,
+    weekKlines,
+    tokenDailyCloses,
+    btcContext.dailyLogs,
+  );
+
+  const bestBid = pair.orderBook.bids[0] as [number, number] | undefined;
+  const bestAsk = pair.orderBook.asks[0] as [number, number] | undefined;
+  const bidPrice = bestBid?.[0] ?? pair.currentPrice;
+  const askPrice = bestAsk?.[0] ?? pair.currentPrice;
+  const bidQty = bestBid?.[1] ?? 0;
+  const askQty = bestAsk?.[1] ?? 1;
+  const mid = (bidPrice + askPrice) / 2 || pair.currentPrice || 1;
+  overview.orderbook_spread_bps = mid
+    ? ((askPrice - bidPrice) / mid) * 10_000
+    : 0;
+  overview.orderbook_depth_ratio = askQty === 0 ? 0 : bidQty / askQty;
+  overview.risk_flags = computeRiskFlags(overview);
+
+  return {
+    overview,
+    generatedAt: new Date().toISOString(),
+    contextKey: btcContext.cacheKey,
+  };
+}
+
+async function loadTokenOverview(
+  token: string,
+  btcContext: CachedBtcContext,
+): Promise<CachedTokenOverview> {
+  const cacheKey = token.toUpperCase();
+  const cached = tokenOverviewCache.get(cacheKey);
+  if (cached && cached.contextKey === btcContext.cacheKey) {
+    return cached;
+  }
+
+  const pendingKey = buildTokenPendingKey(cacheKey, btcContext.cacheKey);
+  let pending = pendingTokenFetches.get(pendingKey);
+  if (!pending) {
+    pending = computeTokenOverview(cacheKey, btcContext)
+      .then((result) => {
+        setTokenCache(cacheKey, result);
+        return result;
+      })
+      .finally(() => {
+        pendingTokenFetches.delete(pendingKey);
+      });
+    pendingTokenFetches.set(pendingKey, pending);
+  }
+  const result = await pending;
+  if (result.contextKey !== btcContext.cacheKey) {
+    return loadTokenOverview(token, btcContext);
+  }
+  return result;
+}
 
 export function createEmptyMarketOverview(
   asOf: Date = new Date(),
@@ -384,57 +533,37 @@ export async function fetchMarketOverview(
   const dedupedSet = new Set(tokens.map((t) => t.toUpperCase()));
   dedupedSet.add('BTC');
   const deduped = Array.from(dedupedSet);
-  const btcPair = await fetchPairData('BTC', 'USDT');
-  const btcDailyCloses = btcPair.year.map((k) => Number(k[4]));
-  const btcDailyLogs = logReturns(btcDailyCloses);
-
+  const btcContext = await getBtcContext();
   const entries = await Promise.all(
     deduped.map(async (token) => {
-      const pair = token === 'BTC' ? btcPair : await fetchPairData(token, 'USDT');
-      const symbol = pair.symbol;
-      const current = pair.currentPrice;
-      const [hourKlines, h4Klines, dayKlines, weekKlines] = await Promise.all([
-        fetchIntervalKlines(symbol, '1h', HOUR_INTERVAL_LIMIT),
-        fetchIntervalKlines(symbol, '4h', 210),
-        fetchIntervalKlines(symbol, '1d', 150),
-        fetchIntervalKlines(symbol, '1w', 60),
-      ]);
-      const tokenDailyCloses = pair.year.map((k) => Number(k[4]));
-      const overview = buildTokenOverview(
-        current,
-        hourKlines,
-        h4Klines,
-        dayKlines,
-        weekKlines,
-        tokenDailyCloses,
-        btcDailyLogs,
-      );
-
-      const bestBid = pair.orderBook.bids[0] as [number, number] | undefined;
-      const bestAsk = pair.orderBook.asks[0] as [number, number] | undefined;
-      const bidPrice = bestBid?.[0] ?? current;
-      const askPrice = bestAsk?.[0] ?? current;
-      const bidQty = bestBid?.[1] ?? 0;
-      const askQty = bestAsk?.[1] ?? 1;
-      const mid = (bidPrice + askPrice) / 2 || current || 1;
-      overview.orderbook_spread_bps = mid
-        ? ((askPrice - bidPrice) / mid) * 10_000
-        : 0;
-      overview.orderbook_depth_ratio = askQty === 0 ? 0 : bidQty / askQty;
-      overview.risk_flags = computeRiskFlags(overview);
-
-      return [token, overview] as const;
+      const data = await loadTokenOverview(token, btcContext);
+      return [token, data] as const;
     }),
   );
 
-  const marketOverview = Object.fromEntries(entries);
+  const marketOverview = Object.fromEntries(
+    entries.map(([token, data]) => [token, data.overview]),
+  );
+
+  const latestAsOf = entries.reduce<Date>((latest, [, data]) => {
+    const ts = new Date(data.generatedAt);
+    return ts > latest ? ts : latest;
+  }, new Date(0));
 
   return {
     schema_version: 'market_overview.v2',
-    as_of: new Date().toISOString(),
+    as_of:
+      latestAsOf.getTime() > 0 ? latestAsOf.toISOString() : new Date().toISOString(),
     timeframe: TIMEFRAME,
     derivations: DERIVATIONS,
     _spec: SPEC,
     market_overview: marketOverview,
   };
+}
+
+export function clearMarketOverviewCache(): void {
+  tokenOverviewCache.flushAll();
+  btcContextCache.flushAll();
+  pendingTokenFetches.clear();
+  pendingBtcContext = null;
 }

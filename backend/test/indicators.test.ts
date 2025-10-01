@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createEmptyMarketOverview,
   fetchMarketOverview,
+  clearMarketOverviewCache,
 } from '../src/services/indicators.js';
 import { fetchPairData } from '../src/services/binance-client.js';
 
@@ -233,12 +234,14 @@ describe('fetchMarketOverview', () => {
     vi.restoreAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-09-20T06:15:00Z'));
+    clearMarketOverviewCache();
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    clearMarketOverviewCache();
   });
 
   it('computes every indicator using the synthetic dataset', async () => {
@@ -462,5 +465,113 @@ describe('fetchMarketOverview', () => {
     const payload = createEmptyMarketOverview(new Date('2024-01-01T00:00:00Z'));
     expect(payload.market_overview).toEqual({});
     expect(payload.as_of).toBe('2024-01-01T00:00:00.000Z');
+  });
+
+  it('caches token overviews to avoid duplicate fetches within the TTL', async () => {
+    const syntheticIntervals: Record<string, Record<string, NumericKline[]>> = {
+      SOLUSDT: {
+        '1h': buildKlines(HOUR_LIMIT, {
+          closeStart: 100,
+          closeStep: 0.5,
+          volumeStart: 1_000,
+          volumeStep: 1,
+        }),
+        '4h': buildKlines(FOUR_HOUR_LIMIT, {
+          closeStart: 120,
+          closeStep: 0.5,
+          volumeStart: 500,
+          volumeStep: 1,
+        }),
+        '1d': buildKlines(DAY_LIMIT, {
+          closeStart: 150,
+          closeStep: 0.5,
+          volumeStart: 400,
+          volumeStep: 1,
+        }),
+        '1w': buildKlines(WEEK_LIMIT, {
+          closeStart: 200,
+          closeStep: 0.5,
+          volumeStart: 200,
+          volumeStep: 1,
+        }),
+      },
+      BTCUSDT: {
+        '1h': buildKlines(HOUR_LIMIT, {
+          closeStart: 300,
+          closeStep: 0.25,
+          volumeStart: 2_000,
+          volumeStep: 1,
+        }),
+        '4h': buildKlines(FOUR_HOUR_LIMIT, {
+          closeStart: 320,
+          closeStep: 0.25,
+          volumeStart: 800,
+          volumeStep: 1,
+        }),
+        '1d': buildKlines(DAY_LIMIT, {
+          closeStart: 350,
+          closeStep: 0.25,
+          volumeStart: 600,
+          volumeStep: 1,
+        }),
+        '1w': buildKlines(WEEK_LIMIT, {
+          closeStart: 380,
+          closeStep: 0.25,
+          volumeStart: 300,
+          volumeStep: 1,
+        }),
+      },
+    };
+
+    const syntheticPairs: Record<string, SyntheticPair> = {
+      SOL: {
+        symbol: 'SOLUSDT',
+        year: buildYearSeries(366, 50, 0.5),
+        currentPrice: Number((50 + 0.5 * (366 - 1)).toFixed(6)),
+        orderBook: {
+          bids: [[Number((50 + 0.5 * (366 - 1) - 0.25).toFixed(6)), 10]],
+          asks: [[Number((50 + 0.5 * (366 - 1) + 0.25).toFixed(6)), 12]],
+        },
+      },
+      BTC: {
+        symbol: 'BTCUSDT',
+        year: buildYearSeries(366, 100, 0.25),
+        currentPrice: Number((100 + 0.25 * (366 - 1)).toFixed(6)),
+        orderBook: {
+          bids: [[Number((100 + 0.25 * (366 - 1) - 0.25).toFixed(6)), 20]],
+          asks: [[Number((100 + 0.25 * (366 - 1) + 0.25).toFixed(6)), 18]],
+        },
+      },
+    };
+
+    const pairMock = fetchPairData as unknown as ReturnType<typeof vi.fn>;
+    pairMock.mockImplementation(async (token: string) => {
+      const key = token.toUpperCase();
+      const pair = syntheticPairs[key];
+      if (!pair) throw new Error(`missing synthetic pair for ${token}`);
+      return pair;
+    });
+
+    const fetchStub = vi.fn(async (url: string) => {
+      const parsed = new URL(url, 'https://api.binance.com');
+      const symbol = parsed.searchParams.get('symbol');
+      const interval = parsed.searchParams.get('interval');
+      const data = symbol && interval ? syntheticIntervals[symbol]?.[interval] : null;
+      if (!data) throw new Error(`no data for ${symbol} ${interval}`);
+      return { ok: true, json: async () => data } as any;
+    });
+    vi.stubGlobal('fetch', fetchStub);
+
+    await fetchMarketOverview(['SOL']);
+    expect(pairMock).toHaveBeenCalledTimes(2);
+    expect(fetchStub).toHaveBeenCalled();
+
+    pairMock.mockClear();
+    fetchStub.mockClear();
+
+    await fetchMarketOverview(['SOL']);
+
+    expect(pairMock).not.toHaveBeenCalled();
+    expect(fetchStub).not.toHaveBeenCalled();
   });
 });
