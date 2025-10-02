@@ -7,7 +7,6 @@ import { setAiKey } from '../src/repos/ai-api-key.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/review-raw-log.js';
 import { getRecentReviewResults } from '../src/repos/review-result.js';
 import * as mainTrader from '../src/agents/main-trader.js';
-import * as newsAnalyst from '../src/agents/news-analyst.js';
 
 const sampleTimeseries = vi.hoisted(() => ({
   minute_60: [[1, 2, 3, 4]],
@@ -18,12 +17,10 @@ const sampleTimeseries = vi.hoisted(() => ({
 const runMainTrader = vi.fn();
 vi.spyOn(mainTrader, 'run').mockImplementation(runMainTrader);
 
-const runNewsAnalyst = vi.fn((_params: any, prompt: any) => {
-  const report = prompt.reports?.find((r: any) => r.token === 'BTC');
-  if (report) report.news = { comment: 'news', score: 1 };
-  return Promise.resolve();
-});
-vi.spyOn(newsAnalyst, 'runNewsAnalyst').mockImplementation(runNewsAnalyst);
+const getNewsByTokenMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock('../src/repos/news.js', () => ({
+  getNewsByToken: getNewsByTokenMock,
+}));
 
 import {
   reviewWorkflowPortfolio,
@@ -212,9 +209,16 @@ describe('reviewPortfolio', () => {
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, workflowId);
     expect(runMainTrader).toHaveBeenCalledTimes(1);
-    expect(runNewsAnalyst).toHaveBeenCalled();
     const rows = await getPortfolioReviewRawPromptsResponses(workflowId);
     const row = rows[0];
+    const promptPayload = JSON.parse(row.prompt!);
+    const btcReport = promptPayload.reports.find(
+      (r: any) => r.token === 'BTC',
+    );
+    expect(btcReport?.news?.version).toBe('news_context.v1');
+    const passedPrompt = runMainTrader.mock.calls[0]?.[1];
+    expect(passedPrompt?.reports?.find((r: any) => r.token === 'BTC')?.news)
+      .toBeDefined();
     expect(JSON.parse(row.response!)).toEqual(decision);
     const [res] = await getRecentReviewResults(workflowId, 1);
     expect(res.rebalance).toBe(true);

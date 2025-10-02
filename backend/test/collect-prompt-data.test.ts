@@ -1,9 +1,14 @@
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockLogger } from './helpers.js';
 import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflows.js';
-import { collectPromptData } from '../src/agents/main-trader.js';
+import {
+  collectPromptData,
+  __resetNewsContextCacheForTest,
+} from '../src/agents/main-trader.js';
 import { fetchAccount } from '../src/services/binance-client.js';
+
+const getNewsByTokenMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 
 vi.mock('../src/services/binance-client.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
@@ -86,7 +91,25 @@ vi.mock('../src/repos/limit-orders.js', () => ({
     }),
 }));
 
+vi.mock('../src/repos/news.js', () => ({
+  getNewsByToken: getNewsByTokenMock,
+}));
+
 describe('collectPromptData', () => {
+  beforeEach(() => {
+    __resetNewsContextCacheForTest();
+    getNewsByTokenMock.mockReset();
+    getNewsByTokenMock.mockResolvedValue([]);
+    vi.mocked(fetchAccount).mockResolvedValue({
+      balances: [
+        { asset: 'BTC', free: '1', locked: '0' },
+        { asset: 'USDT', free: '1000', locked: '0' },
+        { asset: 'ETH', free: '5', locked: '0' },
+        { asset: 'DOGE', free: '100', locked: '0' },
+      ],
+    });
+  });
+
   it('includes start balance and PnL in prompt', async () => {
     const row: ActivePortfolioWorkflow = {
       id: '1',
@@ -217,5 +240,159 @@ describe('collectPromptData', () => {
     const usdt = prompt?.portfolio.positions.find((p) => p.sym === 'USDT');
     expect(btc?.qty).toBe(1);
     expect(usdt?.qty).toBe(1000);
+  });
+
+  it('builds structured news context with aggregates', async () => {
+    vi.useFakeTimers();
+    try {
+      const now = new Date('2025-02-01T12:00:00Z');
+      vi.setSystemTime(now);
+      getNewsByTokenMock.mockImplementationOnce(async () => [
+        {
+          title: 'Bridge XYZ hacked for $8M; withdrawals paused',
+          link: 'hack-link',
+          pubDate: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+          domain: 'coindesk.com',
+        },
+        {
+          title: 'Binance lists ABC token with USDT pair',
+          link: 'listing-link',
+          pubDate: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
+          domain: 'coindesk.com',
+        },
+        {
+          title: 'USDC depegs to $0.97 amid market stress',
+          link: 'depeg-link',
+          pubDate: new Date(now.getTime() - 45 * 60 * 1000).toISOString(),
+          domain: 'coindesk.com',
+        },
+        {
+          title: 'Report: ETF approval expected (rumor)',
+          link: 'rumor-link',
+          pubDate: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
+          domain: 'news.bitcoin.com',
+        },
+        {
+          title: 'General market update from Cointelegraph',
+          link: 'general-link',
+          pubDate: new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString(),
+          domain: 'cointelegraph.com',
+        },
+        {
+          title: 'Partnership announced with Coinbase',
+          link: 'partnership-link',
+          pubDate: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
+          domain: 'coindesk.com',
+        },
+      ]);
+
+      const row: ActivePortfolioWorkflow = {
+        id: 'news-wf',
+        userId: 'user-news',
+        model: 'm',
+        cashToken: 'USDT',
+        tokens: [{ token: 'BTC', minAllocation: 50 }],
+        risk: 'low',
+        reviewInterval: '1h',
+        agentInstructions: 'inst',
+        aiApiKeyId: null,
+        aiApiKeyEnc: '',
+        manualRebalance: false,
+        useEarn: false,
+        startBalance: null,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        portfolioId: 'news-wf',
+      };
+
+      const prompt = await collectPromptData(row, mockLogger());
+      const news = prompt?.reports?.find((r) => r.token === 'BTC')?.news;
+
+      expect(news?.version).toBe('news_context.v1');
+      expect(news?.items.length).toBe(5);
+      expect(news?.biasScore).toBeLessThan(0);
+      expect(news?.maxSeverity ?? 0).toBeGreaterThan(0.7);
+      expect(news?.bearCount ?? 0).toBeGreaterThan(0);
+      expect(news?.bullCount ?? 0).toBeGreaterThan(0);
+      expect(news?.topEventSummary).toMatch(/^Hack — bearish \(sev=\d\.\d{2}\)/);
+      expect(news?.items[0]).toMatchObject({
+        tierHints: expect.any(Object),
+        numbers: expect.any(Object),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('caches structured news context per token for 60 seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      const baseTime = new Date('2025-03-01T00:00:00Z');
+      vi.setSystemTime(baseTime);
+
+      const firstNews = [
+        {
+          title: 'Dogecoin hack drains bridge',
+          link: 'doge-hack',
+          pubDate: new Date(baseTime.getTime() - 10 * 60 * 1000).toISOString(),
+          domain: 'coindesk.com',
+        },
+      ];
+      getNewsByTokenMock.mockResolvedValueOnce(firstNews);
+
+      const row: ActivePortfolioWorkflow = {
+        id: 'wf-cache',
+        userId: 'user-cache',
+        model: 'model',
+        cashToken: 'USDT',
+        tokens: [{ token: 'DOGE', minAllocation: 20 }],
+        risk: 'medium',
+        reviewInterval: '1h',
+        agentInstructions: 'inst',
+        aiApiKeyId: null,
+        aiApiKeyEnc: '',
+        manualRebalance: false,
+        useEarn: false,
+        startBalance: null,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        portfolioId: 'wf-cache',
+      };
+
+      const firstPrompt = await collectPromptData(row, mockLogger());
+      expect(getNewsByTokenMock).toHaveBeenCalledTimes(1);
+      const firstContext = firstPrompt?.reports?.find((r) => r.token === 'DOGE')?.news;
+
+      getNewsByTokenMock.mockResolvedValueOnce([
+        {
+          title: 'Dogecoin partnership announced',
+          link: 'doge-partnership',
+          pubDate: new Date(baseTime.getTime() - 5 * 60 * 1000).toISOString(),
+          domain: 'cointelegraph.com',
+        },
+      ]);
+
+      const secondPrompt = await collectPromptData(row, mockLogger());
+      expect(getNewsByTokenMock).toHaveBeenCalledTimes(1);
+      const secondContext = secondPrompt?.reports?.find((r) => r.token === 'DOGE')?.news;
+      expect(secondContext).toEqual(firstContext);
+
+      vi.setSystemTime(new Date(baseTime.getTime() + 61_000));
+
+      const refreshedNews = [
+        {
+          title: 'Dogecoin outage triggers concern',
+          link: 'doge-outage',
+          pubDate: new Date(baseTime.getTime() + 1 * 1000).toISOString(),
+          domain: 'coindesk.com',
+        },
+      ];
+      getNewsByTokenMock.mockResolvedValueOnce(refreshedNews);
+
+      const thirdPrompt = await collectPromptData(row, mockLogger());
+      expect(getNewsByTokenMock).toHaveBeenCalledTimes(2);
+      const thirdContext = thirdPrompt?.reports?.find((r) => r.token === 'DOGE')?.news;
+      expect(thirdContext).not.toEqual(firstContext);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
