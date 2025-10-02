@@ -201,4 +201,89 @@ describe('news analyst', () => {
       vi.useRealTimers();
     }
   });
+
+  it('computes derived event metadata', async () => {
+    await insertNews([
+      {
+        title: 'Bridge XYZ hacked for $8M; withdrawals paused',
+        link: 'hack-link',
+        pubDate: new Date().toISOString(),
+        tokens: ['BTC'],
+        domain: 'coindesk.com',
+        simhash: '200',
+      },
+      {
+        title: 'Binance lists ABC token',
+        link: 'listing-link',
+        pubDate: new Date().toISOString(),
+        tokens: ['BTC'],
+        domain: 'coindesk.com',
+        simhash: '201',
+      },
+      {
+        title: 'USDC depegs to $0.97 amid market stress',
+        link: 'depeg-link',
+        pubDate: new Date().toISOString(),
+        tokens: ['BTC'],
+        domain: 'coindesk.com',
+        simhash: '202',
+      },
+      {
+        title: 'Report: ETF approval expected (rumor)',
+        link: 'rumor-link',
+        pubDate: new Date().toISOString(),
+        tokens: ['BTC'],
+        domain: 'news.bitcoin.com',
+        simhash: '203',
+      },
+      {
+        title: 'General market update',
+        link: 'general-link',
+        pubDate: new Date().toISOString(),
+        tokens: ['BTC'],
+        domain: 'cointelegraph.com',
+        simhash: '204',
+      },
+    ]);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, text: async () => responseJson });
+    const orig = globalThis.fetch;
+    (globalThis as any).fetch = fetchMock;
+
+    try {
+      const res = await getTokenNewsSummary('BTC', 'gpt', 'key', mockLogger());
+      const derived = (res.prompt as any)?.derivedV1?.items ?? [];
+      expect(Array.isArray(derived)).toBe(true);
+      expect(derived).toHaveLength(5);
+
+      const hack = derived.find((item: any) => item.title.includes('Bridge XYZ'));
+      expect(hack?.eventType).toBe('Hack');
+      expect(hack?.polarity).toBe('bearish');
+      expect(hack?.severity).toBeGreaterThanOrEqual(0.9);
+      expect(hack?.eventConfidence).toBeGreaterThanOrEqual(0.9);
+      expect(hack?.matchedRules).toContain('R.H1');
+      expect(hack?.numbers?.usdApprox).toBe(8_000_000);
+
+      const listing = derived.find((item: any) => item.title.includes('Binance lists'));
+      expect(listing?.eventType).toBe('Listing');
+      expect(listing?.polarity).toBe('bullish');
+      expect(listing?.severity).toBeGreaterThanOrEqual(0.7);
+      expect(listing?.tierHints?.exchangeTier).toBe('T1');
+      expect(listing?.tierHints?.exchange).toBe('binance');
+
+      const depeg = derived.find((item: any) => item.title.includes('USDC depegs'));
+      expect(depeg?.eventType).toBe('StablecoinDepeg');
+      expect(depeg?.severity).toBeGreaterThanOrEqual(0.8);
+      expect(depeg?.polarity).toBe('bearish');
+
+      const rumor = derived.find((item: any) => item.title.includes('ETF approval expected'));
+      expect(rumor?.eventType).toBe('Rumor');
+      expect(rumor?.polarity).toBe('neutral');
+      expect(rumor?.severity).toBeLessThan(0.3);
+    } finally {
+      (globalThis as any).fetch = orig;
+    }
+  });
 });
