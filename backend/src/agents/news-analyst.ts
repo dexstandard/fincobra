@@ -16,6 +16,29 @@ const cache = new Map<
   { promise: Promise<AnalysisLog>; expires: number }
 >();
 
+const HALF_LIFE_MS = 6 * 60 * 60 * 1000;
+
+const REPUTATION_SCORES: Record<string, number> = {
+  'coindesk.com': 0.95,
+  'cointelegraph.com': 0.65,
+  'bitcoinist.com': 0.58,
+  'cryptopotato.com': 0.6,
+  'news.bitcoin.com': 0.5,
+};
+
+function computeWeight(domain: string | null, pubDate: string | null, now: Date): number {
+  if (!domain) return 0;
+  const reputation = REPUTATION_SCORES[domain] ?? 0;
+  if (!reputation) return 0;
+  if (!pubDate) return 0;
+  const publishedMs = Date.parse(pubDate);
+  if (Number.isNaN(publishedMs)) return 0;
+  const ageMs = now.getTime() - publishedMs;
+  if (ageMs <= 0) return reputation;
+  const decay = Math.pow(0.5, ageMs / HALF_LIFE_MS);
+  return reputation * decay;
+}
+
 export function getTokenNewsSummaryCached(
   token: string,
   model: string,
@@ -41,9 +64,32 @@ export async function getTokenNewsSummary(
   apiKey: string,
   log: FastifyBaseLogger,
 ): Promise<AnalysisLog> {
-  const items = await getNewsByToken(token, 5);
+  const items = await getNewsByToken(token, 20);
   if (!items.length) return { analysis: null };
-  const headlines = items.map((i) => `- ${i.title} (${i.link})`).join('\n');
+  const now = new Date();
+  const weighted = items
+    .map((item) => ({ ...item, weight: computeWeight(item.domain, item.pubDate, now) }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5);
+
+  if (!weighted.length) {
+    return { analysis: null };
+  }
+
+  log.info(
+    {
+      token,
+      selectedNews: weighted.map((item) => ({
+        title: item.title,
+        domain: item.domain,
+        pubDate: item.pubDate,
+        weight: item.weight,
+      })),
+    },
+    'selected news items for analysis',
+  );
+
+  const headlines = weighted.map((i) => `- ${i.title} (${i.link})`).join('\n');
   const prompt = { headlines };
   const instructions = `You are a crypto market news analyst. Given the headlines, estimate the overall news tone for ${token}. Include a bullishness score from 0-10 and highlight key events. - shortReport ≤255 chars.`;
   const fallback: Analysis = { comment: 'Analysis unavailable', score: 0 };

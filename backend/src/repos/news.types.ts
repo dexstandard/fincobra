@@ -3,10 +3,12 @@ export interface NewsInsert {
   link: string;
   pubDate?: string;
   tokens: string[];
+  domain: string;
 }
 
 export interface NewsEntry {
   title: string;
   link: string;
   pubDate: string | null;
+  domain: string | null;
 }

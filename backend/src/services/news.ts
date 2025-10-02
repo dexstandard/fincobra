@@ -24,6 +24,15 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, (m) => `\\${m}`);
 }
 
+function extractDomain(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.replace(/^www\./, '');
+  } catch (err) {
+    return null;
+  }
+}
+
 export function tagTokens(text: string): string[] {
   const out: string[] = [];
   for (const { symbol, tags } of TOKENS) {
@@ -85,12 +94,16 @@ export async function fetchNews(
         const tokens = tagTokens(item.title);
         if (!tokens.length) continue;
 
+        const domain = extractDomain(item.link);
+        if (!domain) continue;
+
         c.set(seenKey, true);
         collected.push({
           title: item.title,
           link: item.link,
           pubDate: new Date(item.pubDate!).toISOString(),
           tokens,
+          domain,
         });
         added++;
       }

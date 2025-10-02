@@ -55,6 +55,7 @@ describe('fetchNews', () => {
     expect(res[0]).toMatchObject({
       link: 'https://example.com/btc',
       tokens: ['BTC'],
+      domain: 'example.com',
     });
     parseURL.mockRestore();
   });
@@ -67,6 +68,7 @@ describe('insertNews', () => {
       link: 'https://example.com/btc',
       pubDate: new Date().toISOString(),
       tokens: ['BTC'],
+      domain: 'example.com',
     };
     await insertNews([item]);
     await insertNews([item]);
@@ -81,6 +83,7 @@ describe('insertNews', () => {
       link: 'https://example.com/general',
       pubDate: new Date().toISOString(),
       tokens: [],
+      domain: 'example.com',
     };
     await insertNews([item]);
     const { rows } = await db.query('SELECT 1 FROM news WHERE link = $1', [
