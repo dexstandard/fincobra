@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
+import NodeCache from 'node-cache';
 import { callAi } from '../services/openai-client.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../services/binance-client.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
+import { getNewsByToken } from '../repos/news.js';
 import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import type {
   RunParams,
@@ -20,18 +22,27 @@ import type {
   RebalancePrompt,
   MainTraderDecision,
   MainTraderOrder,
+  NewsContext,
 } from './main-trader.types.js';
+import {
+  computeDerivedItem,
+  sortDerivedItems,
+  computeWeight,
+  computeTimeDecay,
+} from './news-analyst.js';
+import type { DerivedItem } from './news-analyst.js';
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
-  '- You collaborate with the news analyst and personally interpret the shared market_overview.v2 dataset for technical context.',
-  '- Know every team member, their role, and ensure decisions follow the overall trading strategy.',
+  '- Interpret the shared market_overview.v2 dataset for technical context and the structured news_context feeds for event risk.',
   '- Consult marketData.marketOverview (market_overview.v2) for price action, HTF trend, returns, and risk flags before sizing orders.',
-  '- Decide which limit orders to place based on portfolio, market data, and analyst reports.',
+  '- Decide which limit orders to place based on portfolio, market data, and news context.',
   '- Make sure to size limit orders higher then minNotional values to avoid order cancellations.',
   '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
   '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
   '- The prompt lists all supported trading pairs with their current prices for easy reference.',
+  '- Use news_context.biasScore to tilt sizing alongside market_overview; cite top_event_summary in shortReport.',
+  '- If any bearish Hack|StablecoinDepeg|Outage with severity ≥ 0.75, allow protective action even if technicals are neutral.',
   '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,limitPrice:number,basePrice:number,maxPriceDivergencePct:number},...],shortReport}.',
   '- maxPriceDivergencePct is expressed as a percentage drift allowance (e.g. 0.01 = 1%) between basePrice and the live market price before cancelation;',
   '- maxPriceDivergencePct must be at least 0.0001 (0.01%) to avoid premature cancelations;',
@@ -93,6 +104,183 @@ export const rebalanceResponseSchema = {
   required: ['result'],
   additionalProperties: false,
 };
+
+interface DerivedItemWithTime extends DerivedItem {
+  timeDecay: number;
+}
+
+const BIAS_DENOMINATOR_EPSILON = 1e-6;
+const NEWS_CONTEXT_CACHE_TTL_MS = 60_000;
+
+interface NewsContextCacheEntry {
+  value: NewsContext;
+  expires: number;
+}
+
+const newsContextCache = new NodeCache({
+  stdTTL: 0,
+  checkperiod: 0,
+  useClones: false,
+});
+
+const pendingNewsContexts = new Map<string, Promise<NewsContext>>();
+
+function getCachedNewsContext(token: string, now: number): NewsContext | null {
+  const cached = newsContextCache.get<NewsContextCacheEntry>(token);
+  if (cached && now < cached.expires) {
+    return cached.value;
+  }
+  return null;
+}
+
+async function getNewsContextWithCache(
+  token: string,
+  log: FastifyBaseLogger,
+): Promise<NewsContext> {
+  const now = Date.now();
+  const cached = getCachedNewsContext(token, now);
+  if (cached) {
+    return cached;
+  }
+
+  const existing = pendingNewsContexts.get(token);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = (async () => {
+    try {
+      const value = await buildNewsContext(token, log);
+      const entry: NewsContextCacheEntry = {
+        value,
+        expires: Date.now() + NEWS_CONTEXT_CACHE_TTL_MS,
+      };
+      newsContextCache.set<NewsContextCacheEntry>(token, entry);
+      return value;
+    } catch (err) {
+      log.error({ err, token }, 'news context cache refresh failed');
+      newsContextCache.del(token);
+      throw err;
+    } finally {
+      pendingNewsContexts.delete(token);
+    }
+  })().catch(() => createEmptyNewsContext());
+
+  pendingNewsContexts.set(token, promise);
+  return promise;
+}
+
+export function __resetNewsContextCacheForTest(): void {
+  newsContextCache.flushAll();
+  pendingNewsContexts.clear();
+}
+
+function createEmptyNewsContext(): NewsContext {
+  return {
+    version: 'news_context.v1',
+    biasScore: 0,
+    maxSeverity: 0,
+    maxEventConfidence: 0,
+    bullCount: 0,
+    bearCount: 0,
+    topEventSummary: null,
+    items: [],
+  };
+}
+
+async function buildNewsContext(
+  token: string,
+  log: FastifyBaseLogger,
+): Promise<NewsContext> {
+  try {
+    const items = await getNewsByToken(token, 20);
+    if (!items.length) return createEmptyNewsContext();
+
+    const now = new Date();
+    const weighted = items
+      .map((item) => {
+        const timeDecay = computeTimeDecay(item.pubDate, now);
+        const weight = computeWeight(item.domain, item.pubDate, now);
+        return { ...item, weight, timeDecay };
+      })
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 5);
+
+    if (!weighted.length) return createEmptyNewsContext();
+
+    const derivedWithTime: DerivedItemWithTime[] = weighted.map((item) => {
+      const derived = computeDerivedItem({
+        title: item.title,
+        link: item.link,
+        pubDate: item.pubDate,
+        domain: item.domain,
+        weight: item.weight,
+      });
+      return { ...derived, timeDecay: item.timeDecay };
+    });
+
+    const ordered = sortDerivedItems(derivedWithTime) as DerivedItemWithTime[];
+
+    let numerator = 0;
+    let denominator = 0;
+    let maxSeverity = 0;
+    let maxEventConfidence = 0;
+    let bullCount = 0;
+    let bearCount = 0;
+
+    for (const item of ordered) {
+      denominator += item.weight;
+      maxSeverity = Math.max(maxSeverity, item.severity);
+      maxEventConfidence = Math.max(maxEventConfidence, item.eventConfidence);
+      if (item.polarity === 'bullish') bullCount += 1;
+      if (item.polarity === 'bearish') bearCount += 1;
+      const dir = item.polarity === 'bullish' ? 1 : item.polarity === 'bearish' ? -1 : 0;
+      numerator += dir * item.severity * item.eventConfidence * item.timeDecay;
+    }
+
+    const biasScoreRaw = numerator / (denominator + BIAS_DENOMINATOR_EPSILON);
+    const biasScore = Math.max(-1, Math.min(1, biasScoreRaw));
+
+    const top = ordered[0];
+    let topEventSummary: string | null = null;
+    if (top) {
+      topEventSummary = `${top.eventType} — ${top.polarity} (sev=${top.severity.toFixed(2)})`;
+      if (top.tierHints.exchangeTier !== 'none') {
+        let tier = top.tierHints.exchangeTier;
+        if (top.tierHints.exchange) {
+          tier += `/${top.tierHints.exchange}`;
+        }
+        topEventSummary += ` [${tier}]`;
+      }
+    }
+
+    return {
+      version: 'news_context.v1',
+      biasScore,
+      maxSeverity,
+      maxEventConfidence,
+      bullCount,
+      bearCount,
+      topEventSummary,
+      items: ordered.map((item) => ({
+        title: item.title,
+        link: item.link,
+        pubDate: item.pubDate,
+        domain: item.domain,
+        eventType: item.eventType,
+        polarity: item.polarity,
+        severity: item.severity,
+        eventConfidence: item.eventConfidence,
+        headlineScore: item.headlineScore,
+        tierHints: item.tierHints,
+        numbers: item.numbers,
+      })),
+    };
+  } catch (err) {
+    log.error({ err, token }, 'failed to build news context');
+    return createEmptyNewsContext();
+  }
+}
 
 export async function collectPromptData(
   row: ActivePortfolioWorkflow,
@@ -194,6 +382,12 @@ export async function collectPromptData(
   }
 
   const nonStableTokens = tokens.filter((t) => !isStablecoin(t));
+  const reports = await Promise.all(
+    nonStableTokens.map(async (token) => ({
+      token,
+      news: await getNewsContextWithCache(token, log),
+    })),
+  );
 
   const prompt: RebalancePrompt = {
     instructions: row.agentInstructions,
@@ -203,7 +397,7 @@ export async function collectPromptData(
     portfolio,
     routes,
     marketData: {},
-    reports: nonStableTokens.map((token) => ({ token, news: null })),
+    reports,
   };
   if (previousReports.length) {
     prompt.previousReports = previousReports;

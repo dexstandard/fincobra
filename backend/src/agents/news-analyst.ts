@@ -1,24 +1,6 @@
-import type { FastifyBaseLogger } from 'fastify';
-import { getNewsByToken } from '../repos/news.js';
-import { insertReviewRawLog } from '../repos/review-raw-log.js';
-import { callAi, extractJson } from '../services/openai-client.js';
-import { isStablecoin } from '../util/tokens.js';
-import type { RebalancePrompt, RunParams } from './main-trader.types.js';
-import {
-  type AnalysisLog,
-  type Analysis,
-  analysisSchema,
-} from './news-analyst.types.js';
+export const HALF_LIFE_MS = 6 * 60 * 60 * 1000;
 
-const CACHE_MS = 3 * 60 * 1000;
-const cache = new Map<
-  string,
-  { promise: Promise<AnalysisLog>; expires: number }
->();
-
-const HALF_LIFE_MS = 6 * 60 * 60 * 1000;
-
-const REPUTATION_SCORES: Record<string, number> = {
+export const REPUTATION_SCORES: Record<string, number> = {
   'coindesk.com': 0.95,
   'cointelegraph.com': 0.65,
   'bitcoinist.com': 0.58,
@@ -56,18 +38,18 @@ interface Rule {
   baseConfidence: number;
 }
 
-interface DerivedNumbers {
+export interface DerivedNumbers {
   usdApprox: number | null;
   tokenQtyApprox: number | null;
   tokenUnit?: 'BTC' | 'ETH' | 'SOL' | 'USDT' | 'USDC';
 }
 
-interface TierHints {
+export interface TierHints {
   exchangeTier: 'T1' | 'T2' | 'none';
   exchange?: 'binance' | 'coinbase' | 'kraken' | 'okx' | 'bybit';
 }
 
-interface DerivedItem {
+export interface DerivedItem {
   title: string;
   link: string | null;
   pubDate: string | null;
@@ -107,7 +89,8 @@ const RULES: Rule[] = [
   {
     id: 'R.H1',
     eventType: 'Hack',
-    regex: /\b(hack(ed|ing)?|exploit(ed|ing)?|breach|attack(ed)?|drain(ed)?|rug ?pull|vuln(erability)?|stolen|theft|phish(ed|ing))\b/i,
+    regex:
+      /\b(hack(ed|ing)?|exploit(ed|ing)?|breach|attack(ed)?|drain(ed)?|rug ?pull|vuln(erability)?|stolen|theft|phish(ed|ing))\b/i,
     basePolarity: 'bearish',
     baseSeverity: 0.8,
     baseConfidence: 0.9,
@@ -131,7 +114,8 @@ const RULES: Rule[] = [
   {
     id: 'R.O1',
     eventType: 'Outage',
-    regex: /\b(outage|halt(ed)?|pause(d|s)?|suspend(ed|s|sion)|downtime|disruption|congestion|degrad(ed|ing)?)\b/i,
+    regex:
+      /\b(outage|halt(ed)?|pause(d|s)?|suspend(ed|s|sion)|downtime|disruption|congestion|degrad(ed|ing)?)\b/i,
     basePolarity: 'bearish',
     baseSeverity: 0.7,
     baseConfidence: 0.8,
@@ -147,7 +131,8 @@ const RULES: Rule[] = [
   {
     id: 'R.L1',
     eventType: 'Listing',
-    regex: /\b(list(s|ed|ing)?|trading (pair|starts?|opens?))\b.*\b(binance|coinbase|kraken|okx|bybit)\b/i,
+    regex:
+      /\b(list(s|ed|ing)?|trading (pair|starts?|opens?))\b.*\b(binance|coinbase|kraken|okx|bybit)\b/i,
     basePolarity: 'bullish',
     baseSeverity: 0.6,
     baseConfidence: 0.85,
@@ -155,7 +140,8 @@ const RULES: Rule[] = [
   {
     id: 'R.L2',
     eventType: 'Listing',
-    regex: /\b(binance|coinbase|kraken|okx|bybit)\b.*\b(list(s|ed|ing)?|trading (pair|starts?|opens?))\b/i,
+    regex:
+      /\b(binance|coinbase|kraken|okx|bybit)\b.*\b(list(s|ed|ing)?|trading (pair|starts?|opens?))\b/i,
     basePolarity: 'bullish',
     baseSeverity: 0.6,
     baseConfidence: 0.85,
@@ -171,7 +157,8 @@ const RULES: Rule[] = [
   {
     id: 'R.REG1',
     eventType: 'Regulation',
-    regex: /\b(sec|cftc|fca|esma|doj|finma|mas)\b.*\b(lawsuit|sue(d)?|settlement|fine(d)?|charge(d)?|ban(ned)?|enforcement)\b/i,
+    regex:
+      /\b(sec|cftc|fca|esma|doj|finma|mas)\b.*\b(lawsuit|sue(d)?|settlement|fine(d)?|charge(d)?|ban(ned)?|enforcement)\b/i,
     basePolarity: 'bearish',
     baseSeverity: 0.7,
     baseConfidence: 0.85,
@@ -198,92 +185,78 @@ const RULES: Rule[] = [
     regex: /\b(etf|spot etf|futures etf)\b.*\b(deny|denied|rejected|delay(ed)?)\b/i,
     basePolarity: 'bearish',
     baseSeverity: 0.6,
-    baseConfidence: 0.85,
+    baseConfidence: 0.8,
   },
   {
     id: 'R.M1',
     eventType: 'Macro',
-    regex: /\b(fed|fomc|ecb|boe|rate(s)? (hike|rise|increase))\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.55,
-    baseConfidence: 0.75,
-  },
-  {
-    id: 'R.M2',
-    eventType: 'Macro',
-    regex: /\b(fed|fomc|ecb|boe|rate(s)? (cut|decrease|reduce))\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.55,
-    baseConfidence: 0.75,
-  },
-  {
-    id: 'R.M3',
-    eventType: 'Macro',
-    regex: /\b(cpi|inflation)\b.*\b(higher|hot|beat(s)? expectations)\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.55,
-    baseConfidence: 0.7,
-  },
-  {
-    id: 'R.M4',
-    eventType: 'Macro',
-    regex: /\b(cpi|inflation)\b.*\b(lower|cool|miss(es)? expectations)\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.55,
-    baseConfidence: 0.7,
+    regex:
+      /\b(inflation|cpi|jobs report|fomc|fed|interest rate|yields?|usd|treasury|gdp|economy|economic data)\b/i,
+    basePolarity: 'neutral',
+    baseSeverity: 0.4,
+    baseConfidence: 0.6,
   },
   {
     id: 'R.W1',
     eventType: 'WhaleMove',
-    regex: /\b(whale|large)\b.*\b(transfer|move|deposit|withdraw(al|n)|inflow|outflow)s?\b/i,
+    regex: /\b(whale|transfer(ed|s)?|moved|on-chain|wallet|address)\b/i,
     basePolarity: 'neutral',
     baseSeverity: 0.5,
+    baseConfidence: 0.6,
+  },
+  {
+    id: 'R.W2',
+    eventType: 'WhaleMove',
+    regex: /\b(\d[\d,\.]{2,})\s*(btc|eth|sol|usdt|usdc)\b/i,
+    basePolarity: 'neutral',
+    baseSeverity: 0.45,
     baseConfidence: 0.7,
   },
   {
     id: 'R.A1',
     eventType: 'Airdrop',
-    regex: /\b(airdrop|retroactive distribution|claim window)\b/i,
+    regex: /\b(airdrop|token distribution|retroactive reward)\b/i,
     basePolarity: 'bullish',
     baseSeverity: 0.45,
-    baseConfidence: 0.7,
+    baseConfidence: 0.65,
   },
   {
     id: 'R.F1',
     eventType: 'Funding',
-    regex: /\b(raise(d)?|funding|round|series (a|b|c|d)|valuation)\b/i,
+    regex: /\b(raises?|funding|seed round|series [abc])\b/i,
     basePolarity: 'bullish',
-    baseSeverity: 0.5,
-    baseConfidence: 0.75,
+    baseSeverity: 0.45,
+    baseConfidence: 0.6,
   },
   {
     id: 'R.P1',
     eventType: 'Partnership',
-    regex: /\b(partner(ship)?|collaborat(e|ion)|integrat(e|ion)|adopt(s|ion))\b/i,
+    regex: /\b(partner(ship)?|collaborat(e|ion|es)|integrat(e|ion))\b/i,
     basePolarity: 'bullish',
-    baseSeverity: 0.5,
-    baseConfidence: 0.7,
+    baseSeverity: 0.45,
+    baseConfidence: 0.6,
   },
   {
-    id: 'R.UPG1',
+    id: 'R.UP1',
     eventType: 'Upgrade',
-    regex: /\b(upgrade|hardfork|softfork|eip-\d+|protocol update)\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.45,
-    baseConfidence: 0.7,
+    regex: /\b(upgrade|update|fork|hard fork|soft fork|mainnet|testnet)\b/i,
+    basePolarity: 'neutral',
+    baseSeverity: 0.4,
+    baseConfidence: 0.6,
   },
   {
-    id: 'R.LCH1',
+    id: 'R.LN1',
     eventType: 'Launch',
-    regex: /\b(mainnet|testnet|launch(ed)?|go(es)? live|deployment|release(d)?)\b/i,
+    regex: /\b(launch(es|ed|ing)?|debut|rollout)\b/i,
     basePolarity: 'bullish',
     baseSeverity: 0.45,
-    baseConfidence: 0.7,
+    baseConfidence: 0.6,
   },
   {
     id: 'R.R1',
     eventType: 'Rumor',
-    regex: /\b(rumor|rumour|unconfirmed|reportedly|according to (social media|sources))\b/i,
+    regex:
+      /\b(rumor|rumour|unconfirmed|reportedly|according to (social media|sources))\b/i,
     basePolarity: 'neutral',
     baseSeverity: 0.2,
     baseConfidence: 0.5,
@@ -296,12 +269,21 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function getReputation(domain: string | null): number {
+export function getReputation(domain: string | null): number {
   if (!domain) return 0;
   return REPUTATION_SCORES[domain] ?? 0;
 }
 
-function parseUsdAmount(title: string): number | null {
+export function computeTimeDecay(pubDate: string | null, now: Date): number {
+  if (!pubDate) return 0;
+  const publishedMs = Date.parse(pubDate);
+  if (Number.isNaN(publishedMs)) return 0;
+  const ageMs = now.getTime() - publishedMs;
+  if (ageMs <= 0) return 1;
+  return Math.pow(0.5, ageMs / HALF_LIFE_MS);
+}
+
+export function parseUsdAmount(title: string): number | null {
   const match = title.match(/\$[0-9][0-9,\.]*\s?(million|billion|m|bn|b)?/i);
   if (!match) return null;
   const raw = match[0].toLowerCase();
@@ -312,7 +294,11 @@ function parseUsdAmount(title: string): number | null {
   let multiplier = 1;
   if (raw.includes('billion') || /bn\b/.test(raw) || raw.trim().endsWith('b')) {
     multiplier = 1_000_000_000;
-  } else if (raw.includes('million') || /m\b/.test(raw) || raw.trim().endsWith('m')) {
+  } else if (
+    raw.includes('million') ||
+    /m\b/.test(raw) ||
+    raw.trim().endsWith('m')
+  ) {
     multiplier = 1_000_000;
   }
   return base * multiplier;
@@ -365,7 +351,7 @@ function getExchangeTierHints(
   return { exchangeTier: tier, exchange };
 }
 
-function computeDerivedItem(item: {
+export function computeDerivedItem(item: {
   title: string;
   link: string | null;
   pubDate: string | null;
@@ -396,7 +382,9 @@ function computeDerivedItem(item: {
   }
 
   const rumorRules = matchesByType.get('Rumor') ?? [];
-  const hasNegative = negativeBuckets.some((type) => (matchesByType.get(type) ?? []).length > 0);
+  const hasNegative = negativeBuckets.some(
+    (type) => (matchesByType.get(type) ?? []).length > 0,
+  );
   let rumorOverride = false;
   if (rumorRules.length && !hasNegative) {
     eventType = 'Rumor';
@@ -504,7 +492,7 @@ function computeDerivedItem(item: {
   };
 }
 
-function sortDerivedItems(items: DerivedItem[]): DerivedItem[] {
+export function sortDerivedItems(items: DerivedItem[]): DerivedItem[] {
   return [...items].sort((a, b) => {
     const scoreDiff = b.headlineScore - a.headlineScore;
     if (Math.abs(scoreDiff) > 1e-6) return scoreDiff > 0 ? 1 : -1;
@@ -521,7 +509,11 @@ function sortDerivedItems(items: DerivedItem[]): DerivedItem[] {
   });
 }
 
-function computeWeight(domain: string | null, pubDate: string | null, now: Date): number {
+export function computeWeight(
+  domain: string | null,
+  pubDate: string | null,
+  now: Date,
+): number {
   if (!domain) return 0;
   const reputation = REPUTATION_SCORES[domain] ?? 0;
   if (!reputation) return 0;
@@ -532,131 +524,4 @@ function computeWeight(domain: string | null, pubDate: string | null, now: Date)
   if (ageMs <= 0) return reputation;
   const decay = Math.pow(0.5, ageMs / HALF_LIFE_MS);
   return reputation * decay;
-}
-
-export function getTokenNewsSummaryCached(
-  token: string,
-  model: string,
-  apiKey: string,
-  log: FastifyBaseLogger,
-): Promise<AnalysisLog> {
-  const now = Date.now();
-  const cached = cache.get(token);
-  if (cached && cached.expires > now) {
-    log.info({ token }, 'news summary cache hit');
-    return cached.promise;
-  }
-  log.info({ token }, 'news summary cache miss');
-  const promise = getTokenNewsSummary(token, model, apiKey, log);
-  cache.set(token, { promise, expires: now + CACHE_MS });
-  promise.catch(() => cache.delete(token));
-  return promise;
-}
-
-export async function getTokenNewsSummary(
-  token: string,
-  model: string,
-  apiKey: string,
-  log: FastifyBaseLogger,
-): Promise<AnalysisLog> {
-  const items = await getNewsByToken(token, 20);
-  if (!items.length) return { analysis: null };
-  const now = new Date();
-  const weighted = items
-    .map((item) => ({ ...item, weight: computeWeight(item.domain, item.pubDate, now) }))
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 5);
-
-  if (!weighted.length) {
-    return { analysis: null };
-  }
-
-  const derived = weighted.map((item) =>
-    computeDerivedItem({
-      title: item.title,
-      link: item.link,
-      pubDate: item.pubDate,
-      domain: item.domain,
-      weight: item.weight,
-    }),
-  );
-  const orderedDerived = sortDerivedItems(derived);
-
-  log.info(
-    {
-      token,
-      selectedNews: orderedDerived.map((item) => ({
-        title: item.title,
-        domain: item.domain,
-        pubDate: item.pubDate,
-        weight: item.weight,
-        eventType: item.eventType,
-        severity: item.severity,
-        eventConfidence: item.eventConfidence,
-        headlineScore: item.headlineScore,
-      })),
-    },
-    'selected news items for analysis',
-  );
-
-  const headlines = orderedDerived.map((i) => `- ${i.title} (${i.link})`).join('\n');
-  const promptInput = { headlines };
-  const derivedPayload = { items: orderedDerived };
-  const instructions = `You are a crypto market news analyst. Given the headlines, estimate the overall news tone for ${token}. Include a bullishness score from 0-10 and highlight key events. - shortReport ≤255 chars.`;
-  const fallback: Analysis = { comment: 'Analysis unavailable', score: 0 };
-  try {
-    const res = await callAi(
-      model,
-      instructions,
-      analysisSchema,
-      promptInput,
-      apiKey,
-      true,
-    );
-    const analysis = extractJson<Analysis>(res);
-    if (!analysis) {
-      log.error(
-        { token, response: res },
-        'news analyst returned invalid response',
-      );
-      return {
-        analysis: fallback,
-        prompt: { instructions, input: promptInput, derivedV1: derivedPayload },
-        response: res,
-      };
-    }
-    return {
-      analysis,
-      prompt: { instructions, input: promptInput, derivedV1: derivedPayload },
-      response: res,
-    };
-  } catch (err) {
-    log.error({ err, token }, 'news analyst call failed');
-    return { analysis: fallback };
-  }
-}
-
-export async function runNewsAnalyst(
-  { log, model, apiKey, portfolioId }: RunParams,
-  prompt: RebalancePrompt,
-): Promise<void> {
-  if (!prompt.reports) return;
-  await Promise.all(
-    prompt.reports.map(async (report) => {
-      const { token } = report;
-      if (isStablecoin(token)) return;
-      const {
-        analysis,
-        prompt: p,
-        response,
-      } = await getTokenNewsSummaryCached(token, model, apiKey, log);
-      if (p && response)
-        await insertReviewRawLog({
-          portfolioWorkflowId: portfolioId,
-          prompt: p,
-          response,
-        });
-      report.news = analysis;
-    }),
-  );
 }

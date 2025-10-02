@@ -1,6 +1,9 @@
 import type { FastifyBaseLogger } from 'fastify';
-import type { Analysis } from './news-analyst.types.js';
 import type { MarketOverviewPayload } from '../services/indicators.types.js';
+import type {
+  DerivedNumbers,
+  TierHints,
+} from './news-analyst.js';
 
 export interface RunParams {
   log: FastifyBaseLogger;
@@ -42,9 +45,34 @@ export interface MarketTimeseries {
   ret24m: number;
 }
 
+export interface NewsContextItem {
+  title: string;
+  link: string | null;
+  pubDate: string | null;
+  domain: string | null;
+  eventType: string;
+  polarity: 'bullish' | 'bearish' | 'neutral';
+  severity: number;
+  eventConfidence: number;
+  headlineScore: number;
+  tierHints: TierHints;
+  numbers: DerivedNumbers;
+}
+
+export interface NewsContext {
+  version: 'news_context.v1';
+  biasScore: number;
+  maxSeverity: number;
+  maxEventConfidence: number;
+  bullCount: number;
+  bearCount: number;
+  topEventSummary: string | null;
+  items: NewsContextItem[];
+}
+
 export interface PromptReport {
   token: string;
-  news: Analysis | null;
+  news: NewsContext;
 }
 
 export interface RebalancePrompt {
