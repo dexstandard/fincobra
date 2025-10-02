@@ -24,13 +24,7 @@ import type {
   MainTraderOrder,
   NewsContext,
 } from './main-trader.types.js';
-import {
-  computeDerivedItem,
-  sortDerivedItems,
-  computeWeight,
-  computeTimeDecay,
-} from './news-analyst.js';
-import type { DerivedItem } from './news-analyst.js';
+import { computeDerivedItem, sortDerivedItems, computeWeight } from './news-analyst.js';
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
@@ -104,10 +98,6 @@ export const rebalanceResponseSchema = {
   required: ['result'],
   additionalProperties: false,
 };
-
-interface DerivedItemWithTime extends DerivedItem {
-  timeDecay: number;
-}
 
 const BIAS_DENOMINATOR_EPSILON = 1e-6;
 const NEWS_CONTEXT_CACHE_TTL_MS = 60_000;
@@ -198,28 +188,26 @@ async function buildNewsContext(
 
     const now = new Date();
     const weighted = items
-      .map((item) => {
-        const timeDecay = computeTimeDecay(item.pubDate, now);
-        const weight = computeWeight(item.domain, item.pubDate, now);
-        return { ...item, weight, timeDecay };
-      })
+      .map((item) => ({
+        ...item,
+        weight: computeWeight(item.domain, item.pubDate, now),
+      }))
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 5);
 
     if (!weighted.length) return createEmptyNewsContext();
 
-    const derivedWithTime: DerivedItemWithTime[] = weighted.map((item) => {
-      const derived = computeDerivedItem({
+    const derivedItems = weighted.map((item) =>
+      computeDerivedItem({
         title: item.title,
         link: item.link,
         pubDate: item.pubDate,
         domain: item.domain,
         weight: item.weight,
-      });
-      return { ...derived, timeDecay: item.timeDecay };
-    });
+      }),
+    );
 
-    const ordered = sortDerivedItems(derivedWithTime) as DerivedItemWithTime[];
+    const ordered = sortDerivedItems(derivedItems);
 
     let numerator = 0;
     let denominator = 0;
@@ -235,7 +223,7 @@ async function buildNewsContext(
       if (item.polarity === 'bullish') bullCount += 1;
       if (item.polarity === 'bearish') bearCount += 1;
       const dir = item.polarity === 'bullish' ? 1 : item.polarity === 'bearish' ? -1 : 0;
-      numerator += dir * item.severity * item.eventConfidence * item.timeDecay;
+      numerator += dir * item.severity * item.eventConfidence * item.weight;
     }
 
     const biasScoreRaw = numerator / (denominator + BIAS_DENOMINATOR_EPSILON);
