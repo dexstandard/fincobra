@@ -30,6 +30,7 @@ describe('news analyst', () => {
         pubDate: new Date().toISOString(),
         tokens: ['BTC'],
         domain: 'coindesk.com',
+        simhash: '1',
       },
     ]);
     const fetchMock = vi
@@ -63,6 +64,7 @@ describe('news analyst', () => {
         pubDate: new Date().toISOString(),
         tokens: ['BTC'],
         domain: 'coindesk.com',
+        simhash: '2',
       },
     ]);
     const fetchMock = vi
@@ -84,6 +86,7 @@ describe('news analyst', () => {
         pubDate: new Date().toISOString(),
         tokens: ['BTC'],
         domain: 'coindesk.com',
+        simhash: '3',
       },
     ]);
     const orig = globalThis.fetch;
@@ -103,6 +106,7 @@ describe('news analyst', () => {
         pubDate: new Date().toISOString(),
         tokens: ['BTC'],
         domain: 'coindesk.com',
+        simhash: '4',
       },
     ]);
     const orig = globalThis.fetch;
@@ -131,6 +135,7 @@ describe('news analyst', () => {
           pubDate: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
           tokens: ['BTC'],
           domain: 'coindesk.com',
+          simhash: '5',
         },
         {
           title: 'Cointelegraph New',
@@ -138,6 +143,7 @@ describe('news analyst', () => {
           pubDate: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
           tokens: ['BTC'],
           domain: 'cointelegraph.com',
+          simhash: '6',
         },
         {
           title: 'Bitcoinist New',
@@ -145,6 +151,7 @@ describe('news analyst', () => {
           pubDate: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
           tokens: ['BTC'],
           domain: 'bitcoinist.com',
+          simhash: '7',
         },
         {
           title: 'News Bitcoin New',
@@ -152,6 +159,7 @@ describe('news analyst', () => {
           pubDate: new Date(now.getTime() - 20 * 60 * 1000).toISOString(),
           tokens: ['BTC'],
           domain: 'news.bitcoin.com',
+          simhash: '8',
         },
         {
           title: 'Older High',
@@ -159,6 +167,7 @@ describe('news analyst', () => {
           pubDate: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(),
           tokens: ['BTC'],
           domain: 'coindesk.com',
+          simhash: '9',
         },
         {
           title: 'Very Old Cointelegraph',
@@ -166,6 +175,7 @@ describe('news analyst', () => {
           pubDate: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
           tokens: ['BTC'],
           domain: 'cointelegraph.com',
+          simhash: '10',
         },
       ]);
 

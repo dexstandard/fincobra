@@ -4,6 +4,7 @@ export interface NewsInsert {
   pubDate?: string;
   tokens: string[];
   domain: string;
+  simhash: string;
 }
 
 export interface NewsEntry {
