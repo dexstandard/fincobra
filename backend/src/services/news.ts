@@ -1,9 +1,10 @@
 import Parser from 'rss-parser';
 import NodeCache from 'node-cache';
 import type { FastifyBaseLogger } from 'fastify';
-import { insertNews } from '../repos/news.js';
+import { getRecentNewsSimhashes, insertNews } from '../repos/news.js';
 import { TOKENS } from '../util/tokens.js';
 import type { NewsItem } from './news.types.js';
+import { computeSimhash, hammingDistance } from '../util/simhash.js';
 
 const parser = new Parser();
 
@@ -67,6 +68,7 @@ export async function fetchNews(
   now: Date = new Date(),
   log?: FastifyBaseLogger,
   c: NodeCache = cache,
+  recentSimhashes: bigint[] = [],
 ): Promise<NewsItem[]> {
   const nowMs = now.getTime();
   const collected: NewsItem[] = [];
@@ -74,6 +76,8 @@ export async function fetchNews(
   const failedFeeds: Record<string, string> = {};
   let rawItems = 0;
   let deduped = 0;
+  let simhashDeduped = 0;
+  const seenSimhashes = [...recentSimhashes];
 
   for (const url of FEEDS) {
     try {
@@ -97,6 +101,19 @@ export async function fetchNews(
         const domain = extractDomain(item.link);
         if (!domain) continue;
 
+        const simhashValue = computeSimhash(item.title);
+        let isNearDuplicate = false;
+        for (const existing of seenSimhashes) {
+          if (hammingDistance(existing, simhashValue) <= 3) {
+            simhashDeduped++;
+            isNearDuplicate = true;
+            break;
+          }
+        }
+        if (isNearDuplicate) continue;
+
+        seenSimhashes.push(simhashValue);
+
         c.set(seenKey, true);
         collected.push({
           title: item.title,
@@ -104,6 +121,7 @@ export async function fetchNews(
           pubDate: new Date(item.pubDate!).toISOString(),
           tokens,
           domain,
+          simhash: simhashValue.toString(),
         });
         added++;
       }
@@ -145,6 +163,7 @@ export async function fetchNews(
         quietNow, // 0 new items in this run
         silent24h, // no new items for >24h (cumulative)
         perToken: summarizeByToken(collected),
+        simhashDeduped,
       },
       'news fetch summary',
     );
@@ -155,7 +174,17 @@ export async function fetchNews(
 
 export async function fetchAndStoreNews(log: FastifyBaseLogger): Promise<void> {
   try {
-    const news = await fetchNews(new Date(), log);
+    const since = new Date(Date.now() - DAY_MS);
+    const recentSimhashes = await getRecentNewsSimhashes(since);
+    const parsedSimhashes: bigint[] = [];
+    for (const value of recentSimhashes) {
+      try {
+        parsedSimhashes.push(BigInt(value));
+      } catch {
+        // Ignore unparsable values.
+      }
+    }
+    const news = await fetchNews(new Date(), log, cache, parsedSimhashes);
     await insertNews(news);
   } catch (err) {
     log.error({ err }, 'failed to fetch or store news');

@@ -4,6 +4,7 @@ import Parser from 'rss-parser';
 import { tagTokens, isRecent, fetchNews, FEEDS } from '../src/services/news.js';
 import { insertNews } from '../src/repos/news.js';
 import { db } from '../src/db/index.js';
+import { computeSimhash } from '../src/util/simhash.js';
 
 describe('tagTokens', () => {
   it('detects token tags case-insensitively', () => {
@@ -59,6 +60,26 @@ describe('fetchNews', () => {
     });
     parseURL.mockRestore();
   });
+
+  it('skips near-duplicate titles based on simhash distance', async () => {
+    const now = new Date('2023-01-02T00:00:00Z');
+    const recent = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+    const simhash = computeSimhash('BTC surges to new highs');
+    const parseURL = vi.spyOn(Parser.prototype, 'parseURL');
+    parseURL.mockResolvedValue({ items: [] });
+    parseURL.mockResolvedValueOnce({
+      items: [
+        {
+          title: 'BTC surges to new highs!',
+          link: 'https://example.com/btc-1',
+          pubDate: recent,
+        },
+      ],
+    });
+    const res = await fetchNews(now, undefined, undefined, [simhash]);
+    expect(res).toHaveLength(0);
+    parseURL.mockRestore();
+  });
 });
 
 describe('insertNews', () => {
@@ -69,6 +90,7 @@ describe('insertNews', () => {
       pubDate: new Date().toISOString(),
       tokens: ['BTC'],
       domain: 'example.com',
+      simhash: '1',
     };
     await insertNews([item]);
     await insertNews([item]);
@@ -84,6 +106,7 @@ describe('insertNews', () => {
       pubDate: new Date().toISOString(),
       tokens: [],
       domain: 'example.com',
+      simhash: '2',
     };
     await insertNews([item]);
     const { rows } = await db.query('SELECT 1 FROM news WHERE link = $1', [

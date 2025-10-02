@@ -4,4 +4,5 @@ export interface NewsItem {
   pubDate?: string;
   tokens: string[];
   domain: string;
+  simhash: string;
 }
