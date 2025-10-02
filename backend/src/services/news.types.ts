@@ -3,4 +3,5 @@ export interface NewsItem {
   link: string;
   pubDate?: string;
   tokens: string[];
+  domain: string;
 }
