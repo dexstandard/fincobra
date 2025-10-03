@@ -43,9 +43,7 @@ export async function validateTokenConflicts(
 ): Promise<ValidationErr | null> {
   const dupRows = await findActiveTokenConflicts(userId, tokens, id);
   if (!dupRows.length) return null;
-  const conflicts = dupRows.map(
-    (r) => `${r.token} used by ${r.name} (${r.id})`,
-  );
+  const conflicts = dupRows.map((r) => `${r.token} used by workflow ${r.id}`);
   const parts = conflicts;
   const msg = `token${parts.length > 1 ? 's' : ''} ${parts.join(', ')} already used`;
   log.error('token conflict');
@@ -98,7 +96,6 @@ async function validateWorkflowInput(
       {
         userId,
         model: body.model,
-        name: body.name,
         cashToken: body.cash,
         tokens: body.tokens,
         risk: body.risk,
@@ -114,7 +111,7 @@ async function validateWorkflowInput(
       return {
         code: 400,
         body: errorResponse(
-          `identical inactive workflow already exists: ${dupInactive.name} (${dupInactive.id})`,
+          `identical inactive workflow already exists: workflow ${dupInactive.id}`,
         ),
       };
     }

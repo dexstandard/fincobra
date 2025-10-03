@@ -1,6 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from '../lib/i18n';
-import WorkflowName from '../components/WorkflowName';
 import AgentInstructions from '../components/AgentInstructions';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -64,9 +63,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     isAccountLoading,
   } = usePrerequisites(tokenSymbols);
 
-  const [name, setName] = useState(
-    workflow?.name || tokenSymbols.map((t) => t.toUpperCase()).join(' / '),
-  );
   const [instructions, setInstructions] = useState(
     workflow?.agentInstructions || '',
   );
@@ -118,14 +114,10 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-        <span>{t('workflow_setup')}:</span>
-        <WorkflowName
-          name={name}
-          onChange={setName}
-          className="text-2xl font-bold"
-        />
-      </h1>
+      <h1 className="text-2xl font-bold mb-1">{t('workflow_setup')}</h1>
+      <p className="text-sm text-gray-600 uppercase tracking-wide">
+        {tokenSymbols.map((t) => t.toUpperCase()).join(' / ')}
+      </p>
       <FormProvider {...methods}>
         <div className="max-w-xl">
           <PortfolioWorkflowFields
@@ -204,7 +196,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
                 const [cashToken, ...positions] = values.tokens;
                 const payload = {
                   model,
-                  name,
                   cash: cashToken.token.toUpperCase(),
                   tokens: positions.map((t) => ({
                     token: t.token.toUpperCase(),
@@ -240,7 +231,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
           <WorkflowStartButton
             workflow={workflow}
             workflowData={{
-              name,
               tokens: values.tokens.map((t) => ({
                 token: t.token,
                 minAllocation: t.minAllocation,

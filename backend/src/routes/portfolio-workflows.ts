@@ -67,7 +67,6 @@ const workflowUpsertSchema = z
       .string()
       .optional()
       .transform((value) => value ?? ''),
-    name: z.string(),
     cash: z
       .string()
       .optional()
@@ -373,7 +372,6 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         model: validated.model,
         status,
         startBalance,
-        name: validated.name,
         cashToken: validated.cash,
         tokens: validated.tokens,
         risk: validated.risk,
@@ -723,7 +721,6 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         id,
         model: validated.model,
         status,
-        name: validated.name,
         cashToken: validated.cash,
         tokens: validated.tokens,
         risk: validated.risk,

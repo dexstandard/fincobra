@@ -25,7 +25,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -84,7 +83,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -141,7 +139,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -188,7 +185,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -234,7 +230,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -295,7 +290,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -372,7 +366,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -424,7 +417,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -500,7 +492,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -566,7 +557,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -620,7 +610,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -706,7 +695,6 @@ describe('portfolio workflow exec log routes', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },

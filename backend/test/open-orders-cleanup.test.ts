@@ -142,7 +142,6 @@ describe('cleanup open orders', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -189,7 +188,6 @@ describe('cleanup open orders', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -246,7 +244,6 @@ describe('cleanup open orders', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -288,7 +285,6 @@ describe('cleanup open orders', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -328,7 +324,6 @@ describe('cleanup open orders', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },

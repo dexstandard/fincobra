@@ -17,7 +17,6 @@ describe('portfolio workflow start', () => {
     const userId = await insertUserWithKeys('1');
     const payload = {
       model: 'm',
-      name: 'Inactive',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },

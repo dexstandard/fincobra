@@ -10,7 +10,6 @@ export interface PortfolioWorkflow {
   status: string;
   createdAt: string;
   startBalance: number | null;
-  name: string;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;
@@ -28,7 +27,6 @@ export interface PortfolioWorkflowInsert {
   model: string | null;
   status: string;
   startBalance: number | null;
-  name: string;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;
@@ -42,7 +40,6 @@ export interface PortfolioWorkflowUpdate {
   id: string;
   model: string | null;
   status: string;
-  name: string;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;
@@ -56,7 +53,6 @@ export interface PortfolioWorkflowUpdate {
 export interface PortfolioWorkflowInactiveSearch {
   userId: string;
   model: string | null;
-  name: string;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;
