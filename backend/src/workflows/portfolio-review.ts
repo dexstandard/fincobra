@@ -185,7 +185,7 @@ export async function executeWorkflow(
       portfolioId: wf.id,
     };
     const decision = await runStep('runMainTrader', () =>
-      runMainTrader(params, prompt!),
+      runMainTrader(params, prompt!, wf.agentInstructions),
     );
     const logId = await runStep('insertReviewRawLog', () =>
       insertReviewRawLog({

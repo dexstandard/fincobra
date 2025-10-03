@@ -45,6 +45,7 @@ import type {
   MainTraderDecision,
   MainTraderOrder,
 } from '../agents/main-trader.types.js';
+import { developerInstructions } from '../agents/main-trader.js';
 import { adminOnlyPreHandlers, getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
@@ -440,6 +441,18 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         page,
         pageSize,
       };
+    },
+  );
+
+  app.get(
+    '/developer-instructions',
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
+    async (req) => {
+      req.log.info('fetched developer instructions');
+      return { instructions: developerInstructions };
     },
   );
 
