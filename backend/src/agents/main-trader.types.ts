@@ -19,6 +19,7 @@ export interface PreviousReportOrder {
   side: string;
   qty: number;
   status: string;
+  price?: number;
   reason?: string;
 }
 

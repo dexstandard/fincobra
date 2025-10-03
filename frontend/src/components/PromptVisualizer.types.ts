@@ -105,6 +105,7 @@ export interface PromptPreviousReportOrder {
   side: string;
   qty: number;
   status: string;
+  price?: number;
   reason?: string;
 }
 
