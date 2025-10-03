@@ -48,7 +48,7 @@ const translations: Record<Lang, Record<string, string>> = {
     binance_api_credentials: 'Binance API Credentials',
     binance_balances: 'Binance Balances',
     connect_binance_api: 'Connect your Binance API',
-    my_workflows: 'My Portfolios',
+    my_workflows: 'Portfolios',
     only_active: 'Only Active',
     only_my: 'Only My',
     please_log_in_workflows: 'Please log in to view your portfolios.',
@@ -220,7 +220,7 @@ const translations: Record<Lang, Record<string, string>> = {
     binance_api_credentials: 'Учётные данные Binance API',
     binance_balances: 'Балансы Binance',
     connect_binance_api: 'Подключите ваш Binance API',
-    my_workflows: 'Мои портфолио',
+    my_workflows: 'Портфели',
     only_active: 'Только активные',
     only_my: 'Только мои',
     please_log_in_workflows:

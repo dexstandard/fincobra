@@ -388,7 +388,13 @@ export default function Dashboard() {
                   </Link>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div
+                className={`flex gap-3 ${
+                  isAdmin
+                    ? 'flex-col items-end sm:flex-row sm:items-center'
+                    : 'items-center'
+                }`}
+              >
                 {isAdmin && (
                   <Toggle
                     label={t('only_my')}
