@@ -7,7 +7,7 @@ async function ensureOwnerOrAdmin(
   req: FastifyRequest,
   reply: FastifyReply,
   sessionUserId: string,
-): Promise<void | FastifyReply> {
+): Promise<FastifyReply | undefined> {
   if (sessionUserId === req.validatedUserId) {
     return;
   }
@@ -64,7 +64,7 @@ export async function requireOwnerOrAdmin(
   const sessionUserId = requireUserId(req, reply);
   if (!sessionUserId) return reply;
   const result = await ensureOwnerOrAdmin(req, reply, sessionUserId);
-  if (result) return result;
+  if (result !== undefined) return result;
 }
 
 export async function requireAdminAccess(
