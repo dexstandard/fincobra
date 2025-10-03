@@ -365,6 +365,19 @@ export async function collectPromptData(
         qty: plannedQty,
         status: o.status,
       };
+      const priceRaw =
+        planned.limitPrice !== undefined ? planned.limitPrice : planned.price;
+      if (priceRaw !== undefined) {
+        const price = Number(priceRaw);
+        if (Number.isFinite(price)) {
+          order.price = price;
+        } else {
+          log.warn(
+            { limitOrderId: o.orderId },
+            'non-numeric price in planned limit order payload',
+          );
+        }
+      }
       if (o.cancellationReason) {
         order.reason = o.cancellationReason;
       }
