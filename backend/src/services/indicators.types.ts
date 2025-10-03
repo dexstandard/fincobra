@@ -1,13 +1,13 @@
 export interface MarketOverviewRiskFlags {
   overbought: boolean;
   oversold: boolean;
-  vol_spike: boolean;
-  thin_book: boolean;
+  volSpike: boolean;
+  thinBook: boolean;
 }
 
 export interface MarketOverviewTrendBasis {
-  sma_periods: [number, number];
-  gap_pct: number;
+  smaPeriods: [number, number];
+  gapPct: number;
 }
 
 export interface MarketOverviewTrendFrame extends MarketOverviewTrendBasis {
@@ -28,10 +28,10 @@ export interface MarketOverviewTrend {
 }
 
 export interface MarketOverviewRegime {
-  vol_state: 'depressed' | 'normal' | 'elevated';
-  vol_rank_1y: number;
-  corr_btc_90d: number;
-  market_beta_90d: number;
+  volState: 'depressed' | 'normal' | 'elevated';
+  volRank1y: number;
+  corrBtc90d: number;
+  marketBeta90d: number;
 }
 
 export interface MarketOverviewHtf {
@@ -41,43 +41,43 @@ export interface MarketOverviewHtf {
 }
 
 export interface MarketOverviewToken {
-  trend_slope: 'up' | 'flat' | 'down';
-  trend_basis: MarketOverviewTrendBasis;
+  trendSlope: 'up' | 'flat' | 'down';
+  trendBasis: MarketOverviewTrendBasis;
   ret1h: number;
   ret24h: number;
-  vol_atr_pct: number;
-  vol_anomaly_z: number;
+  volAtrPct: number;
+  volAnomalyZ: number;
   rsi14: number;
-  orderbook_spread_bps: number;
-  orderbook_depth_ratio: number;
-  risk_flags: MarketOverviewRiskFlags;
+  orderbookSpreadBps: number;
+  orderbookDepthRatio: number;
+  riskFlags: MarketOverviewRiskFlags;
   htf: MarketOverviewHtf;
 }
 
 export interface MarketOverviewTimeframe {
-  candle_interval: string;
-  review_interval: string;
+  candleInterval: string;
+  reviewInterval: string;
   semantics: string;
 }
 
 export interface MarketOverviewDerivations {
-  trend_slope_rule: string;
-  ret1h_rule: string;
-  ret24h_rule: string;
-  vol_atr_pct_rule: string;
-  vol_anomaly_z_rule: string;
-  rsi14_rule: string;
-  orderbook_spread_bps_rule: string;
-  orderbook_depth_ratio_rule: string;
-  htf_returns_rule: string;
-  htf_trend_rule: string;
-  regime_vol_state_rule: string;
-  regime_corr_beta_rule: string;
-  risk_flags_rules: {
+  trendSlopeRule: string;
+  ret1hRule: string;
+  ret24hRule: string;
+  volAtrPctRule: string;
+  volAnomalyZRule: string;
+  rsi14Rule: string;
+  orderbookSpreadBpsRule: string;
+  orderbookDepthRatioRule: string;
+  htfReturnsRule: string;
+  htfTrendRule: string;
+  regimeVolStateRule: string;
+  regimeCorrBetaRule: string;
+  riskFlagsRules: {
     overbought: string;
     oversold: string;
-    vol_spike: string;
-    thin_book: string;
+    volSpike: string;
+    thinBook: string;
   };
 }
 
@@ -87,10 +87,10 @@ export interface MarketOverviewSpec {
 }
 
 export interface MarketOverviewPayload {
-  schema_version: 'market_overview.v2';
-  as_of: string;
+  schemaVersion: 'market_overview.v2';
+  asOf: string;
   timeframe: MarketOverviewTimeframe;
   derivations: MarketOverviewDerivations;
-  _spec: MarketOverviewSpec;
-  market_overview: Record<string, MarketOverviewToken>;
+  spec: MarketOverviewSpec;
+  marketOverview: Record<string, MarketOverviewToken>;
 }

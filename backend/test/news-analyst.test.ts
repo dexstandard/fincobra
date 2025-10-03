@@ -4,7 +4,6 @@ import {
   sortDerivedItems,
   computeWeight,
   computeTimeDecay,
-  parseUsdAmount,
 } from '../src/agents/news-analyst.js';
 
 describe('news analyst helpers', () => {
@@ -51,11 +50,8 @@ describe('news analyst helpers', () => {
     expect(hack.polarity).toBe('bearish');
     expect(hack.severity).toBeGreaterThan(0.8);
     expect(hack.eventConfidence).toBeGreaterThan(0.8);
-    expect(hack.numbers.usdApprox).toBe(8_000_000);
-
     expect(listing.eventType).toBe('Listing');
     expect(listing.polarity).toBe('bullish');
-    expect(listing.tierHints.exchangeTier).toBe('T1');
 
     expect(rumor.eventType).toBe('Rumor');
     expect(rumor.polarity).toBe('neutral');
@@ -89,14 +85,12 @@ describe('news analyst helpers', () => {
     expect(ordered[2].eventType).toBe('Upgrade');
   });
 
-  it('computes time decay and USD parsing helpers', () => {
+  it('computes time decay helper', () => {
     const now = new Date('2025-01-05T00:00:00Z');
     const recent = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
     const distant = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
     expect(computeTimeDecay(recent, now)).toBeGreaterThan(0.4);
     expect(computeTimeDecay(distant, now)).toBeLessThan(0.05);
-    expect(parseUsdAmount('Hack drains $7.5M in funds')).toBe(7_500_000);
-    expect(parseUsdAmount('No dollars mentioned')).toBeNull();
   });
 });

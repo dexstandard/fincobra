@@ -25,16 +25,15 @@ describe('callAi structured output', () => {
       marketData: {},
       reviewInterval: '1h',
       previousReports: [
-        { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
+        { ts: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
         {
-          datetime: '2025-01-02T00:00:00.000Z',
+          ts: '2025-01-02T00:00:00.000Z',
           orders: [
             {
               symbol: 'BTCUSDT',
               side: 'BUY',
-              quantity: 1,
+              qty: 1,
               status: LimitOrderStatus.Filled,
-              datetime: '2025-01-02T00:00:00.000Z',
             },
           ],
           shortReport: 'p2',
@@ -57,16 +56,15 @@ describe('callAi structured output', () => {
     expect(typeof body.input).toBe('string');
     const parsed = JSON.parse(body.input);
     expect(parsed.previousReports).toEqual([
-      { datetime: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
+      { ts: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
       {
-        datetime: '2025-01-02T00:00:00.000Z',
+        ts: '2025-01-02T00:00:00.000Z',
         orders: [
           {
             symbol: 'BTCUSDT',
             side: 'BUY',
-            quantity: 1,
+            qty: 1,
             status: LimitOrderStatus.Filled,
-            datetime: '2025-01-02T00:00:00.000Z',
           },
         ],
         shortReport: 'p2',

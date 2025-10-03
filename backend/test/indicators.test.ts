@@ -214,21 +214,6 @@ function beta(asset: number[], market: number[]) {
   return covariance / varianceB;
 }
 
-function computeRiskFlags(token: {
-  rsi14: number;
-  vol_atr_pct: number;
-  orderbook_spread_bps: number;
-  orderbook_depth_ratio: number;
-}) {
-  return {
-    overbought: token.rsi14 >= 75,
-    oversold: token.rsi14 <= 25,
-    vol_spike: token.vol_atr_pct >= 3,
-    thin_book:
-      token.orderbook_spread_bps > 10 || token.orderbook_depth_ratio < 0.5,
-  };
-}
-
 describe('fetchMarketOverview', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -345,16 +330,16 @@ describe('fetchMarketOverview', () => {
 
     const payload = await fetchMarketOverview(['SOL']);
 
-    expect(payload.schema_version).toBe('market_overview.v2');
-    expect(payload.as_of).toBe('2025-09-20T06:15:00.000Z');
-    expect(Object.keys(payload.market_overview)).toEqual(['SOL', 'BTC']);
+    expect(payload.schemaVersion).toBe('market_overview.v2');
+    expect(payload.asOf).toBe('2025-09-20T06:15:00.000Z');
+    expect(Object.keys(payload.marketOverview)).toEqual(['SOL', 'BTC']);
 
     const btcDailyCloses = syntheticPairs.BTC.year.map((k) => Number(k[4]));
     const btcDailyLogs = logReturns(btcDailyCloses);
 
     for (const token of ['SOL', 'BTC'] as const) {
       const symbol = syntheticPairs[token].symbol;
-      const overview = payload.market_overview[token];
+      const overview = payload.marketOverview[token];
       const hourSeries = syntheticIntervals[symbol]['1h'];
       const fourHourSeries = syntheticIntervals[symbol]['4h'];
       const daySeries = syntheticIntervals[symbol]['1d'];
@@ -412,50 +397,50 @@ describe('fetchMarketOverview', () => {
       const corr = correlation(assetLogs, btcLogsSlice);
       const betaVal = beta(assetLogs, btcLogsSlice);
 
-      const riskFlags = computeRiskFlags({
-        rsi14: rsi,
-        vol_atr_pct: volAtrPct,
-        orderbook_spread_bps: spreadBps,
-        orderbook_depth_ratio: depthRatio,
-      });
+      const expectedRiskFlags = {
+        overbought: rsi >= 75,
+        oversold: rsi <= 25,
+        volSpike: volAtrPct >= 3,
+        thinBook: spreadBps > 10 || depthRatio < 0.5,
+      };
 
-      expect(overview.trend_slope).toBe(expectedTrendSlope);
-      expect(overview.trend_basis.sma_periods).toEqual([50, 200]);
-      expect(overview.trend_basis.gap_pct).toBeCloseTo(gap, 10);
+      expect(overview.trendSlope).toBe(expectedTrendSlope);
+      expect(overview.trendBasis.smaPeriods).toEqual([50, 200]);
+      expect(overview.trendBasis.gapPct).toBeCloseTo(gap, 10);
       expect(overview.ret1h).toBeCloseTo(ret1h, 10);
       expect(overview.ret24h).toBeCloseTo(ret24h, 10);
-      expect(overview.vol_atr_pct).toBeCloseTo(volAtrPct, 10);
-      expect(overview.vol_anomaly_z).toBeCloseTo(volZ, 10);
+      expect(overview.volAtrPct).toBeCloseTo(volAtrPct, 10);
+      expect(overview.volAnomalyZ).toBeCloseTo(volZ, 10);
       expect(overview.rsi14).toBeCloseTo(rsi, 10);
-      expect(overview.orderbook_spread_bps).toBeCloseTo(spreadBps, 10);
-      expect(overview.orderbook_depth_ratio).toBeCloseTo(depthRatio, 10);
-      expect(overview.risk_flags).toEqual(riskFlags);
+      expect(overview.orderbookSpreadBps).toBeCloseTo(spreadBps, 10);
+      expect(overview.orderbookDepthRatio).toBeCloseTo(depthRatio, 10);
+      expect(overview.riskFlags).toEqual(expectedRiskFlags);
 
       expect(overview.htf.returns['30d']).toBeCloseTo(ret30, 10);
       expect(overview.htf.returns['90d']).toBeCloseTo(ret90, 10);
       expect(overview.htf.returns['180d']).toBeCloseTo(ret180, 10);
       expect(overview.htf.returns['365d']).toBeCloseTo(ret365, 10);
 
-      expect(overview.htf.trend['4h'].gap_pct).toBeCloseTo(
-        trend4h.gap_pct,
+      expect(overview.htf.trend['4h'].gapPct).toBeCloseTo(
+        trend4h.gapPct,
         10,
       );
       expect(overview.htf.trend['4h'].slope).toBe(trend4h.slope);
-      expect(overview.htf.trend['1d'].gap_pct).toBeCloseTo(
-        trend1d.gap_pct,
+      expect(overview.htf.trend['1d'].gapPct).toBeCloseTo(
+        trend1d.gapPct,
         10,
       );
       expect(overview.htf.trend['1d'].slope).toBe(trend1d.slope);
-      expect(overview.htf.trend['1w'].gap_pct).toBeCloseTo(
-        trend1w.gap_pct,
+      expect(overview.htf.trend['1w'].gapPct).toBeCloseTo(
+        trend1w.gapPct,
         10,
       );
       expect(overview.htf.trend['1w'].slope).toBe(trend1w.slope);
 
-      expect(overview.htf.regime.vol_state).toBe(volState);
-      expect(overview.htf.regime.vol_rank_1y).toBeCloseTo(volRank, 10);
-      expect(overview.htf.regime.corr_btc_90d).toBeCloseTo(corr, 10);
-      expect(overview.htf.regime.market_beta_90d).toBeCloseTo(betaVal, 10);
+      expect(overview.htf.regime.volState).toBe(volState);
+      expect(overview.htf.regime.volRank1y).toBeCloseTo(volRank, 10);
+      expect(overview.htf.regime.corrBtc90d).toBeCloseTo(corr, 10);
+      expect(overview.htf.regime.marketBeta90d).toBeCloseTo(betaVal, 10);
     }
 
     expect(fetchStub).toHaveBeenCalled();
@@ -463,8 +448,8 @@ describe('fetchMarketOverview', () => {
 
   it('provides an empty overview when no tokens are requested', () => {
     const payload = createEmptyMarketOverview(new Date('2024-01-01T00:00:00Z'));
-    expect(payload.market_overview).toEqual({});
-    expect(payload.as_of).toBe('2024-01-01T00:00:00.000Z');
+    expect(payload.marketOverview).toEqual({});
+    expect(payload.asOf).toBe('2024-01-01T00:00:00.000Z');
   });
 
   it('caches token overviews to avoid duplicate fetches within the TTL', async () => {

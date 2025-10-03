@@ -83,7 +83,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'USDT',
           side: 'BUY',
-          quantity: 100,
+          qty: 100,
           limitPrice: 99.9,
           basePrice: 100,
           maxPriceDivergencePct: 0.05,
@@ -96,7 +96,7 @@ describe('createDecisionLimitOrders', () => {
     expect(JSON.parse(row.planned_json)).toMatchObject({
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 1.001001,
+      qty: 1.001001,
       price: 99.9,
       limitPrice: 99.9,
       basePrice: 100,
@@ -106,7 +106,7 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 1.001001,
+      qty: 1.001001,
       price: 99.9,
     });
   });
@@ -150,7 +150,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'USDT',
           side: 'BUY',
-          quantity: 100,
+          qty: 100,
           limitPrice: 95,
           basePrice: 100,
           maxPriceDivergencePct: 0.05,
@@ -163,7 +163,7 @@ describe('createDecisionLimitOrders', () => {
     expect(JSON.parse(row2.planned_json)).toMatchObject({
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 1.05263158,
+      qty: 1.05263158,
       price: 95,
       basePrice: 100,
       limitPrice: 95,
@@ -173,7 +173,7 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 1.05263158,
+      qty: 1.05263158,
       price: 95,
     });
   });
@@ -217,7 +217,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 1,
+          qty: 1,
           limitPrice: 95,
           basePrice: 100,
           maxPriceDivergencePct: 0.05,
@@ -230,7 +230,7 @@ describe('createDecisionLimitOrders', () => {
     expect(JSON.parse(row.planned_json)).toMatchObject({
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 1,
+      qty: 1,
       price: 95,
       basePrice: 100,
       limitPrice: 95,
@@ -240,7 +240,7 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 1,
+      qty: 1,
       price: 95,
     });
   });
@@ -284,7 +284,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'SELL',
-          quantity: 1,
+          qty: 1,
           limitPrice: 250,
           basePrice: 249,
           maxPriceDivergencePct: 0.02,
@@ -303,7 +303,7 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'SELL',
-      quantity: 1,
+      qty: 1,
       price: 251.251,
     });
   });
@@ -347,7 +347,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 1,
+          qty: 1,
           limitPrice: 100,
           basePrice: 101,
           maxPriceDivergencePct: 0.05,
@@ -363,7 +363,7 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 1,
+      qty: 1,
       price: 97.902,
     });
   });
@@ -407,7 +407,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 1,
+          qty: 1,
           limitPrice: 99.9,
           basePrice: 100,
           maxPriceDivergencePct: 0.02,
@@ -460,7 +460,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 1,
+          qty: 1,
           limitPrice: Number.NaN,
           basePrice: 100,
           maxPriceDivergencePct: 0.05,
@@ -515,7 +515,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 1,
+          qty: 1,
           limitPrice: 99,
           basePrice: 100,
           maxPriceDivergencePct: 0,
@@ -571,7 +571,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.05,
+          qty: 0.05,
           limitPrice: 99.9,
           basePrice: 100,
           maxPriceDivergencePct: 0.05,
@@ -626,7 +626,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'DOGEUSDT',
           token: 'USDT',
           side: 'BUY',
-          quantity: 0.02056,
+          qty: 0.02056,
           limitPrice: 0.02065,
           basePrice: 0.02065,
           maxPriceDivergencePct: 0.01,
@@ -645,7 +645,7 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'DOGEUSDT',
       side: 'BUY',
-      quantity: 1.1,
+      qty: 1.1,
       price: 0.02,
     });
   });
@@ -692,7 +692,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.000043,
+          qty: 0.000043,
           limitPrice: 110000,
           basePrice: 115000,
           maxPriceDivergencePct: 0.05,
@@ -759,7 +759,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.00003,
+          qty: 0.00003,
           limitPrice: 110000,
           basePrice: 115000,
           maxPriceDivergencePct: 0.05,
@@ -817,7 +817,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'SELL',
-          quantity: 0.00004,
+          qty: 0.00004,
           limitPrice: 110000,
           basePrice: 115000,
           maxPriceDivergencePct: 0.05,
@@ -882,7 +882,7 @@ describe('createDecisionLimitOrders', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.5,
+          qty: 0.5,
           limitPrice: 99.5,
           basePrice: 100,
           maxPriceDivergencePct: 0.05,

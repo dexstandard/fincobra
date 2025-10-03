@@ -61,12 +61,12 @@ vi.mock('../src/services/binance-client.js', () => ({
 }));
 
 vi.mock('../src/repos/review-result.js', () => ({
-  getRecentReviewResults: vi.fn().mockResolvedValue(
+  getRecentReviewResults: vi.fn().mockImplementation(async (_workflowId, limit) =>
     Array.from({ length: 5 }, (_, i) => ({
       id: `r${i + 1}`,
       createdAt: new Date(`2025-01-0${i + 1}T00:00:00.000Z`),
       shortReport: `p${i + 1}`,
-    })),
+    })).slice(0, limit),
   ),
 }));
 
@@ -156,17 +156,16 @@ describe('collectPromptData', () => {
     };
 
     const prompt = await collectPromptData(row, mockLogger());
-    expect(prompt?.previousReports).toHaveLength(5);
+    expect(prompt?.previousReports).toHaveLength(3);
     expect(prompt?.previousReports?.[0]).toMatchObject({
-      datetime: '2025-01-01T00:00:00.000Z',
+      ts: '2025-01-01T00:00:00.000Z',
       orders: [
         {
           symbol: 'BTCUSDT',
           side: 'BUY',
-          quantity: 1,
+          qty: 1,
           status: LimitOrderStatus.Filled,
-          datetime: '2025-01-01T00:00:00.000Z',
-          cancellationReason: 'price limit',
+          reason: 'price limit',
         },
       ],
       shortReport: 'p1',
@@ -309,15 +308,11 @@ describe('collectPromptData', () => {
 
       expect(news?.version).toBe('news_context.v1');
       expect(news?.items.length).toBe(5);
-      expect(news?.biasScore).toBeLessThan(0);
-      expect(news?.maxSeverity ?? 0).toBeGreaterThan(0.7);
-      expect(news?.bearCount ?? 0).toBeGreaterThan(0);
-      expect(news?.bullCount ?? 0).toBeGreaterThan(0);
-      expect(news?.topEventSummary).toMatch(/^Hack — bearish \(sev=\d\.\d{2}\)/);
-      expect(news?.items[0]).toMatchObject({
-        tierHints: expect.any(Object),
-        numbers: expect.any(Object),
-      });
+      expect(news?.bias).toBeLessThan(0);
+      expect(news?.maxSev ?? 0).toBeGreaterThan(0.7);
+      expect(news?.bear ?? 0).toBeGreaterThan(0);
+      expect(news?.bull ?? 0).toBeGreaterThan(0);
+      expect(news?.top).toMatch(/^StablecoinDepeg — bearish \(sev=\d\.\d{2}\)/);
     } finally {
       vi.useRealTimers();
     }

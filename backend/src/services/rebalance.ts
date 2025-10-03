@@ -136,7 +136,7 @@ export async function createDecisionLimitOrders(opts: {
       basePrice: o.basePrice,
       limitPrice: o.limitPrice,
       maxPriceDivergencePct: o.maxPriceDivergencePct,
-      requestedQuantity: o.quantity,
+      requestedQuantity: o.qty,
       observedPrice: currentPrice,
     };
 
@@ -154,14 +154,14 @@ export async function createDecisionLimitOrders(opts: {
 
     const side: 'BUY' | 'SELL' = requestedSide;
 
-    if (!Number.isFinite(o.quantity) || o.quantity <= 0) {
+    if (!Number.isFinite(o.qty) || o.qty <= 0) {
       await insertLimitOrder({
         userId: opts.userId,
         planned: plannedBase,
         status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
-        cancellationReason: `Malformed quantity: ${o.quantity}`,
+        cancellationReason: `Malformed qty: ${o.qty}`,
       });
       continue;
     }
@@ -255,9 +255,9 @@ export async function createDecisionLimitOrders(opts: {
 
     let quantity: number;
     if (requestedToken === info.baseAsset) {
-      quantity = o.quantity;
+      quantity = o.qty;
     } else if (requestedToken === info.quoteAsset) {
-      quantity = o.quantity / roundedLimit;
+      quantity = o.qty / roundedLimit;
     } else {
       continue;
     }
@@ -283,7 +283,7 @@ export async function createDecisionLimitOrders(opts: {
       if (
         minForRequestedToken !== null &&
         minForRequestedToken > 0 &&
-        matchesTruncatedPrefix(o.quantity, minForRequestedToken)
+        matchesTruncatedPrefix(o.qty, minForRequestedToken)
       ) {
         const targetNominal =
           Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;

@@ -6,7 +6,7 @@
   "background": false,
   "error": null,
   "incomplete_details": null,
-  "instructions": "- Decide whether to rebalance based on portfolio and market data.\n- If rebalancing, return {orders:[{pair,token,side,quantity,limitPrice,basePrice,maxPriceDivergencePct}],shortReport}.\n- If not, return {orders:[],shortReport}.\n- shortReport ≤255 chars.\n- On error, return {error:\"message\"}.",
+  "instructions": "- Decide whether to rebalance based on portfolio and market data.\n- If rebalancing, return {orders:[{pair,token,side,qty,limitPrice,basePrice,maxPriceDivergencePct}],shortReport}.\n- If not, return {orders:[],shortReport}.\n- shortReport ≤255 chars.\n- On error, return {error:\"message\"}.",
   "max_output_tokens": null,
   "max_tool_calls": null,
   "model": "gpt-5-nano-2025-08-07",
@@ -52,7 +52,7 @@
           "type": "output_text",
           "annotations": [],
           "logprobs": [],
-          "text": "{\"result\": {\"orders\": [{\"pair\": \"SOLUSDT\", \"token\": \"SOL\", \"side\": \"BUY\", \"quantity\": 0.000071, \"limitPrice\": 185, \"basePrice\": 184, \"maxPriceDivergencePct\": 0.02}], \"shortReport\": \"SOL ~$184. Current: USDT 0.043834, SOL 0. Rebalance: buy ~0.000071 SOL costing ~0.01315 USDT.\"}}"
+          "text": "{\"result\": {\"orders\": [{\"pair\": \"SOLUSDT\", \"token\": \"SOL\", \"side\": \"BUY\", \"qty\": 0.000071, \"limitPrice\": 185, \"basePrice\": 184, \"maxPriceDivergencePct\": 0.02}], \"shortReport\": \"SOL ~$184. Current: USDT 0.043834, SOL 0. Rebalance: buy ~0.000071 SOL costing ~0.01315 USDT.\"}}"
         }
       ],
       "role": "assistant"
@@ -104,7 +104,7 @@
                         "pair": { "type": "string" },
                         "token": { "type": "string" },
                         "side": { "type": "string" },
-                        "quantity": { "type": "number" },
+                        "qty": { "type": "number" },
                         "limitPrice": { "type": "number" },
                         "basePrice": { "type": "number" },
                         "maxPriceDivergencePct": { "type": "number" }
@@ -113,7 +113,7 @@
                         "pair",
                         "token",
                         "side",
-                        "quantity",
+                        "qty",
                         "limitPrice",
                         "basePrice",
                         "maxPriceDivergencePct"

@@ -38,17 +38,6 @@ interface Rule {
   baseConfidence: number;
 }
 
-export interface DerivedNumbers {
-  usdApprox: number | null;
-  tokenQtyApprox: number | null;
-  tokenUnit?: 'BTC' | 'ETH' | 'SOL' | 'USDT' | 'USDC';
-}
-
-export interface TierHints {
-  exchangeTier: 'T1' | 'T2' | 'none';
-  exchange?: 'binance' | 'coinbase' | 'kraken' | 'okx' | 'bybit';
-}
-
 export interface DerivedItem {
   title: string;
   link: string | null;
@@ -61,8 +50,6 @@ export interface DerivedItem {
   eventConfidence: number;
   headlineScore: number;
   matchedRules: string[];
-  numbers: DerivedNumbers;
-  tierHints: TierHints;
 }
 
 const EVENT_PRIORITY: EventType[] = [
@@ -263,8 +250,6 @@ const RULES: Rule[] = [
   },
 ];
 
-const EXCHANGE_REGEX = /\b(binance|coinbase|kraken|okx|bybit)\b/i;
-
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -281,74 +266,6 @@ export function computeTimeDecay(pubDate: string | null, now: Date): number {
   const ageMs = now.getTime() - publishedMs;
   if (ageMs <= 0) return 1;
   return Math.pow(0.5, ageMs / HALF_LIFE_MS);
-}
-
-export function parseUsdAmount(title: string): number | null {
-  const match = title.match(/\$[0-9][0-9,\.]*\s?(million|billion|m|bn|b)?/i);
-  if (!match) return null;
-  const raw = match[0].toLowerCase();
-  const numberMatch = raw.match(/\$([0-9][0-9,\.]*)/);
-  if (!numberMatch) return null;
-  const base = Number(numberMatch[1].replace(/,/g, ''));
-  if (Number.isNaN(base)) return null;
-  let multiplier = 1;
-  if (raw.includes('billion') || /bn\b/.test(raw) || raw.trim().endsWith('b')) {
-    multiplier = 1_000_000_000;
-  } else if (
-    raw.includes('million') ||
-    /m\b/.test(raw) ||
-    raw.trim().endsWith('m')
-  ) {
-    multiplier = 1_000_000;
-  }
-  return base * multiplier;
-}
-
-function parseTokenQuantity(
-  title: string,
-): { amount: number; unit: DerivedNumbers['tokenUnit'] } | null {
-  const match = title.match(/(\d[\d,\.]{2,})\s*(btc|eth|sol|usdt|usdc)\b/i);
-  if (!match) return null;
-  const amount = Number(match[1].replace(/,/g, ''));
-  if (Number.isNaN(amount)) return null;
-  const unit = match[2].toUpperCase() as DerivedNumbers['tokenUnit'];
-  return { amount, unit };
-}
-
-function applyTokenSeverityBoost(
-  severity: number,
-  token: { amount: number; unit: DerivedNumbers['tokenUnit'] },
-): number {
-  const { amount, unit } = token;
-  if (!unit) return severity;
-  if (unit === 'BTC') {
-    if (amount >= 1000) return severity + 0.2;
-    if (amount >= 200) return severity + 0.1;
-  }
-  if (unit === 'ETH') {
-    if (amount >= 10000) return severity + 0.2;
-    if (amount >= 2000) return severity + 0.1;
-  }
-  if (unit === 'SOL') {
-    if (amount >= 100000) return severity + 0.1;
-  }
-  if (unit === 'USDT' || unit === 'USDC') {
-    if (amount >= 50_000_000) return severity + 0.15;
-  }
-  return severity;
-}
-
-function getExchangeTierHints(
-  eventType: EventType,
-  exchangeMatch: RegExpMatchArray | null,
-): TierHints {
-  if (!exchangeMatch) return { exchangeTier: 'none' };
-  const exchange = exchangeMatch[1].toLowerCase() as TierHints['exchange'];
-  if (!['Listing', 'Delisting', 'Outage'].includes(eventType)) {
-    return { exchangeTier: 'none' };
-  }
-  const tier = exchange === 'binance' || exchange === 'coinbase' ? 'T1' : 'T2';
-  return { exchangeTier: tier, exchange };
 }
 
 export function computeDerivedItem(item: {
@@ -415,14 +332,12 @@ export function computeDerivedItem(item: {
     polarity = 'bullish';
   }
 
-  const exchangeMatch = titleLower.match(EXCHANGE_REGEX);
-
   if (eventType === 'WhaleMove') {
     const depositLike = /(deposit|inflow|transfer(ed|s)?)/.test(titleLower);
     const withdrawLike = /(withdraw|withdrawal|outflow|redeem)/.test(titleLower);
-    if (exchangeMatch && depositLike) {
+    if (depositLike) {
       polarity = 'bearish';
-    } else if (exchangeMatch && withdrawLike) {
+    } else if (withdrawLike) {
       polarity = 'bullish';
     }
   }
@@ -436,32 +351,6 @@ export function computeDerivedItem(item: {
   }
   if (rumorMatched) {
     eventConfidence -= 0.1;
-  }
-
-  const usdAmount = parseUsdAmount(titleLower);
-  const numbers: DerivedNumbers = {
-    usdApprox: usdAmount,
-    tokenQtyApprox: null,
-  };
-
-  if (usdAmount) {
-    if (usdAmount >= 5_000_000) severity += 0.2;
-    else if (usdAmount >= 1_000_000) severity += 0.1;
-  }
-
-  const tokenQuantity = parseTokenQuantity(titleLower);
-  if (tokenQuantity) {
-    numbers.tokenQtyApprox = tokenQuantity.amount;
-    numbers.tokenUnit = tokenQuantity.unit;
-    severity = applyTokenSeverityBoost(severity, tokenQuantity);
-    matchedRules.push('R.W2');
-  }
-
-  const tierHints = getExchangeTierHints(eventType, exchangeMatch);
-  if (tierHints.exchangeTier === 'T1') {
-    severity += 0.1;
-  } else if (tierHints.exchangeTier === 'T2') {
-    severity += 0.05;
   }
 
   if (rumorMatched) {
@@ -487,8 +376,6 @@ export function computeDerivedItem(item: {
     eventConfidence,
     headlineScore,
     matchedRules,
-    numbers,
-    tierHints,
   };
 }
 
