@@ -339,19 +339,37 @@ export async function collectPromptData(
   const previousReports: PreviousReport[] = [];
   for (const r of prevRows) {
     const ordersRows = await getLimitOrdersByReviewResult(row.id, r.id);
-    const orders = ordersRows.map((o) => {
+    const orders: PreviousReportOrder[] = [];
+    for (const o of ordersRows) {
       const planned = JSON.parse(o.plannedJson);
+      // TODO: drop quantity fallback once legacy orders are migrated.
+      const plannedQtyRaw = planned.qty ?? planned.quantity;
+      if (plannedQtyRaw === undefined) {
+        log.warn(
+          { limitOrderId: o.id },
+          'missing qty in planned limit order payload',
+        );
+        continue;
+      }
+      const plannedQty = Number(plannedQtyRaw);
+      if (!Number.isFinite(plannedQty)) {
+        log.warn(
+          { limitOrderId: o.id },
+          'non-numeric qty in planned limit order payload',
+        );
+        continue;
+      }
       const order: PreviousReportOrder = {
         symbol: planned.symbol,
         side: planned.side,
-        qty: planned.qty,
+        qty: plannedQty,
         status: o.status,
       };
       if (o.cancellationReason) {
         order.reason = o.cancellationReason;
       }
-      return order;
-    });
+      orders.push(order);
+    }
     const report: PreviousReport = {
       ts: r.createdAt.toISOString(),
       ...(r.shortReport !== undefined ? { shortReport: r.shortReport } : {}),
