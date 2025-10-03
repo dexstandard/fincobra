@@ -186,7 +186,6 @@ async function setupWorkflow(tokens: string[], manual = false) {
     model: 'gpt',
     status: 'active',
     startBalance: null,
-    name: 'Agent',
     cashToken: 'USDT',
     tokens: tokens.map((t, i) => ({ token: t, minAllocation: (i + 1) * 10 })),
     risk: 'low',

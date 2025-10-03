@@ -41,7 +41,6 @@ describe('syncOpenOrderStatuses', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'SOL', minAllocation: 10 },
         { token: 'USDT', minAllocation: 10 },
