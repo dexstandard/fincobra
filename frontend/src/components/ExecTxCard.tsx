@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import { LIMIT_ORDER_STATUS, type LimitOrder } from '../lib/types';
 import api from '../lib/axios';
 import Button from './ui/Button';
@@ -37,9 +37,9 @@ export default function ExecTxCard({
   }
 
   return (
-    <div className="mt-2 rounded border p-2 text-sm">
+    <div className="mt-2 rounded border p-2 text-xs sm:text-sm">
       <div className="font-bold mb-1">Limit order(s)</div>
-      <table className="w-full text-left text-xs">
+      <table className="w-full text-left text-[0.7rem] sm:text-xs">
         <thead>
           <tr>
             <th className="hidden pr-2 sm:table-cell">Time</th>
@@ -73,12 +73,15 @@ export default function ExecTxCard({
               <td>
                 {o.status === LIMIT_ORDER_STATUS.Open && (
                   <Button
+                    aria-label="Cancel order"
+                    title="Cancel order"
                     variant="danger"
                     onClick={() => handleCancel(o.id)}
                     loading={canceling === o.id}
-                    className="px-2 py-1 text-xs"
+                    className="px-2 py-1 text-[0.7rem] sm:text-xs"
                   >
-                    Cancel
+                    <X className="h-4 w-4 sm:hidden" aria-hidden />
+                    <span className="hidden sm:inline">Cancel</span>
                   </Button>
                 )}
               </td>
