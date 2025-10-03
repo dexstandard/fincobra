@@ -17,11 +17,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   portfolioReviewSchema,
   portfolioReviewDefaults,
-  DEFAULT_AGENT_INSTRUCTIONS,
   type PortfolioReviewFormValues,
 } from '../lib/constants';
 import PortfolioWorkflowFields from '../components/forms/PortfolioWorkflowFields';
 import type { PortfolioWorkflow } from '../lib/useWorkflowData';
+import { useDeveloperInstructions } from '../lib/useDeveloperInstructions';
 
 interface Props {
   workflow?: PortfolioWorkflow;
@@ -68,13 +68,14 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     workflow?.name || tokenSymbols.map((t) => t.toUpperCase()).join(' / '),
   );
   const [instructions, setInstructions] = useState(
-    workflow?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS,
+    workflow?.agentInstructions || '',
   );
   const [manualRebalance, setManualRebalance] = useState(
     workflow?.manualRebalance || false,
   );
   const [isSaving, setIsSaving] = useState(false);
   const values = methods.watch();
+  const { data: defaultDeveloperInstructions } = useDeveloperInstructions();
 
   useEffect(() => {
     setModel(workflow?.model || '');
@@ -93,6 +94,19 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
       setName(tokenSymbols.map((t) => t.toUpperCase()).join(' / '));
     }
   }, [tokenSymbols, workflow]);
+
+  useEffect(() => {
+    if (workflow) {
+      setInstructions(workflow.agentInstructions);
+    }
+  }, [workflow?.agentInstructions, workflow]);
+
+  useEffect(() => {
+    if (workflow || !defaultDeveloperInstructions) return;
+    if (!instructions.trim()) {
+      setInstructions(defaultDeveloperInstructions);
+    }
+  }, [workflow, defaultDeveloperInstructions, instructions]);
 
   function WarningSign({ children }: { children: ReactNode }) {
     return (

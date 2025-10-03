@@ -401,7 +401,6 @@ export async function collectPromptData(
   );
 
   const prompt: RebalancePrompt = {
-    instructions: row.agentInstructions,
     reviewInterval: row.reviewInterval,
     policy: { floor },
     cash,
@@ -448,10 +447,14 @@ function extractResult(res: string): MainTraderDecision | null {
 export async function run(
   { log, model, apiKey }: RunParams,
   prompt: RebalancePrompt,
+  instructionsOverride?: string,
 ): Promise<MainTraderDecision | null> {
+  const instructions = instructionsOverride?.trim()
+    ? instructionsOverride
+    : developerInstructions;
   const res = await callAi(
     model,
-    developerInstructions,
+    instructions,
     rebalanceResponseSchema,
     prompt,
     apiKey,

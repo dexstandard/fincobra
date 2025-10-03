@@ -71,7 +71,6 @@ export interface PromptReport {
 }
 
 export interface RebalancePrompt {
-  instructions: string;
   reviewInterval: string;
   policy: { floor: Record<string, number> };
   cash: string;

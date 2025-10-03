@@ -385,7 +385,7 @@ describe('portfolio workflow exec log routes', () => {
     });
     const workflowId = agent.id;
     const entry = JSON.stringify({
-      prompt: { instructions: 'inst' },
+      prompt: { reviewInterval: '1h' },
       response: 'ok',
     });
     await insertReviewRawLog({
