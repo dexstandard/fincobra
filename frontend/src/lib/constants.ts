@@ -39,9 +39,6 @@ export const reviewIntervalOptions = (t: (key: string) => string) => [
   { value: '1w', label: t('review_interval_1w') },
 ];
 
-export const DEFAULT_AGENT_INSTRUCTIONS =
-  'Day trade this pair and determine the target allocation yourself. Monitor real-time market data and news, trimming positions after rallies and adding to them after dips to stay within policy floors while exploiting intraday swings.';
-
 export const portfolioReviewSchema = z
   .object({
     tokens: z

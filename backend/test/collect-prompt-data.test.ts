@@ -135,6 +135,7 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.startBalanceTs).toBe('2025-01-01T00:00:00.000Z');
     expect(prompt?.portfolio.pnlUsd).toBeCloseTo(1000);
     expect(prompt?.reviewInterval).toBe('1h');
+    expect(prompt).not.toHaveProperty('instructions');
   });
 
   it('includes recent limit orders in prompt', async () => {

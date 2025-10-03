@@ -39,7 +39,7 @@ vi.mock('../src/services/openai-client.js', () => ({
   callAi: callAiMock,
 }));
 
-import { run } from '../src/agents/main-trader.js';
+import { run, developerInstructions } from '../src/agents/main-trader.js';
 
 describe('main trader step', () => {
   beforeEach(() => {
@@ -48,8 +48,9 @@ describe('main trader step', () => {
 
   it('returns decision from AI response', async () => {
     const prompt = {
-      instructions: '',
+      reviewInterval: '1h',
       policy: { floor: {} },
+      cash: 'USDT',
       portfolio: { ts: new Date().toISOString(), positions: [] },
       routes: [],
       marketData: { currentPrice: 0, minNotional: 10 },
@@ -76,5 +77,30 @@ describe('main trader step', () => {
       },
     ]);
     expect(callAiMock).toHaveBeenCalled();
+    const [, instructionsArg] = callAiMock.mock.calls[0];
+    expect(instructionsArg).toBe(developerInstructions);
+  });
+
+  it('prefers prompt instructions when provided', async () => {
+    const prompt = {
+      reviewInterval: '1h',
+      policy: { floor: {} },
+      cash: 'USDT',
+      portfolio: { ts: new Date().toISOString(), positions: [] },
+      routes: [],
+      marketData: {},
+    };
+    await run(
+      {
+        log: mockLogger(),
+        model: 'gpt',
+        apiKey: 'key',
+        portfolioId: 'agent1',
+      },
+      prompt,
+      'custom developer instructions',
+    );
+    const [, instructionsArg] = callAiMock.mock.calls[0];
+    expect(instructionsArg).toBe('custom developer instructions');
   });
 });

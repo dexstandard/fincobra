@@ -159,6 +159,7 @@ export default function WorkflowView() {
                                   workflow.cashToken,
                                 ].filter(Boolean) as string[]
                               }
+                              developerInstructions={workflow.agentInstructions}
                             />
                           </td>
                         </tr>
@@ -185,6 +186,7 @@ export default function WorkflowView() {
                           Boolean,
                         ) as string[]
                       }
+                      developerInstructions={workflow.agentInstructions}
                     />
                   </div>
                 ))}
