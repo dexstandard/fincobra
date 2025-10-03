@@ -346,7 +346,7 @@ export async function collectPromptData(
       const plannedQtyRaw = planned.qty ?? planned.quantity;
       if (plannedQtyRaw === undefined) {
         log.warn(
-          { limitOrderId: o.id },
+          { limitOrderId: o.orderId },
           'missing qty in planned limit order payload',
         );
         continue;
@@ -354,7 +354,7 @@ export async function collectPromptData(
       const plannedQty = Number(plannedQtyRaw);
       if (!Number.isFinite(plannedQty)) {
         log.warn(
-          { limitOrderId: o.id },
+          { limitOrderId: o.orderId },
           'non-numeric qty in planned limit order payload',
         );
         continue;
