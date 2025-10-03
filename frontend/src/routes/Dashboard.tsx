@@ -33,10 +33,12 @@ function WorkflowRow({
   workflow,
   onDelete,
   showOwner,
+  canDelete,
 }: {
   workflow: WorkflowSummary;
   onDelete: (id: string) => void;
   showOwner: boolean;
+  canDelete: boolean;
 }) {
   const t = useTranslation();
   const tokenList = [
@@ -135,13 +137,15 @@ function WorkflowRow({
           >
             <Eye className="w-4 h-4" />
           </Link>
-          <button
-            className="text-red-600"
-            onClick={() => onDelete(workflow.id)}
-            aria-label={t('delete_workflow')}
-          >
-            <Trash className="w-4 h-4" />
-          </button>
+          {canDelete && (
+            <button
+              className="text-red-600"
+              onClick={() => onDelete(workflow.id)}
+              aria-label={t('delete_workflow')}
+            >
+              <Trash className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -152,10 +156,12 @@ function WorkflowBlock({
   workflow,
   onDelete,
   showOwner,
+  canDelete,
 }: {
   workflow: WorkflowSummary;
   onDelete: (id: string) => void;
   showOwner: boolean;
+  canDelete: boolean;
 }) {
   const t = useTranslation();
   const tokenList = [
@@ -274,13 +280,15 @@ function WorkflowBlock({
           </div>
         )}
         <div className="flex justify-end">
-          <button
-            className="text-red-600"
-            onClick={() => onDelete(workflow.id)}
-            aria-label={t('delete_workflow')}
-          >
-            <Trash className="w-5 h-5" />
-          </button>
+          {canDelete && (
+            <button
+              className="text-red-600"
+              onClick={() => onDelete(workflow.id)}
+              aria-label={t('delete_workflow')}
+            >
+              <Trash className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -460,6 +468,7 @@ export default function Dashboard() {
                         workflow={workflow}
                         onDelete={handleDelete}
                         showOwner={showOwnerColumn}
+                        canDelete={workflow.userId === user?.id}
                       />
                     ))}
                   </tbody>
@@ -471,6 +480,7 @@ export default function Dashboard() {
                       workflow={workflow}
                       onDelete={handleDelete}
                       showOwner={showOwnerColumn}
+                      canDelete={workflow.userId === user?.id}
                     />
                   ))}
                 </div>
