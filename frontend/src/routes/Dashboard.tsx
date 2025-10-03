@@ -29,6 +29,14 @@ interface WorkflowSummary {
   ownerEmail?: string | null;
 }
 
+function formatOwnerEmail(email?: string | null) {
+  if (!email) {
+    return undefined;
+  }
+  const atIndex = email.indexOf('@');
+  return atIndex === -1 ? email : email.slice(0, atIndex);
+}
+
 function WorkflowRow({
   workflow,
   onDelete,
@@ -124,7 +132,7 @@ function WorkflowRow({
           {workflow.reviewInterval}
         </span>
       </td>
-      {showOwner && <td>{workflow.ownerEmail ?? '-'}</td>}
+      {showOwner && <td>{formatOwnerEmail(workflow.ownerEmail) ?? '-'}</td>}
       <td>
         <WorkflowStatusLabel status={workflow.status} />
       </td>
@@ -276,7 +284,7 @@ function WorkflowBlock({
         {showOwner && (
           <div>
             <div className="text-xs text-gray-500">{t('owner')}</div>
-            {workflow.ownerEmail ?? '-'}
+            {formatOwnerEmail(workflow.ownerEmail) ?? '-'}
           </div>
         )}
         <div className="flex justify-end">
