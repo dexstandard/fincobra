@@ -33,11 +33,35 @@ interface Props {
 const currencyFormatter = new Intl.NumberFormat(undefined, {
   style: 'currency',
   currency: 'USD',
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const numberFormatter = new Intl.NumberFormat(undefined, {
+const currencyFormatterPrecise = new Intl.NumberFormat(undefined, {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 6,
+});
+
+const numberFormatter0 = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 0,
+});
+
+const numberFormatter2 = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
+});
+
+const numberFormatter4 = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 4,
+});
+
+const numberFormatter6 = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 6,
+});
+
+const numberFormatter8 = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 8,
 });
 
 const percentFormatter = new Intl.NumberFormat(undefined, {
@@ -58,12 +82,20 @@ function formatPercent(value?: number): string {
 
 function formatNumber(value?: number): string {
   if (typeof value !== 'number') return '—';
-  return numberFormatter.format(value);
+  const abs = Math.abs(value);
+  if (abs === 0) return '0';
+  if (abs >= 1000) return numberFormatter0.format(value);
+  if (abs >= 1) return numberFormatter2.format(value);
+  if (abs >= 0.1) return numberFormatter4.format(value);
+  if (abs >= 0.01) return numberFormatter6.format(value);
+  return numberFormatter8.format(value);
 }
 
 function formatCurrency(value?: number): string {
   if (typeof value !== 'number') return '—';
-  return currencyFormatter.format(value);
+  return Math.abs(value) >= 0.01
+    ? currencyFormatter.format(value)
+    : currencyFormatterPrecise.format(value);
 }
 
 function getRiskFlags(flags?: PromptRiskFlags): string[] {
