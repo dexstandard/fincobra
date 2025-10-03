@@ -9,15 +9,20 @@ interface BinanceBalanceResponse {
   locked?: unknown;
 }
 
-export function useWorkflowBalanceUsd(tokens: string[]) {
+export function useWorkflowBalanceUsd(tokens: string[], ownerId?: string) {
   const { user } = useUser();
   const uniqTokens = Array.from(new Set(tokens.map((t) => t.toUpperCase())));
+  const targetUserId = ownerId ?? user?.id;
+  const isAdmin = user?.role === 'admin';
+  const isOwner = !!targetUserId && targetUserId === user?.id;
+  const canAccess = !!user && !!targetUserId && (isOwner || isAdmin);
+
   const { data: binanceKey } = useQuery<string | null>({
-    queryKey: ['binance-key', user?.id],
-    enabled: !!user,
+    queryKey: ['binance-key', targetUserId],
+    enabled: canAccess && isOwner,
     queryFn: async () => {
       try {
-        const res = await api.get(`/users/${user!.id}/binance-key`);
+        const res = await api.get(`/users/${targetUserId}/binance-key`);
         return res.data.key as string;
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 404)
@@ -27,27 +32,39 @@ export function useWorkflowBalanceUsd(tokens: string[]) {
     },
   });
 
-  const enabled = !!user && !!binanceKey && uniqTokens.length > 0;
+  const hasKey = isOwner ? !!binanceKey : true;
+  const enabled = canAccess && hasKey && uniqTokens.length > 0;
   const balanceQueries = useQueries({
     queries: enabled
       ? uniqTokens.map((token) => ({
-          queryKey: ['binance-balance-usd', user?.id, token.toUpperCase()],
+          queryKey: ['binance-balance-usd', targetUserId, token.toUpperCase()],
           enabled,
           queryFn: async () => {
-            const res = await api.get(
-              `/users/${user!.id}/binance-balance/${token.toUpperCase()}`,
-            );
-            const bal = res.data as BinanceBalanceResponse;
-            const amount =
-              parseBalanceAmount(bal.free) + parseBalanceAmount(bal.locked);
-            if (!amount) return 0;
-            if (['USDT', 'USDC'].includes(token.toUpperCase())) return amount;
-            const priceRes = await fetch(
-              `https://api.binance.com/api/v3/ticker/price?symbol=${token.toUpperCase()}USDT`,
-            );
-            if (!priceRes.ok) return 0;
-            const priceData = (await priceRes.json()) as { price: string };
-            return amount * Number(priceData.price);
+            const tokenUpper = token.toUpperCase();
+            try {
+              const res = await api.get(
+                `/users/${targetUserId}/binance-balance/${tokenUpper}`,
+              );
+              const bal = res.data as BinanceBalanceResponse;
+              const amount =
+                parseBalanceAmount(bal.free) + parseBalanceAmount(bal.locked);
+              if (!amount) return 0;
+              if (['USDT', 'USDC'].includes(tokenUpper)) return amount;
+              const priceRes = await fetch(
+                `https://api.binance.com/api/v3/ticker/price?symbol=${tokenUpper}USDT`,
+              );
+              if (!priceRes.ok) return 0;
+              const priceData = (await priceRes.json()) as { price: string };
+              return amount * Number(priceData.price);
+            } catch (err) {
+              if (
+                axios.isAxiosError(err) &&
+                (err.response?.status === 403 || err.response?.status === 404)
+              ) {
+                return 0;
+              }
+              throw err;
+            }
           },
         }))
       : [],

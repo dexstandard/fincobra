@@ -3,6 +3,19 @@ import { requireAdmin, requireUserId } from '../../util/auth.js';
 import { errorResponse, ERROR_MESSAGES } from '../../util/error-messages.js';
 import { parseRequestParams, userIdParams } from './validation.js';
 
+async function ensureOwnerOrAdmin(
+  req: FastifyRequest,
+  reply: FastifyReply,
+  sessionUserId: string,
+): Promise<void | FastifyReply> {
+  if (sessionUserId === req.validatedUserId) {
+    return;
+  }
+  const adminId = await requireAdmin(req, reply);
+  if (!adminId) return reply;
+  req.adminUserId = adminId;
+}
+
 export async function parseUserIdParam(
   req: FastifyRequest,
   reply: FastifyReply,
@@ -41,6 +54,19 @@ export async function requireAdminOwner(
   req.adminUserId = adminId;
 }
 
+export async function requireOwnerOrAdmin(
+  req: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void | FastifyReply> {
+  if (!req.validatedUserId) {
+    return reply.code(400).send(errorResponse('missing user id'));
+  }
+  const sessionUserId = requireUserId(req, reply);
+  if (!sessionUserId) return reply;
+  const result = await ensureOwnerOrAdmin(req, reply, sessionUserId);
+  if (result) return result;
+}
+
 export async function requireAdminAccess(
   req: FastifyRequest,
   reply: FastifyReply,
@@ -69,5 +95,9 @@ export const adminOnlyPreHandlers = [requireAdminAccess];
 export const adminManagedUserPreHandlers = [
   parseUserIdParam,
   requireAdminAccess,
+];
+export const userOrAdminPreHandlers = [
+  parseUserIdParam,
+  requireOwnerOrAdmin,
 ];
 export const sessionPreHandlers = [requireSession];
