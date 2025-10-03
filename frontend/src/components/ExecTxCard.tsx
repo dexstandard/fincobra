@@ -4,6 +4,7 @@ import { LIMIT_ORDER_STATUS, type LimitOrder } from '../lib/types';
 import api from '../lib/axios';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
+import FormattedDate from './ui/FormattedDate';
 import { useTranslation } from '../lib/i18n';
 
 interface Props {
@@ -41,7 +42,7 @@ export default function ExecTxCard({
       <table className="w-full text-left text-xs">
         <thead>
           <tr>
-            <th className="pr-2">Time</th>
+            <th className="hidden pr-2 sm:table-cell">Time</th>
             <th className="pr-2">Symbol</th>
             <th className="pr-2">Side</th>
             <th className="pr-2">Qty</th>
@@ -53,7 +54,9 @@ export default function ExecTxCard({
         <tbody>
           {orders.map((o) => (
             <tr key={o.id}>
-              <td className="pr-2">{new Date(o.createdAt).toLocaleString()}</td>
+              <td className="hidden pr-2 whitespace-nowrap sm:table-cell">
+                <FormattedDate date={o.createdAt} />
+              </td>
               <td className="pr-2">{o.symbol}</td>
               <td className="pr-2">{o.side}</td>
               <td className="pr-2">{o.qty}</td>
@@ -73,6 +76,7 @@ export default function ExecTxCard({
                     variant="danger"
                     onClick={() => handleCancel(o.id)}
                     loading={canceling === o.id}
+                    className="px-2 py-1 text-xs"
                   >
                     Cancel
                   </Button>
