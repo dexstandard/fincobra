@@ -97,7 +97,7 @@ function computeTrendFrame(
   let slope: 'up' | 'flat' | 'down' = 'flat';
   if (gap > 0.5) slope = 'up';
   else if (gap < -0.5) slope = 'down';
-  return { sma_periods: periods, gap_pct: gap, slope };
+  return { smaPeriods: periods, gapPct: gap, slope };
 }
 
 function calcAtr(highs: number[], lows: number[], closes: number[]) {
