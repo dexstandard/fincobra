@@ -373,6 +373,9 @@ function PreviousReportsSection({
                     </span>
                     <span className="uppercase text-gray-700">{order.side}</span>
                     <span>Qty: {formatNumber(order.qty)}</span>
+                    {typeof order.price === 'number' && (
+                      <span>Price: {formatNumber(order.price)}</span>
+                    )}
                     <span>Status: {order.status}</span>
                     {order.reason && <span>Reason: {order.reason}</span>}
                   </div>

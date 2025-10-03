@@ -4,11 +4,12 @@ import { useTranslation } from '../lib/i18n';
 interface Props {
   tokens: string[];
   startBalanceUsd: number | null;
+  userId?: string;
 }
 
-export default function WorkflowPnlMobile({ tokens, startBalanceUsd }: Props) {
+export default function WorkflowPnlMobile({ tokens, startBalanceUsd, userId }: Props) {
   const t = useTranslation();
-  const { balance, isLoading } = useWorkflowBalanceUsd(tokens);
+  const { balance, isLoading } = useWorkflowBalanceUsd(tokens, userId);
   const balanceText =
     balance === null
       ? '-'

@@ -59,7 +59,11 @@ export default function WorkflowDetailsDesktop({ workflow }: Props) {
           </pre>
         )}
       </div>
-      <WorkflowPnl tokens={tokens} startBalanceUsd={workflow.startBalanceUsd} />
+      <WorkflowPnl
+        tokens={tokens}
+        startBalanceUsd={workflow.startBalanceUsd}
+        userId={workflow.userId}
+      />
     </div>
   );
 }

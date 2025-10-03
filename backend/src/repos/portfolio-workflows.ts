@@ -1,6 +1,8 @@
 import { db, withTransaction } from '../db/index.js';
 import { PortfolioWorkflowStatus } from '../services/portfolio-workflows.js';
 import { convertKeysToCamelCase } from '../util/object-case.js';
+import { decrypt } from '../util/crypto.js';
+import { env } from '../util/env.js';
 import type {
   ActivePortfolioWorkflow,
   PortfolioWorkflowInactiveSearch,
@@ -31,6 +33,10 @@ export function toApi(row: PortfolioWorkflow) {
     useEarn: row.useEarn,
     aiApiKeyId: row.aiApiKeyId ?? null,
     exchangeApiKeyId: row.exchangeApiKeyId ?? null,
+    ownerEmail:
+      row.ownerEmailEnc && env.KEY_PASSWORD
+        ? decrypt(row.ownerEmailEnc, env.KEY_PASSWORD)
+        : null,
   };
 }
 
@@ -39,8 +45,10 @@ const baseSelect = `
          COALESCE(json_agg(json_build_object('token', t.token, 'min_allocation', t.min_allocation) ORDER BY t.position)
                   FILTER (WHERE t.token IS NOT NULL), '[]') AS tokens,
          pw.risk, pw.review_interval, pw.agent_instructions, pw.manual_rebalance, pw.use_earn,
-         COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id, COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id
+         COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id, COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
+         u.email_enc AS owner_email_enc
     FROM portfolio_workflow pw
+    JOIN users u ON u.id = pw.user_id
     LEFT JOIN portfolio_workflow_tokens t ON t.portfolio_workflow_id = pw.id
     LEFT JOIN ai_api_keys ak ON ak.user_id = pw.user_id AND ak.provider = 'openai'
     LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
@@ -52,7 +60,7 @@ export async function getPortfolioWorkflow(
   id: string,
 ): Promise<PortfolioWorkflow | undefined> {
   const { rows } = await db.query(
-    `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id`,
+    `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc`,
     [id, PortfolioWorkflowStatus.Retired],
   );
   if (!rows[0]) return undefined;
@@ -74,7 +82,7 @@ export async function getPortfolioWorkflowsPaginated(
       [userId, status],
     );
     const { rows } = await db.query(
-      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $3 OFFSET $4`,
+      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $3 OFFSET $4`,
       [userId, status, limit, offset],
     );
     return {
@@ -88,7 +96,7 @@ export async function getPortfolioWorkflowsPaginated(
     [userId, PortfolioWorkflowStatus.Retired],
   );
   const { rows } = await db.query(
-    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $3 OFFSET $4`,
+    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $3 OFFSET $4`,
     [userId, PortfolioWorkflowStatus.Retired, limit, offset],
   );
   return {
@@ -115,7 +123,7 @@ export async function getPortfolioWorkflowsPaginatedAdmin(
       [status],
     );
     const { rows } = await db.query(
-      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $2 OFFSET $3`,
+      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $2 OFFSET $3`,
       [status, limit, offset],
     );
     return {
@@ -129,7 +137,7 @@ export async function getPortfolioWorkflowsPaginatedAdmin(
     [PortfolioWorkflowStatus.Retired],
   );
   const { rows } = await db.query(
-    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id LIMIT $2 OFFSET $3`,
+    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $2 OFFSET $3`,
     [PortfolioWorkflowStatus.Retired, limit, offset],
   );
   return {

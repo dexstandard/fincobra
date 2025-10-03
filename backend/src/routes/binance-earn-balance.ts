@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { RATE_LIMITS } from '../rate-limit.js';
 import { fetchEarnFlexibleBalance } from '../services/binance-client.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
-import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
+import {
+  getValidatedUserId,
+  userOrAdminPreHandlers,
+} from './_shared/guards.js';
 import {
   parseRequestParams,
   userTokenParamsSchema,
@@ -32,7 +35,7 @@ export default async function binanceEarnBalanceRoutes(app: FastifyInstance) {
     '/users/:id/binance-earn-balance/:token',
     {
       config: { rateLimit: RATE_LIMITS.RELAXED },
-      preHandler: userPreHandlers,
+      preHandler: userOrAdminPreHandlers,
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);

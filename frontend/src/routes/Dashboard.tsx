@@ -26,21 +26,29 @@ interface WorkflowSummary {
   tokens?: { token: string }[];
   startBalanceUsd?: number | null;
   reviewInterval: string;
+  ownerEmail?: string | null;
 }
 
 function WorkflowRow({
   workflow,
   onDelete,
+  showOwner,
+  canDelete,
 }: {
   workflow: WorkflowSummary;
   onDelete: (id: string) => void;
+  showOwner: boolean;
+  canDelete: boolean;
 }) {
   const t = useTranslation();
   const tokenList = [
     workflow.cashToken,
     ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
   ];
-  const { balance, isLoading } = useWorkflowBalanceUsd(tokenList);
+  const { balance, isLoading } = useWorkflowBalanceUsd(
+    tokenList,
+    workflow.userId,
+  );
   const balanceText =
     balance === null
       ? '-'
@@ -116,6 +124,7 @@ function WorkflowRow({
           {workflow.reviewInterval}
         </span>
       </td>
+      {showOwner && <td>{workflow.ownerEmail ?? '-'}</td>}
       <td>
         <WorkflowStatusLabel status={workflow.status} />
       </td>
@@ -128,13 +137,15 @@ function WorkflowRow({
           >
             <Eye className="w-4 h-4" />
           </Link>
-          <button
-            className="text-red-600"
-            onClick={() => onDelete(workflow.id)}
-            aria-label={t('delete_workflow')}
-          >
-            <Trash className="w-4 h-4" />
-          </button>
+          {canDelete && (
+            <button
+              className="text-red-600"
+              onClick={() => onDelete(workflow.id)}
+              aria-label={t('delete_workflow')}
+            >
+              <Trash className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -144,16 +155,23 @@ function WorkflowRow({
 function WorkflowBlock({
   workflow,
   onDelete,
+  showOwner,
+  canDelete,
 }: {
   workflow: WorkflowSummary;
   onDelete: (id: string) => void;
+  showOwner: boolean;
+  canDelete: boolean;
 }) {
   const t = useTranslation();
   const tokenList = [
     workflow.cashToken,
     ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
   ];
-  const { balance, isLoading } = useWorkflowBalanceUsd(tokenList);
+  const { balance, isLoading } = useWorkflowBalanceUsd(
+    tokenList,
+    workflow.userId,
+  );
   const balanceText =
     balance === null
       ? '-'
@@ -237,7 +255,9 @@ function WorkflowBlock({
           </Link>
         </div>
       </div>
-      <div className="grid grid-cols-4 gap-2 items-center">
+      <div
+        className={`grid ${showOwner ? 'grid-cols-5' : 'grid-cols-4'} gap-2 items-center`}
+      >
         <div>
           <div className="text-xs text-gray-500">{t('status')}</div>
           <WorkflowStatusLabel status={workflow.status} />
@@ -253,14 +273,22 @@ function WorkflowBlock({
             {workflow.reviewInterval}
           </span>
         </div>
+        {showOwner && (
+          <div>
+            <div className="text-xs text-gray-500">{t('owner')}</div>
+            {workflow.ownerEmail ?? '-'}
+          </div>
+        )}
         <div className="flex justify-end">
-          <button
-            className="text-red-600"
-            onClick={() => onDelete(workflow.id)}
-            aria-label={t('delete_workflow')}
-          >
-            <Trash className="w-5 h-5" />
-          </button>
+          {canDelete && (
+            <button
+              className="text-red-600"
+              onClick={() => onDelete(workflow.id)}
+              aria-label={t('delete_workflow')}
+            >
+              <Trash className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -279,6 +307,7 @@ export default function Dashboard() {
     includeAiKey: false,
   });
   const isAdmin = user?.role === 'admin';
+  const showOwnerColumn = isAdmin && !onlyMy;
 
   const { data } = useQuery({
     queryKey: [
@@ -425,6 +454,9 @@ export default function Dashboard() {
                       <th className="text-left">{t('pnl_usd')}</th>
                       <th className="text-left">{t('model')}</th>
                       <th className="text-left">{t('interval')}</th>
+                      {showOwnerColumn && (
+                        <th className="text-left">{t('owner')}</th>
+                      )}
                       <th className="text-left">{t('status')}</th>
                       <th></th>
                     </tr>
@@ -435,6 +467,8 @@ export default function Dashboard() {
                         key={workflow.id}
                         workflow={workflow}
                         onDelete={handleDelete}
+                        showOwner={showOwnerColumn}
+                        canDelete={workflow.userId === user?.id}
                       />
                     ))}
                   </tbody>
@@ -445,6 +479,8 @@ export default function Dashboard() {
                       key={workflow.id}
                       workflow={workflow}
                       onDelete={handleDelete}
+                      showOwner={showOwnerColumn}
+                      canDelete={workflow.userId === user?.id}
                     />
                   ))}
                 </div>
