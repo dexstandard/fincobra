@@ -100,7 +100,7 @@ export interface MainTraderOrder {
   qty: number;
   limitPrice: number;
   basePrice: number;
-  maxPriceDivergencePct: number;
+  maxPriceDriftPct: number;
 }
 
 export interface MainTraderDecision {

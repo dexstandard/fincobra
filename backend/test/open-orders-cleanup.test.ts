@@ -12,7 +12,7 @@ import { setAiKey } from '../src/repos/ai-api-key.js';
 import { reviewWorkflowPortfolio } from '../src/workflows/portfolio-review.js';
 
 const sampleMarketOverview = vi.hoisted(() => ({
-  schemaVersion: 'market_overview.v2' as const,
+  schema: 'market_overview.v2' as const,
   asOf: '2024-01-01T00:00:00Z',
   timeframe: { candleInterval: '1h', reviewInterval: '30m', semantics: '' },
   derivations: {
@@ -161,7 +161,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -208,14 +208,14 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '456',
@@ -265,7 +265,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -307,7 +307,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -347,7 +347,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '789',

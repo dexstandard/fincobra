@@ -80,7 +80,7 @@ vi.mock('../src/repos/limit-orders.js', () => ({
           plannedJson: JSON.stringify({
             symbol: 'BTCUSDT',
             side: 'BUY',
-            quantity: i,
+            qty: i,
           }),
           status: LimitOrderStatus.Filled,
           createdAt: new Date(`2025-01-0${i}T00:00:00.000Z`),

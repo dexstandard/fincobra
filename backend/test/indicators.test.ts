@@ -330,7 +330,7 @@ describe('fetchMarketOverview', () => {
 
     const payload = await fetchMarketOverview(['SOL']);
 
-    expect(payload.schemaVersion).toBe('market_overview.v2');
+    expect(payload.schema).toBe('market_overview.v2');
     expect(payload.asOf).toBe('2025-09-20T06:15:00.000Z');
     expect(Object.keys(payload.marketOverview)).toEqual(['SOL', 'BTC']);
 

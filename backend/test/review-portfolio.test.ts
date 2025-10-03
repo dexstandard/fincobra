@@ -65,7 +65,7 @@ vi.mock('../src/services/sentiment.js', () => ({
 }));
 
 const sampleMarketOverview = vi.hoisted(() => ({
-  schemaVersion: 'market_overview.v2' as const,
+  schema: 'market_overview.v2' as const,
   asOf: '2024-01-01T00:00:00Z',
   timeframe: {
     candleInterval: '1h',
@@ -202,7 +202,7 @@ describe('reviewPortfolio', () => {
   it('saves decision and logs', async () => {
     const { workflowId } = await setupWorkflow(['BTC']);
     const decision = {
-      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', qty: 1 }],
       shortReport: 'ok',
     };
     runMainTrader.mockResolvedValue(decision);
@@ -232,8 +232,8 @@ describe('reviewPortfolio', () => {
     ]);
     const decision = {
       orders: [
-        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
-        { pair: 'ETHBTC', token: 'ETH', side: 'SELL', quantity: 0.5 },
+        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 },
+        { pair: 'ETHBTC', token: 'ETH', side: 'SELL', qty: 0.5 },
       ],
       shortReport: 's',
     };
@@ -249,7 +249,7 @@ describe('reviewPortfolio', () => {
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
     const { workflowId: agent3 } = await setupWorkflow(['BTC'], true);
     const decision = {
-      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
@@ -261,7 +261,7 @@ describe('reviewPortfolio', () => {
   it('records error when pair is invalid', async () => {
     const { workflowId: agent4 } = await setupWorkflow(['BTC']);
     const decision = {
-      orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', quantity: 1 }],
+      orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', qty: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
@@ -274,7 +274,7 @@ describe('reviewPortfolio', () => {
   it('records error when quantity is invalid', async () => {
     const { workflowId: agent5 } = await setupWorkflow(['BTC']);
     const decision = {
-      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 0 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 0 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);

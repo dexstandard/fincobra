@@ -408,7 +408,7 @@ export async function createLimitOrder(
   opts: {
     symbol: string;
     side: 'BUY' | 'SELL';
-    quantity: number;
+    qty: number;
     price: number;
   },
 ) {
@@ -418,7 +418,7 @@ export async function createLimitOrder(
       side: opts.side,
       type: 'LIMIT',
       timeInForce: 'GTC',
-      quantity: String(opts.quantity),
+      quantity: String(opts.qty),
       price: String(opts.price),
     });
     appendSignature(creds.secret, params);

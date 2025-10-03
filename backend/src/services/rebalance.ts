@@ -25,7 +25,7 @@ function splitPair(pair: string): [string, string] {
   return ['', ''];
 }
 
-const MIN_MAX_PRICE_DIVERGENCE = 0.0001;
+const MIN_MAX_PRICE_DRIFT = 0.0001;
 const NOMINAL_BUFFER_RATIO = 1.0001;
 
 interface NominalAdjustmentOptions {
@@ -135,8 +135,8 @@ export async function createDecisionLimitOrders(opts: {
       manuallyEdited,
       basePrice: o.basePrice,
       limitPrice: o.limitPrice,
-      maxPriceDivergencePct: o.maxPriceDivergencePct,
-      requestedQuantity: o.qty,
+      maxPriceDriftPct: o.maxPriceDriftPct,
+      requestedQty: o.qty,
       observedPrice: currentPrice,
     };
 
@@ -191,8 +191,8 @@ export async function createDecisionLimitOrders(opts: {
     }
 
     if (
-      !Number.isFinite(o.maxPriceDivergencePct) ||
-      o.maxPriceDivergencePct < MIN_MAX_PRICE_DIVERGENCE
+      !Number.isFinite(o.maxPriceDriftPct) ||
+      o.maxPriceDriftPct < MIN_MAX_PRICE_DRIFT
     ) {
       await insertLimitOrder({
         userId: opts.userId,
@@ -200,14 +200,14 @@ export async function createDecisionLimitOrders(opts: {
         status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
         orderId: String(Date.now()),
-        cancellationReason: `Malformed maxPriceDivergencePct: ${o.maxPriceDivergencePct}`,
+        cancellationReason: `Malformed maxPriceDriftPct: ${o.maxPriceDriftPct}`,
       });
       continue;
     }
 
     const basePrice = o.basePrice;
     const requestedLimitPrice = o.limitPrice;
-    const divergenceLimit = o.maxPriceDivergencePct;
+    const divergenceLimit = o.maxPriceDriftPct;
     const divergence = Math.abs(currentPrice - basePrice) / basePrice;
     if (divergence > divergenceLimit) {
       await insertLimitOrder({
@@ -216,7 +216,7 @@ export async function createDecisionLimitOrders(opts: {
           ...plannedBase,
           basePrice,
           limitPrice: requestedLimitPrice,
-          maxPriceDivergencePct: divergenceLimit,
+          maxPriceDriftPct: divergenceLimit,
         },
         status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
@@ -243,7 +243,7 @@ export async function createDecisionLimitOrders(opts: {
           ...plannedBase,
           basePrice,
           limitPrice: adjustedLimit,
-          maxPriceDivergencePct: divergenceLimit,
+          maxPriceDriftPct: divergenceLimit,
         },
         status: LimitOrderStatus.Canceled,
         reviewResultId: opts.reviewResultId,
@@ -261,9 +261,9 @@ export async function createDecisionLimitOrders(opts: {
     } else {
       continue;
     }
-    const rawQuantity = quantity;
-    let qty = Number(rawQuantity.toFixed(info.quantityPrecision));
-    const freshNominal = rawQuantity * roundedLimit;
+    const rawQty = quantity;
+    let qty = Number(rawQty.toFixed(info.quantityPrecision));
+    const freshNominal = rawQty * roundedLimit;
     const roundedNominal = qty * roundedLimit;
     const meetsRoundedNominal = meetsMinNotional(
       roundedNominal,
@@ -301,16 +301,16 @@ export async function createDecisionLimitOrders(opts: {
     const params = {
       symbol: info.symbol,
       side,
-      quantity: qty,
+      qty,
       price: roundedLimit,
     } as const;
     const planned = {
       ...plannedBase,
-      quantity: qty,
+      qty,
       price: roundedLimit,
       basePrice,
       limitPrice: roundedLimit,
-      maxPriceDivergencePct: divergenceLimit,
+      maxPriceDriftPct: divergenceLimit,
     };
 
     if (!meetsMinNotional(nominalValue, info.minNotional)) {

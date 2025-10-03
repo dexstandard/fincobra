@@ -221,7 +221,7 @@ export function createEmptyMarketOverview(
   asOf: Date = new Date(),
 ): MarketOverviewPayload {
   return {
-    schemaVersion: 'market_overview.v2',
+    schema: 'market_overview.v2',
     asOf: asOf.toISOString(),
     timeframe: TIMEFRAME,
     derivations: DERIVATIONS,
@@ -551,7 +551,7 @@ export async function fetchMarketOverview(
   }, new Date(0));
 
   return {
-    schemaVersion: 'market_overview.v2',
+    schema: 'market_overview.v2',
     asOf:
       latestAsOf.getTime() > 0 ? latestAsOf.toISOString() : new Date().toISOString(),
     timeframe: TIMEFRAME,

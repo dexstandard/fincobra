@@ -87,7 +87,7 @@ export interface MarketOverviewSpec {
 }
 
 export interface MarketOverviewPayload {
-  schemaVersion: 'market_overview.v2';
+  schema: 'market_overview.v2';
   asOf: string;
   timeframe: MarketOverviewTimeframe;
   derivations: MarketOverviewDerivations;

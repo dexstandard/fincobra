@@ -215,7 +215,7 @@ function isValidManualOrder(value: unknown): value is MainTraderOrder {
     typeof record.qty === 'number' &&
     typeof record.limitPrice === 'number' &&
     typeof record.basePrice === 'number' &&
-    typeof record.maxPriceDivergencePct === 'number'
+    typeof record.maxPriceDriftPct === 'number'
   );
 }
 
@@ -488,12 +488,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           return {
             id: r.orderId,
             side: planned.side,
-            quantity: planned.quantity,
+            qty: planned.qty,
             price: planned.price,
             symbol: planned.symbol,
             status: r.status,
             createdAt: r.createdAt.getTime(),
-            cancellationReason: r.cancellationReason ?? undefined,
+            reason: r.cancellationReason ?? undefined,
           } as const;
         }),
       };
@@ -663,7 +663,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       return {
         order: {
           side: order.side,
-          quantity: order.quantity,
+          qty: order.qty,
           price: order.limitPrice,
         },
       };

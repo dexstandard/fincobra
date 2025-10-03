@@ -86,7 +86,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 100,
           limitPrice: 99.9,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -100,7 +100,7 @@ describe('createDecisionLimitOrders', () => {
       price: 99.9,
       limitPrice: 99.9,
       basePrice: 100,
-      maxPriceDivergencePct: 0.05,
+      maxPriceDriftPct: 0.05,
       manuallyEdited: false,
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
@@ -153,7 +153,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 100,
           limitPrice: 95,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -167,7 +167,7 @@ describe('createDecisionLimitOrders', () => {
       price: 95,
       basePrice: 100,
       limitPrice: 95,
-      maxPriceDivergencePct: 0.05,
+      maxPriceDriftPct: 0.05,
       manuallyEdited: false,
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
@@ -220,7 +220,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 1,
           limitPrice: 95,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -234,7 +234,7 @@ describe('createDecisionLimitOrders', () => {
       price: 95,
       basePrice: 100,
       limitPrice: 95,
-      maxPriceDivergencePct: 0.05,
+      maxPriceDriftPct: 0.05,
       manuallyEdited: false,
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
@@ -287,7 +287,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 1,
           limitPrice: 250,
           basePrice: 249,
-          maxPriceDivergencePct: 0.02,
+          maxPriceDriftPct: 0.02,
         },
       ],
       reviewResultId,
@@ -350,7 +350,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 1,
           limitPrice: 100,
           basePrice: 101,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -410,7 +410,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 1,
           limitPrice: 99.9,
           basePrice: 100,
-          maxPriceDivergencePct: 0.02,
+          maxPriceDriftPct: 0.02,
         },
       ],
       reviewResultId,
@@ -463,7 +463,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 1,
           limitPrice: Number.NaN,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -476,7 +476,7 @@ describe('createDecisionLimitOrders', () => {
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
 
-  it('requires a minimum maxPriceDivergencePct', async () => {
+  it('requires a minimum maxPriceDriftPct', async () => {
     const log = mockLogger();
     const userId = await insertUser('18');
     const agent = await insertPortfolioWorkflow({
@@ -518,7 +518,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 1,
           limitPrice: 99,
           basePrice: 100,
-          maxPriceDivergencePct: 0,
+          maxPriceDriftPct: 0,
         },
       ],
       reviewResultId,
@@ -528,7 +528,7 @@ describe('createDecisionLimitOrders', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
     expect(rows[0].cancellation_reason).toBe(
-      'Malformed maxPriceDivergencePct: 0',
+      'Malformed maxPriceDriftPct: 0',
     );
     expect(createLimitOrder).not.toHaveBeenCalled();
   });
@@ -574,7 +574,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 0.05,
           limitPrice: 99.9,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -629,7 +629,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 0.02056,
           limitPrice: 0.02065,
           basePrice: 0.02065,
-          maxPriceDivergencePct: 0.01,
+          maxPriceDriftPct: 0.01,
         },
       ],
       reviewResultId,
@@ -639,9 +639,9 @@ describe('createDecisionLimitOrders', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe(LimitOrderStatus.Open);
     const planned = JSON.parse(rows[0].planned_json);
-    expect(planned.quantity).toBe(1.1);
+    expect(planned.qty).toBe(1.1);
     expect(planned.price).toBe(0.02);
-    expect(planned.quantity * planned.price).toBeGreaterThan(0.02056);
+    expect(planned.qty * planned.price).toBeGreaterThan(0.02056);
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'DOGEUSDT',
       side: 'BUY',
@@ -695,7 +695,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 0.000043,
           limitPrice: 110000,
           basePrice: 115000,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -705,13 +705,13 @@ describe('createDecisionLimitOrders', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe(LimitOrderStatus.Open);
     const planned = JSON.parse(rows[0].planned_json);
-    expect(planned.quantity).toBeCloseTo(0.00004546, 12);
+    expect(planned.qty).toBeCloseTo(0.00004546, 12);
     expect(planned.price).toBe(110000);
-    expect(planned.quantity * planned.price).toBeGreaterThan(5);
+    expect(planned.qty * planned.price).toBeGreaterThan(5);
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: planned.quantity,
+      qty: planned.qty,
       price: 110000,
     });
     expect(fetchAccount).not.toHaveBeenCalled();
@@ -762,7 +762,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 0.00003,
           limitPrice: 110000,
           basePrice: 115000,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -820,7 +820,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 0.00004,
           limitPrice: 110000,
           basePrice: 115000,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       reviewResultId,
@@ -832,13 +832,13 @@ describe('createDecisionLimitOrders', () => {
     const planned = JSON.parse(rows[0].planned_json);
     // Sell-side limits are anchored to the live price (currentPrice * 1.001) before rounding,
     // which raises the final notional slightly above the agent's requested value.
-    expect(planned.quantity).toBeCloseTo(0.00004344, 12);
+    expect(planned.qty).toBeCloseTo(0.00004344, 12);
     expect(planned.price).toBe(115115);
-    expect(planned.quantity * planned.price).toBeGreaterThan(5);
+    expect(planned.qty * planned.price).toBeGreaterThan(5);
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       side: 'SELL',
-      quantity: planned.quantity,
+      qty: planned.qty,
       price: 115115,
     });
     expect(fetchAccount).not.toHaveBeenCalled();
@@ -885,7 +885,7 @@ describe('createDecisionLimitOrders', () => {
           qty: 0.5,
           limitPrice: 99.5,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
           manuallyEdited: true,
         },
       ],
