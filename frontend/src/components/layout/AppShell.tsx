@@ -45,7 +45,7 @@ export default function AppShell() {
           <GoogleLoginButton />
         </div>
       </header>
-      <div className="flex flex-1 pt-16 pb-16 md:pb-8 overflow-hidden">
+      <div className="flex flex-1 pt-16 pb-24 md:pb-8 overflow-hidden">
         <nav
           className={`${navCollapsed ? 'w-20' : 'w-32'} bg-gray-100 p-4 transition-all duration-300 hidden md:flex md:flex-col`}
         >
@@ -126,7 +126,10 @@ export default function AppShell() {
           {t('privacy')}
         </Link>
       </footer>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-100 border-t flex justify-around py-4">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-100 border-t flex justify-around pt-3 pb-8"
+        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+      >
         <Link
           to="/settings"
           className="text-gray-700 hover:text-gray-900"
