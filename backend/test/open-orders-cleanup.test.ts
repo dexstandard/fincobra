@@ -12,59 +12,59 @@ import { setAiKey } from '../src/repos/ai-api-key.js';
 import { reviewWorkflowPortfolio } from '../src/workflows/portfolio-review.js';
 
 const sampleMarketOverview = vi.hoisted(() => ({
-  schema_version: 'market_overview.v2' as const,
-  as_of: '2024-01-01T00:00:00Z',
-  timeframe: { candle_interval: '1h', review_interval: '30m', semantics: '' },
+  schema: 'market_overview.v2' as const,
+  asOf: '2024-01-01T00:00:00Z',
+  timeframe: { candleInterval: '1h', reviewInterval: '30m', semantics: '' },
   derivations: {
-    trend_slope_rule: '',
-    ret1h_rule: '',
-    ret24h_rule: '',
-    vol_atr_pct_rule: '',
-    vol_anomaly_z_rule: '',
-    rsi14_rule: '',
-    orderbook_spread_bps_rule: '',
-    orderbook_depth_ratio_rule: '',
-    htf_returns_rule: '',
-    htf_trend_rule: '',
-    regime_vol_state_rule: '',
-    regime_corr_beta_rule: '',
-    risk_flags_rules: {
+    trendSlopeRule: '',
+    ret1hRule: '',
+    ret24hRule: '',
+    volAtrPctRule: '',
+    volAnomalyZRule: '',
+    rsi14Rule: '',
+    orderbookSpreadBpsRule: '',
+    orderbookDepthRatioRule: '',
+    htfReturnsRule: '',
+    htfTrendRule: '',
+    regimeVolStateRule: '',
+    regimeCorrBetaRule: '',
+    riskFlagsRules: {
       overbought: '',
       oversold: '',
-      vol_spike: '',
-      thin_book: '',
+      volSpike: '',
+      thinBook: '',
     },
   },
-  _spec: { units: {}, interpretation: {} },
-  market_overview: {
+  spec: { units: {}, interpretation: {} },
+  marketOverview: {
     BTC: {
-      trend_slope: 'flat' as const,
-      trend_basis: { sma_periods: [50, 200] as [number, number], gap_pct: 0 },
+      trendSlope: 'flat' as const,
+      trendBasis: { smaPeriods: [50, 200] as [number, number], gapPct: 0 },
       ret1h: 0,
       ret24h: 0,
-      vol_atr_pct: 0,
-      vol_anomaly_z: 0,
+      volAtrPct: 0,
+      volAnomalyZ: 0,
       rsi14: 50,
-      orderbook_spread_bps: 0,
-      orderbook_depth_ratio: 1,
-      risk_flags: {
+      orderbookSpreadBps: 0,
+      orderbookDepthRatio: 1,
+      riskFlags: {
         overbought: false,
         oversold: false,
-        vol_spike: false,
-        thin_book: false,
+        volSpike: false,
+        thinBook: false,
       },
       htf: {
         returns: { '30d': 0, '90d': 0, '180d': 0, '365d': 0 },
         trend: {
-          '4h': { sma_periods: [50, 200], gap_pct: 0, slope: 'flat' },
-          '1d': { sma_periods: [20, 100], gap_pct: 0, slope: 'flat' },
-          '1w': { sma_periods: [13, 52], gap_pct: 0, slope: 'flat' },
+          '4h': { smaPeriods: [50, 200], gapPct: 0, slope: 'flat' },
+          '1d': { smaPeriods: [20, 100], gapPct: 0, slope: 'flat' },
+          '1w': { smaPeriods: [13, 52], gapPct: 0, slope: 'flat' },
         },
         regime: {
-          vol_state: 'normal' as const,
-          vol_rank_1y: 0,
-          corr_btc_90d: 0,
-          market_beta_90d: 0,
+          volState: 'normal' as const,
+          volRank1y: 0,
+          corrBtc90d: 0,
+          marketBeta90d: 0,
         },
       },
     },
@@ -161,7 +161,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -208,14 +208,14 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '456',
@@ -265,7 +265,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -307,7 +307,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -347,7 +347,7 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', quantity: 1, price: 1 },
+      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '789',

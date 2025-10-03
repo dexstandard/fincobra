@@ -11,15 +11,15 @@ function isExecOrder(value: unknown): value is ExecOrder {
     typeof value.pair !== 'string' ||
     typeof value.token !== 'string' ||
     typeof value.side !== 'string' ||
-    typeof value.quantity !== 'number'
+    typeof value.qty !== 'number'
   )
     return false;
   if ('limitPrice' in value && typeof value.limitPrice !== 'number')
     return false;
   if ('basePrice' in value && typeof value.basePrice !== 'number') return false;
   if (
-    'maxPriceDivergencePct' in value &&
-    typeof value.maxPriceDivergencePct !== 'number'
+    'maxPriceDriftPct' in value &&
+    typeof value.maxPriceDriftPct !== 'number'
   )
     return false;
   return true;
@@ -160,8 +160,8 @@ export function validateExecResponse(
     if (!allowedTokens.includes(base) || !allowedTokens.includes(quote))
       return 'invalid pair';
     if (o.token !== base && o.token !== quote) return 'invalid token';
-    if (typeof o.quantity !== 'number' || o.quantity <= 0)
-      return 'invalid quantity';
+    if (typeof o.qty !== 'number' || o.qty <= 0)
+      return 'invalid qty';
   }
   return undefined;
 }

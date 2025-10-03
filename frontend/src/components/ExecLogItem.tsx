@@ -38,10 +38,10 @@ export interface ExecLog {
       pair: string;
       token: string;
       side: string;
-      quantity: number;
+      qty: number;
       limitPrice: number;
       basePrice: number;
-      maxPriceDivergencePct: number;
+      maxPriceDriftPct: number;
     }[];
   };
   error?: Record<string, unknown>;
@@ -84,11 +84,11 @@ export default function ExecLogItem({
   const [creating, setCreating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [order, setOrder] = useState<{
-    quantity: number;
+    qty: number;
     price: number;
     side: string;
   } | null>(null);
-  const [quantity, setQuantity] = useState('');
+  const [qtyInput, setQtyInput] = useState('');
   const [price, setPrice] = useState('');
   const [manuallyEdited, setManuallyEdited] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -109,7 +109,7 @@ export default function ExecLogItem({
 
   useEffect(() => {
     if (showPreview && order) {
-      setQuantity(order.quantity.toString());
+      setQtyInput(order.qty.toString());
       setPrice(order.price.toString());
     }
   }, [showPreview, order]);
@@ -121,7 +121,7 @@ export default function ExecLogItem({
         `/portfolio-workflows/${workflowId}/exec-log/${log.id}/rebalance/preview`,
       );
       const ord = res.data.order as {
-        quantity: number;
+        qty: number;
         price: number;
         side: string;
       };
@@ -145,7 +145,7 @@ export default function ExecLogItem({
       await api.post(
         `/portfolio-workflows/${workflowId}/exec-log/${log.id}/rebalance`,
         {
-          quantity: Number(quantity),
+          qty: Number(qtyInput),
           price: Number(price),
           ...(manuallyEdited ? { manuallyEdited: true } : {}),
         },
@@ -264,9 +264,9 @@ export default function ExecLogItem({
             </label>
             <TextInput
               type="number"
-              value={quantity}
+              value={qtyInput}
               onChange={(e) => {
-                setQuantity(e.target.value);
+                setQtyInput(e.target.value);
                 setManuallyEdited(true);
               }}
             />

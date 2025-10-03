@@ -42,7 +42,7 @@ describe('portfolio workflow exec log routes', () => {
     });
     await insertLimitOrder({
       userId: user1Id,
-      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      planned: { side: 'BUY', qty: 1, price: 100, symbol: 'BTCETH' },
       status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '1',
@@ -58,7 +58,7 @@ describe('portfolio workflow exec log routes', () => {
         {
           id: '1',
           side: 'BUY',
-          quantity: 1,
+          qty: 1,
           price: 100,
           symbol: 'BTCETH',
           status: LimitOrderStatus.Open,
@@ -101,7 +101,7 @@ describe('portfolio workflow exec log routes', () => {
     });
     await insertLimitOrder({
       userId: user1Id,
-      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      planned: { side: 'BUY', qty: 1, price: 100, symbol: 'BTCETH' },
       status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '2',
@@ -158,7 +158,7 @@ describe('portfolio workflow exec log routes', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      planned: { side: 'BUY', qty: 1, price: 100, symbol: 'BTCETH' },
       status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '3',
@@ -319,7 +319,7 @@ describe('portfolio workflow exec log routes', () => {
           content: [
             {
               type: 'output_text',
-              text: '{"result":{"orders":[{"pair":"BTCUSDT","token":"BTC","side":"SELL","quantity":1}],"shortReport":"s"}}',
+              text: '{"result":{"orders":[{"pair":"BTCUSDT","token":"BTC","side":"SELL","qty":1}],"shortReport":"s"}}',
             },
           ],
         },
@@ -354,11 +354,11 @@ describe('portfolio workflow exec log routes', () => {
 
     const parsedLog = JSON.parse(body.items[0].log);
     expect(parsedLog).toMatchObject({
-      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', qty: 1 }],
       shortReport: 's',
     });
     expect(body.items[0].response.orders).toEqual([
-      { pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 },
+      { pair: 'BTCUSDT', token: 'BTC', side: 'SELL', qty: 1 },
     ]);
 
     await app.close();
@@ -441,10 +441,10 @@ describe('portfolio workflow exec log routes', () => {
           pair: 'BTCETH',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.5,
+          qty: 0.5,
           limitPrice: 99.9,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       shortReport: 's',
@@ -517,10 +517,10 @@ describe('portfolio workflow exec log routes', () => {
           pair: 'BTCUSDT',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.0001,
+          qty: 0.0001,
           limitPrice: 100,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       shortReport: 's',
@@ -583,10 +583,10 @@ describe('portfolio workflow exec log routes', () => {
           pair: 'BTCETH',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.2,
+          qty: 0.2,
           limitPrice: 99.9,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       shortReport: 's',
@@ -606,7 +606,7 @@ describe('portfolio workflow exec log routes', () => {
     const body = res.json();
     expect(body.order).toMatchObject({
       side: 'BUY',
-      quantity: 0.2,
+      qty: 0.2,
       price: 99.9,
     });
     await app.close();
@@ -637,10 +637,10 @@ describe('portfolio workflow exec log routes', () => {
           pair: 'BTCETH',
           token: 'BTC',
           side: 'BUY',
-          quantity: 0.5,
+          qty: 0.5,
           limitPrice: 99.9,
           basePrice: 100,
-          maxPriceDivergencePct: 0.05,
+          maxPriceDriftPct: 0.05,
         },
       ],
       shortReport: 's',
@@ -691,7 +691,7 @@ describe('portfolio workflow exec log routes', () => {
     expect(res2.statusCode).toBe(200);
     const body = res2.json();
     expect(body.orders).toHaveLength(1);
-    expect(body.orders[0].cancellationReason).toBe(
+    expect(body.orders[0].reason).toBe(
       'Invalid API-key, IP, or permissions for action.',
     );
     vi.restoreAllMocks();

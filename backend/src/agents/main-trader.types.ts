@@ -1,10 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { MarketOverviewPayload } from '../services/indicators.types.js';
-import type {
-  DerivedNumbers,
-  TierHints,
-} from './news-analyst.js';
-
 export interface RunParams {
   log: FastifyBaseLogger;
   model: string;
@@ -19,16 +14,17 @@ export interface RebalancePosition {
   valueUsdt: number;
 }
 
+export interface PreviousReportOrder {
+  symbol: string;
+  side: string;
+  qty: number;
+  status: string;
+  reason?: string;
+}
+
 export interface PreviousReport {
-  datetime: string;
-  orders?: {
-    symbol: string;
-    side: string;
-    quantity: number;
-    status: string;
-    datetime: string;
-    cancellationReason?: string;
-  }[];
+  ts: string;
+  orders?: PreviousReportOrder[];
   shortReport?: string;
   error?: unknown;
 }
@@ -55,18 +51,16 @@ export interface NewsContextItem {
   severity: number;
   eventConfidence: number;
   headlineScore: number;
-  tierHints: TierHints;
-  numbers: DerivedNumbers;
 }
 
 export interface NewsContext {
   version: 'news_context.v1';
-  biasScore: number;
-  maxSeverity: number;
-  maxEventConfidence: number;
-  bullCount: number;
-  bearCount: number;
-  topEventSummary: string | null;
+  bias: number;
+  maxSev: number;
+  maxConf: number;
+  bull: number;
+  bear: number;
+  top: string | null;
   items: NewsContextItem[];
 }
 
@@ -103,10 +97,10 @@ export interface MainTraderOrder {
   pair: string;
   token: string;
   side: string;
-  quantity: number;
+  qty: number;
   limitPrice: number;
   basePrice: number;
-  maxPriceDivergencePct: number;
+  maxPriceDriftPct: number;
 }
 
 export interface MainTraderDecision {

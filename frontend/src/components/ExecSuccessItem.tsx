@@ -16,10 +16,10 @@ interface Props {
       pair: string;
       token: string;
       side: string;
-      quantity: number;
+      qty: number;
       limitPrice: number;
       basePrice: number;
-      maxPriceDivergencePct: number;
+      maxPriceDriftPct: number;
     }[];
   };
   promptIcon?: ReactNode;

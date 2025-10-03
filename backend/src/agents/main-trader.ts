@@ -19,6 +19,7 @@ import type {
   RunParams,
   RebalancePosition,
   PreviousReport,
+  PreviousReportOrder,
   RebalancePrompt,
   MainTraderDecision,
   MainTraderOrder,
@@ -28,18 +29,18 @@ import { computeDerivedItem, sortDerivedItems, computeWeight } from './news-anal
 
 export const developerInstructions = [
   '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
-  '- Interpret the shared market_overview.v2 dataset for technical context and the structured news_context feeds for event risk.',
-  '- Consult marketData.marketOverview (market_overview.v2) for price action, HTF trend, returns, and risk flags before sizing orders.',
+  '- Interpret the shared marketOverview.v2 dataset for technical context and the structured newsContext feeds for event risk.',
+  '- Consult marketData.marketOverview (marketOverview.v2) for price action, HTF trend, returns, and risk flags before sizing orders.',
   '- Decide which limit orders to place based on portfolio, market data, and news context.',
   '- Make sure to size limit orders higher then minNotional values to avoid order cancellations.',
   '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
   '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
   '- The prompt lists all supported trading pairs with their current prices for easy reference.',
-  '- Use news_context.biasScore to tilt sizing alongside market_overview; cite top_event_summary in shortReport.',
+  '- Use newsContext.bias to tilt sizing alongside marketOverview; cite top in shortReport.',
   '- If any bearish Hack|StablecoinDepeg|Outage with severity ≥ 0.75, allow protective action even if technicals are neutral.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",quantity:number,limitPrice:number,basePrice:number,maxPriceDivergencePct:number},...],shortReport}.',
-  '- maxPriceDivergencePct is expressed as a percentage drift allowance (e.g. 0.01 = 1%) between basePrice and the live market price before cancelation;',
-  '- maxPriceDivergencePct must be at least 0.0001 (0.01%) to avoid premature cancelations;',
+  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",qty:number,limitPrice:number,basePrice:number,maxPriceDriftPct:number},...],shortReport}.',
+  '- maxPriceDriftPct is expressed as a percentage drift allowance (e.g. 0.01 = 1%) between basePrice and the live market price before cancelation;',
+  '- maxPriceDriftPct must be at least 0.0001 (0.01%) to avoid premature cancelations;',
   '- Keep limit targets realistic for the stated review interval so orders can fill within that window; avoid extreme prices unlikely to execute within interval.',
   '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
   '- shortReport ≤255 chars.',
@@ -62,19 +63,19 @@ export const rebalanceResponseSchema = {
                   pair: { type: 'string' },
                   token: { type: 'string' },
                   side: { type: 'string', enum: ['BUY', 'SELL'] },
-                  quantity: { type: 'number' },
+                  qty: { type: 'number' },
                   limitPrice: { type: 'number' },
                   basePrice: { type: 'number' },
-                  maxPriceDivergencePct: { type: 'number' },
+                  maxPriceDriftPct: { type: 'number' },
                 },
                 required: [
                   'pair',
                   'token',
                   'side',
-                  'quantity',
+                  'qty',
                   'limitPrice',
                   'basePrice',
-                  'maxPriceDivergencePct',
+                  'maxPriceDriftPct',
                 ],
                 additionalProperties: false,
               },
@@ -168,12 +169,12 @@ export function __resetNewsContextCacheForTest(): void {
 function createEmptyNewsContext(): NewsContext {
   return {
     version: 'news_context.v1',
-    biasScore: 0,
-    maxSeverity: 0,
-    maxEventConfidence: 0,
-    bullCount: 0,
-    bearCount: 0,
-    topEventSummary: null,
+    bias: 0,
+    maxSev: 0,
+    maxConf: 0,
+    bull: 0,
+    bear: 0,
+    top: null,
     items: [],
   };
 }
@@ -211,45 +212,38 @@ async function buildNewsContext(
 
     let numerator = 0;
     let denominator = 0;
-    let maxSeverity = 0;
-    let maxEventConfidence = 0;
-    let bullCount = 0;
-    let bearCount = 0;
+    let maxSev = 0;
+    let maxConf = 0;
+    let bull = 0;
+    let bear = 0;
 
     for (const item of ordered) {
       denominator += item.weight;
-      maxSeverity = Math.max(maxSeverity, item.severity);
-      maxEventConfidence = Math.max(maxEventConfidence, item.eventConfidence);
-      if (item.polarity === 'bullish') bullCount += 1;
-      if (item.polarity === 'bearish') bearCount += 1;
+      maxSev = Math.max(maxSev, item.severity);
+      maxConf = Math.max(maxConf, item.eventConfidence);
+      if (item.polarity === 'bullish') bull += 1;
+      if (item.polarity === 'bearish') bear += 1;
       const dir = item.polarity === 'bullish' ? 1 : item.polarity === 'bearish' ? -1 : 0;
       numerator += dir * item.severity * item.eventConfidence * item.weight;
     }
 
-    const biasScoreRaw = numerator / (denominator + BIAS_DENOMINATOR_EPSILON);
-    const biasScore = Math.max(-1, Math.min(1, biasScoreRaw));
+    const biasRaw = numerator / (denominator + BIAS_DENOMINATOR_EPSILON);
+    const bias = Math.max(-1, Math.min(1, biasRaw));
 
     const top = ordered[0];
-    let topEventSummary: string | null = null;
+    let topSummary: string | null = null;
     if (top) {
-      topEventSummary = `${top.eventType} — ${top.polarity} (sev=${top.severity.toFixed(2)})`;
-      if (top.tierHints.exchangeTier !== 'none') {
-        let tier = top.tierHints.exchangeTier;
-        if (top.tierHints.exchange) {
-          tier += `/${top.tierHints.exchange}`;
-        }
-        topEventSummary += ` [${tier}]`;
-      }
+      topSummary = `${top.eventType} — ${top.polarity} (sev=${top.severity.toFixed(2)})`;
     }
 
     return {
       version: 'news_context.v1',
-      biasScore,
-      maxSeverity,
-      maxEventConfidence,
-      bullCount,
-      bearCount,
-      topEventSummary,
+      bias,
+      maxSev,
+      maxConf,
+      bull,
+      bear,
+      top: topSummary,
       items: ordered.map((item) => ({
         title: item.title,
         link: item.link,
@@ -260,8 +254,6 @@ async function buildNewsContext(
         severity: item.severity,
         eventConfidence: item.eventConfidence,
         headlineScore: item.headlineScore,
-        tierHints: item.tierHints,
-        numbers: item.numbers,
       })),
     };
   } catch (err) {
@@ -343,25 +335,43 @@ export async function collectPromptData(
     portfolio.pnlUsd = totalValue - row.startBalance;
   }
 
-  const prevRows = await getRecentReviewResults(row.id, 5);
+  const prevRows = await getRecentReviewResults(row.id, 3);
   const previousReports: PreviousReport[] = [];
   for (const r of prevRows) {
     const ordersRows = await getLimitOrdersByReviewResult(row.id, r.id);
-    const orders = ordersRows.map((o) => {
+    const orders: PreviousReportOrder[] = [];
+    for (const o of ordersRows) {
       const planned = JSON.parse(o.plannedJson);
-      return {
+      // TODO: drop quantity fallback once legacy orders are migrated.
+      const plannedQtyRaw = planned.qty ?? planned.quantity;
+      if (plannedQtyRaw === undefined) {
+        log.warn(
+          { limitOrderId: o.orderId },
+          'missing qty in planned limit order payload',
+        );
+        continue;
+      }
+      const plannedQty = Number(plannedQtyRaw);
+      if (!Number.isFinite(plannedQty)) {
+        log.warn(
+          { limitOrderId: o.orderId },
+          'non-numeric qty in planned limit order payload',
+        );
+        continue;
+      }
+      const order: PreviousReportOrder = {
         symbol: planned.symbol,
         side: planned.side,
-        quantity: planned.quantity,
+        qty: plannedQty,
         status: o.status,
-        datetime: o.createdAt.toISOString(),
-        ...(o.cancellationReason
-          ? { cancellationReason: o.cancellationReason }
-          : {}),
-      } as const;
-    });
+      };
+      if (o.cancellationReason) {
+        order.reason = o.cancellationReason;
+      }
+      orders.push(order);
+    }
     const report: PreviousReport = {
-      datetime: r.createdAt.toISOString(),
+      ts: r.createdAt.toISOString(),
       ...(r.shortReport !== undefined ? { shortReport: r.shortReport } : {}),
       ...(r.error !== undefined ? { error: r.error } : {}),
       ...(orders.length ? { orders } : {}),

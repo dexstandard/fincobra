@@ -56,14 +56,14 @@ export default function ExecTxCard({
               <td className="pr-2">{new Date(o.createdAt).toLocaleString()}</td>
               <td className="pr-2">{o.symbol}</td>
               <td className="pr-2">{o.side}</td>
-              <td className="pr-2">{o.quantity}</td>
+              <td className="pr-2">{o.qty}</td>
               <td className="pr-2">{o.price}</td>
               <td className="pr-2">
                 {o.status}
-                {o.cancellationReason && (
+                {o.reason && (
                   <AlertCircle
                     className="ml-1 inline h-4 w-4 text-red-600 cursor-pointer"
-                    onClick={() => setErrorMsg(o.cancellationReason!)}
+                    onClick={() => setErrorMsg(o.reason!)}
                   />
                 )}
               </td>

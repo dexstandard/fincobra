@@ -103,7 +103,7 @@ const manualPreviewQuerySchema = z.object({
 
 interface ManualRebalanceBody {
   price?: number;
-  quantity?: number;
+  qty?: number;
   manuallyEdited?: boolean;
   orderIndex?: number;
 }
@@ -111,7 +111,7 @@ interface ManualRebalanceBody {
 const manualRebalanceBodySchema = z
   .object({
     price: z.number().optional(),
-    quantity: z.number().optional(),
+    qty: z.number().optional(),
     manuallyEdited: z.boolean().optional(),
     orderIndex: z.number().int().nonnegative().optional(),
   })
@@ -212,10 +212,10 @@ function isValidManualOrder(value: unknown): value is MainTraderOrder {
     typeof record.pair === 'string' &&
     typeof record.token === 'string' &&
     typeof record.side === 'string' &&
-    typeof record.quantity === 'number' &&
+    typeof record.qty === 'number' &&
     typeof record.limitPrice === 'number' &&
     typeof record.basePrice === 'number' &&
-    typeof record.maxPriceDivergencePct === 'number'
+    typeof record.maxPriceDriftPct === 'number'
   );
 }
 
@@ -488,12 +488,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           return {
             id: r.orderId,
             side: planned.side,
-            quantity: planned.quantity,
+            qty: planned.qty,
             price: planned.price,
             symbol: planned.symbol,
             status: r.status,
             createdAt: r.createdAt.getTime(),
-            cancellationReason: r.cancellationReason ?? undefined,
+            reason: r.cancellationReason ?? undefined,
           } as const;
         }),
       };
@@ -546,12 +546,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         updatedOrder.basePrice = body.price;
         manuallyEdited = true;
       }
-      if (body.quantity !== undefined) {
-        if (!Number.isFinite(body.quantity) || body.quantity <= 0) {
-          log.error({ execLogId: logId }, 'invalid manual quantity');
-          return reply.code(400).send(errorResponse('invalid quantity'));
+      if (body.qty !== undefined) {
+        if (!Number.isFinite(body.qty) || body.qty <= 0) {
+          log.error({ execLogId: logId }, 'invalid manual qty');
+          return reply.code(400).send(errorResponse('invalid qty'));
         }
-        updatedOrder.quantity = body.quantity;
+        updatedOrder.qty = body.qty;
         manuallyEdited = true;
       }
       if (manuallyEdited) updatedOrder.manuallyEdited = true;
@@ -663,7 +663,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       return {
         order: {
           side: order.side,
-          quantity: order.quantity,
+          qty: order.qty,
           price: order.limitPrice,
         },
       };
