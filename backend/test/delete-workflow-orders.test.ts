@@ -38,7 +38,6 @@ describe('delete workflow cancels all orders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },

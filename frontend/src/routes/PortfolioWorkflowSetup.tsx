@@ -1,6 +1,5 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useTranslation } from '../lib/i18n';
-import WorkflowName from '../components/WorkflowName';
 import AgentInstructions from '../components/AgentInstructions';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -33,16 +32,19 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const toast = useToast();
   const t = useTranslation();
 
-  const defaultValues = workflow
-    ? {
-        tokens: [
-          { token: workflow.cashToken, minAllocation: 0 },
-          ...workflow.tokens,
-        ],
-        risk: workflow.risk,
-        reviewInterval: workflow.reviewInterval,
-      }
-    : portfolioReviewDefaults;
+  const workflowFormValues = useMemo(() => {
+    if (!workflow) return null;
+    return {
+      tokens: [
+        { token: workflow.cashToken, minAllocation: 0 },
+        ...workflow.tokens,
+      ],
+      risk: workflow.risk,
+      reviewInterval: workflow.reviewInterval,
+    } satisfies PortfolioReviewFormValues;
+  }, [workflow]);
+
+  const defaultValues = workflowFormValues ?? portfolioReviewDefaults;
 
   const [model, setModel] = useState(workflow?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
@@ -55,6 +57,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     resolver: zodResolver(portfolioReviewSchema),
     defaultValues,
   });
+  const { reset } = methods;
   const {
     hasOpenAIKey,
     hasBinanceKey,
@@ -64,9 +67,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     isAccountLoading,
   } = usePrerequisites(tokenSymbols);
 
-  const [name, setName] = useState(
-    workflow?.name || tokenSymbols.map((t) => t.toUpperCase()).join(' / '),
-  );
   const [instructions, setInstructions] = useState(
     workflow?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS,
   );
@@ -89,10 +89,20 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   }, [hasOpenAIKey, models, workflow?.model, model]);
 
   useEffect(() => {
-    if (!workflow) {
-      setName(tokenSymbols.map((t) => t.toUpperCase()).join(' / '));
-    }
-  }, [tokenSymbols, workflow]);
+    if (!workflowFormValues) return;
+
+    reset(workflowFormValues);
+    setTokenSymbols(workflowFormValues.tokens.map((t) => t.token));
+    setUseEarn(workflow?.useEarn ?? false);
+    setInstructions(workflow?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS);
+    setManualRebalance(workflow?.manualRebalance || false);
+  }, [
+    workflowFormValues,
+    workflow?.agentInstructions,
+    workflow?.manualRebalance,
+    workflow?.useEarn,
+    reset,
+  ]);
 
   function WarningSign({ children }: { children: ReactNode }) {
     return (
@@ -104,14 +114,10 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-        <span>{t('workflow_setup')}:</span>
-        <WorkflowName
-          name={name}
-          onChange={setName}
-          className="text-2xl font-bold"
-        />
-      </h1>
+      <h1 className="text-2xl font-bold mb-1">{t('workflow_setup')}</h1>
+      <p className="text-sm text-gray-600 uppercase tracking-wide">
+        {tokenSymbols.map((t) => t.toUpperCase()).join(' / ')}
+      </p>
       <FormProvider {...methods}>
         <div className="max-w-xl">
           <PortfolioWorkflowFields
@@ -190,7 +196,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
                 const [cashToken, ...positions] = values.tokens;
                 const payload = {
                   model,
-                  name,
                   cash: cashToken.token.toUpperCase(),
                   tokens: positions.map((t) => ({
                     token: t.token.toUpperCase(),
@@ -226,7 +231,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
           <WorkflowStartButton
             workflow={workflow}
             workflowData={{
-              name,
               tokens: values.tokens.map((t) => ({
                 token: t.token,
                 minAllocation: t.minAllocation,

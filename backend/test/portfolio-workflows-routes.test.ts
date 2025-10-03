@@ -95,7 +95,6 @@ describe('portfolio workflow routes', () => {
 
     const payload = {
       model: 'gpt-5',
-      name: 'A1',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -248,7 +247,6 @@ describe('portfolio workflow routes', () => {
     const userId = await insertUser('nokeys');
     const payload = {
       model: 'm',
-      name: 'NoKeys',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -283,7 +281,6 @@ describe('portfolio workflow routes', () => {
     const starterId = await insertUserWithKeys('starter');
     const inactivePayload = {
       model: 'm',
-      name: 'Inactive',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -412,7 +409,6 @@ describe('portfolio workflow routes', () => {
 
     const createPayload = {
       model: 'm',
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -461,7 +457,6 @@ describe('portfolio workflow routes', () => {
 
     const basePayload = {
       model: 'm',
-      name: 'Inactive1',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -521,7 +516,7 @@ describe('portfolio workflow routes', () => {
       method: 'POST',
       url: '/api/portfolio-workflows',
       cookies: authCookies(u2Id),
-      payload: { ...basePayload, name: 'Active', status: 'active' },
+      payload: { ...basePayload, status: 'active' },
     });
     expect(res.statusCode).toBe(200);
     const activeId = res.json().id as string;
@@ -530,7 +525,7 @@ describe('portfolio workflow routes', () => {
       method: 'POST',
       url: '/api/portfolio-workflows',
       cookies: authCookies(u2Id),
-      payload: { ...basePayload, name: 'Inactive2', status: 'inactive' },
+      payload: { ...basePayload, status: 'inactive' },
     });
     const inactive2Id = resInactive2.json().id as string;
 
@@ -587,7 +582,6 @@ describe('portfolio workflow routes', () => {
 
     const base = {
       model: 'm',
-      name: 'A1',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -613,7 +607,6 @@ describe('portfolio workflow routes', () => {
       cookies: authCookies(dupId),
       payload: {
         ...base,
-        name: 'B1',
         tokens: [
           { token: 'BTC', minAllocation: 10 },
           { token: 'SOL', minAllocation: 20 },
@@ -622,7 +615,7 @@ describe('portfolio workflow routes', () => {
     });
     expect(resDup.statusCode).toBe(400);
     expect(resDup.json().error).toContain('BTC');
-    expect(resDup.json().error).toContain('A1');
+    expect(resDup.json().error).toContain('workflow');
     expect(resDup.json().error).toContain(existingId);
 
     await setWorkflowStatus(existingId, 'inactive');
@@ -633,7 +626,6 @@ describe('portfolio workflow routes', () => {
       cookies: authCookies(dupId),
       payload: {
         ...base,
-        name: 'B2',
         tokens: [
           { token: 'BTC', minAllocation: 10 },
           { token: 'SOL', minAllocation: 20 },
@@ -652,7 +644,6 @@ describe('portfolio workflow routes', () => {
 
     const inactivePayload = {
       model: 'm',
-      name: 'Inactive',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -662,6 +653,7 @@ describe('portfolio workflow routes', () => {
       agentInstructions: 'p',
       cash: 'USDT',
       status: 'inactive',
+      useEarn: false,
     };
 
     const res1 = await app.inject({
@@ -688,7 +680,7 @@ describe('portfolio workflow routes', () => {
       method: 'POST',
       url: '/api/portfolio-workflows',
       cookies: authCookies(inactiveUserId),
-      payload: { ...inactivePayload, name: 'Inactive2' },
+      payload: { ...inactivePayload, useEarn: true },
     });
     expect(resOk.statusCode).toBe(200);
 
@@ -701,7 +693,6 @@ describe('portfolio workflow routes', () => {
 
     const base = {
       model: 'm1',
-      name: 'Inactive1',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -727,7 +718,6 @@ describe('portfolio workflow routes', () => {
       cookies: authCookies(updId),
       payload: {
         ...base,
-        name: 'Inactive2',
         tokens: [
           { token: 'BTC', minAllocation: 10 },
           { token: 'SOL', minAllocation: 20 },
@@ -743,7 +733,7 @@ describe('portfolio workflow routes', () => {
       payload: { ...base },
     });
     expect(resUpd.statusCode).toBe(400);
-    expect(resUpd.json().error).toContain('Inactive1');
+    expect(resUpd.json().error).toContain('workflow');
     expect(resUpd.json().error).toContain(inactive1);
 
     await app.close();
@@ -754,7 +744,6 @@ describe('portfolio workflow routes', () => {
     const nomodelId = await insertUserWithKeys('nomodel');
     const payload = {
       model: '',
-      name: 'Incomplete',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -787,7 +776,6 @@ describe('portfolio workflow routes', () => {
     const allocId = await insertUser('allocUser');
     const payload = {
       model: 'm',
-      name: 'Bad',
       tokens: [
         { token: 'BTC', minAllocation: 60 },
         { token: 'ETH', minAllocation: 40 },
@@ -832,7 +820,6 @@ describe('portfolio workflow routes', () => {
       userId: firstUser,
       model: 'm1',
       status: 'active',
-      name: 'W1',
       tokens: [],
       risk: 'low',
       reviewInterval: '1h',
@@ -844,7 +831,6 @@ describe('portfolio workflow routes', () => {
       userId: secondUser,
       model: 'm2',
       status: 'inactive',
-      name: 'W2',
       tokens: [],
       risk: 'low',
       reviewInterval: '1h',
@@ -903,7 +889,6 @@ describe('portfolio workflow routes', () => {
     const payload = {
       userId,
       model: 'gpt-4',
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },

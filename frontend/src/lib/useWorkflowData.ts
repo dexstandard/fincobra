@@ -9,7 +9,6 @@ export interface PortfolioWorkflow {
   model: string | null;
   status: 'active' | 'inactive' | 'retired';
   createdAt: number;
-  name: string;
   cashToken: string;
   tokens: { token: string; minAllocation: number }[];
   risk: PortfolioReviewFormValues['risk'];
