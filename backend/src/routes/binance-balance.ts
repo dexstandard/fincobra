@@ -7,7 +7,10 @@ import {
 } from '../services/binance-client.js';
 import type { BinanceAccount } from '../services/binance-client.types.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
-import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
+import {
+  getValidatedUserId,
+  userOrAdminPreHandlers,
+} from './_shared/guards.js';
 import {
   parseRequestParams,
   userTokenParamsSchema,
@@ -56,7 +59,7 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
     '/users/:id/binance-account',
     {
       config: { rateLimit: RATE_LIMITS.RELAXED },
-      preHandler: userPreHandlers,
+      preHandler: userOrAdminPreHandlers,
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);
@@ -70,7 +73,7 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
     '/users/:id/binance-balance',
     {
       config: { rateLimit: RATE_LIMITS.MODERATE },
-      preHandler: userPreHandlers,
+      preHandler: userOrAdminPreHandlers,
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);
@@ -84,7 +87,7 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
     '/users/:id/binance-balance/:token',
     {
       config: { rateLimit: RATE_LIMITS.LAX },
-      preHandler: userPreHandlers,
+      preHandler: userOrAdminPreHandlers,
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);

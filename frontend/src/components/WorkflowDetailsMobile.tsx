@@ -34,6 +34,7 @@ export default function WorkflowDetailsMobile({ workflow }: Props) {
       <WorkflowPnlMobile
         tokens={tokens}
         startBalanceUsd={workflow.startBalanceUsd}
+        userId={workflow.userId}
       />
     </div>
   );

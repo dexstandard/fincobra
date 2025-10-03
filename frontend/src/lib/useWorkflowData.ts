@@ -20,6 +20,7 @@ export interface PortfolioWorkflow {
   useEarn: boolean;
   aiApiKeyId: string | null;
   exchangeApiKeyId: string | null;
+  ownerEmail?: string | null;
 }
 
 export function useWorkflowData(id?: string) {
