@@ -16,6 +16,8 @@ import ExecSuccessItem from './ExecSuccessItem';
 import ExecTxCard from './ExecTxCard';
 import Button from './ui/Button';
 import { useTranslation } from '../lib/i18n';
+import PromptVisualizer from './PromptVisualizer';
+import type { PromptData } from './PromptVisualizer.types';
 
 const MAX_LEN = 255;
 function truncate(text: string) {
@@ -64,7 +66,11 @@ export default function ExecLogItem({
   const [showJson, setShowJson] = useState(false);
   const [showTx, setShowTx] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [promptText, setPromptText] = useState<string | null>(null);
+  const [promptData, setPromptData] = useState<PromptData | null>(null);
+  const [promptRaw, setPromptRaw] = useState<string | null>(null);
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [promptLoaded, setPromptLoaded] = useState(false);
+  const [promptLoading, setPromptLoading] = useState(false);
   const { log: text, error, response } = log;
   const hasError = error && Object.keys(error).length > 0;
   const hasResponse = response && Object.keys(response).length > 0;
@@ -94,14 +100,44 @@ export default function ExecLogItem({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleShowPrompt() {
-    if (!showPrompt) {
+    if (!showPrompt && !promptLoaded) {
+      setPromptLoading(true);
+      setPromptError(null);
       try {
         const res = await api.get(
           `/portfolio-workflows/${workflowId}/exec-log/${log.id}/prompt`,
         );
-        setPromptText(JSON.stringify(res.data.prompt, null, 2));
+        const payload = res.data.prompt;
+        let raw =
+          typeof payload === 'string'
+            ? payload
+            : JSON.stringify(payload, null, 2);
+        let parsed: PromptData | null = null;
+        if (typeof payload === 'string') {
+          try {
+            const maybe = JSON.parse(payload);
+            if (maybe && typeof maybe === 'object') {
+              parsed = maybe as PromptData;
+              raw = JSON.stringify(maybe, null, 2);
+            }
+          } catch {
+            parsed = null;
+          }
+        } else if (payload && typeof payload === 'object') {
+          parsed = payload as PromptData;
+        }
+        setPromptRaw(raw);
+        setPromptData(parsed);
+        setPromptError(null);
+        setPromptLoaded(true);
       } catch {
-        setPromptText(t('failed_load_prompt'));
+        const message = t('failed_load_prompt');
+        setPromptRaw(null);
+        setPromptData(null);
+        setPromptError(message);
+        setPromptLoaded(false);
+      } finally {
+        setPromptLoading(false);
       }
     }
     setShowPrompt(true);
@@ -241,8 +277,25 @@ export default function ExecLogItem({
           </div>
         )}
       </div>
-      <Modal open={showPrompt} onClose={() => setShowPrompt(false)}>
-        <pre className="whitespace-pre-wrap text-sm">{promptText}</pre>
+      <Modal
+        open={showPrompt}
+        onClose={() => setShowPrompt(false)}
+        className="max-w-5xl w-full max-h-[90vh]"
+      >
+        <div className="max-h-[78vh] overflow-y-auto pr-2">
+          {promptLoading && (
+            <p className="text-sm text-gray-600">{t('loading')}</p>
+          )}
+          {!promptLoading && promptData && (
+            <PromptVisualizer data={promptData} raw={promptRaw} />
+          )}
+          {!promptLoading && !promptData && promptRaw && (
+            <pre className="whitespace-pre-wrap text-sm">{promptRaw}</pre>
+          )}
+          {!promptLoading && promptError && !promptRaw && !promptData && (
+            <p className="text-sm text-red-600">{promptError}</p>
+          )}
+        </div>
       </Modal>
       {showTx && orders && (
         <ExecTxCard

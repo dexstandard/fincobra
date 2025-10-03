@@ -125,44 +125,55 @@ export default function WorkflowView() {
             <p>{t('no_logs_yet')}</p>
           ) : (
             <>
-              <table className="w-full mb-2 table-fixed hidden md:table">
-                <colgroup>
-                  <col className="w-40" />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th className="text-left">{t('time')}</th>
-                    <th className="text-left">{t('log')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logData.items.map((log) => (
-                    <tr key={log.id}>
-                      <td className="align-top pr-2 whitespace-nowrap">
-                        <FormattedDate date={log.createdAt} />
-                      </td>
-                      <td className="w-full">
-                        <ExecLogItem
-                          log={log}
-                          workflowId={id!}
-                          manualRebalance={workflow.manualRebalance}
-                          tokens={
-                            [
-                              workflow.tokens[0]?.token,
-                              workflow.cashToken,
-                            ].filter(Boolean) as string[]
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="md:hidden mb-2">
+              <div className="hidden md:block">
+                <div className="overflow-hidden rounded border border-gray-200 bg-white shadow-sm">
+                  <table className="w-full table-fixed">
+                    <colgroup>
+                      <col className="w-40" />
+                      <col />
+                    </colgroup>
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-sm font-semibold text-gray-600">
+                          {t('time')}
+                        </th>
+                        <th className="px-3 py-2 text-left text-sm font-semibold text-gray-600">
+                          {t('log')}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {logData.items.map((log) => (
+                        <tr key={log.id} className="align-top">
+                          <td className="px-3 py-2 align-top whitespace-nowrap text-sm text-gray-600">
+                            <FormattedDate date={log.createdAt} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <ExecLogItem
+                              log={log}
+                              workflowId={id!}
+                              manualRebalance={workflow.manualRebalance}
+                              tokens={
+                                [
+                                  workflow.tokens[0]?.token,
+                                  workflow.cashToken,
+                                ].filter(Boolean) as string[]
+                              }
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="md:hidden mb-2 space-y-2">
                 {logData.items.map((log) => (
-                  <div key={log.id} className="mb-2">
-                    <div className="text-xs text-gray-500 mb-1">
+                  <div
+                    key={log.id}
+                    className="rounded border border-gray-200 bg-white p-3 shadow-sm"
+                  >
+                    <div className="mb-1 text-xs text-gray-500">
                       <FormattedDate date={log.createdAt} />
                     </div>
                     <ExecLogItem
