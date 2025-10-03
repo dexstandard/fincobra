@@ -34,7 +34,7 @@ describe('binance order helpers', () => {
     await createLimitOrder(id1, {
       symbol: 'BTCUSDT',
       side: 'BUY',
-      quantity: 0.1,
+      qty: 0.1,
       price: 20000,
     });
 

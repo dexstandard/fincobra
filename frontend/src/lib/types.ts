@@ -10,10 +10,10 @@ export type LimitOrderStatus =
 export interface LimitOrder {
   id: string;
   side: string;
-  quantity: number;
+  qty: number;
   price: number;
   symbol: string;
   status: LimitOrderStatus;
   createdAt: number;
-  cancellationReason?: string;
+  reason?: string;
 }

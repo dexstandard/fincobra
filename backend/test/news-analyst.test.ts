@@ -1,96 +1,96 @@
-import { describe, it, expect, vi } from 'vitest';
-import { mockLogger } from './helpers.js';
-import { insertNews } from '../src/repos/news.js';
+import { describe, it, expect } from 'vitest';
 import {
-  getTokenNewsSummary,
-  getTokenNewsSummaryCached,
+  computeDerivedItem,
+  sortDerivedItems,
+  computeWeight,
+  computeTimeDecay,
 } from '../src/agents/news-analyst.js';
 
-const responseJson = JSON.stringify({
-  object: 'response',
-  output: [
-    {
-      id: 'msg_1',
-      content: [
-        {
-          type: 'output_text',
-          text: JSON.stringify({ comment: 'summary text', score: 1 }),
-        },
-      ],
-    },
-  ],
-});
+describe('news analyst helpers', () => {
+  it('computes weight with reputation and time decay', () => {
+    const now = new Date('2025-01-02T12:00:00Z');
+    const recent = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
+    const older = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
 
-describe('news analyst', () => {
-  it('returns summary and raw data', async () => {
-    await insertNews([
-      { title: 't', link: 'l', pubDate: new Date(), tokens: ['BTC'] },
-    ]);
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, text: async () => responseJson });
-    const orig = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
-    const res = await getTokenNewsSummary('BTC', 'gpt', 'key', mockLogger());
-    expect(res.analysis?.comment).toBe('summary text');
-    expect(res.prompt).toBeTruthy();
-    expect(res.response).toBe(responseJson);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    (globalThis as any).fetch = orig;
+    const weightRecent = computeWeight('coindesk.com', recent, now);
+    const weightOlder = computeWeight('coindesk.com', older, now);
+    const zeroWeight = computeWeight('unknown.com', recent, now);
+
+    expect(weightRecent).toBeGreaterThan(weightOlder);
+    expect(weightRecent).toBeGreaterThan(0);
+    expect(weightOlder).toBeGreaterThan(0);
+    expect(zeroWeight).toBe(0);
   });
 
-  it('returns null when no news available', async () => {
-    const orig = globalThis.fetch;
-    const fetchMock = vi.fn();
-    (globalThis as any).fetch = fetchMock;
-    const res = await getTokenNewsSummary('DOGE', 'gpt', 'key', mockLogger());
-    expect(res.analysis).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-    (globalThis as any).fetch = orig;
+  it('derives event metadata from headlines', () => {
+    const now = new Date('2025-01-03T00:00:00Z');
+    const base = {
+      link: 'l',
+      pubDate: now.toISOString(),
+      weight: 0.8,
+    };
+
+    const hack = computeDerivedItem({
+      title: 'Bridge hacked for $8M, withdrawals paused',
+      domain: 'coindesk.com',
+      ...base,
+    });
+    const listing = computeDerivedItem({
+      title: 'Binance lists ABC token today',
+      domain: 'coindesk.com',
+      ...base,
+    });
+    const rumor = computeDerivedItem({
+      title: 'Rumor: ETF approval expected soon',
+      domain: 'news.bitcoin.com',
+      ...base,
+    });
+
+    expect(hack.eventType).toBe('Hack');
+    expect(hack.polarity).toBe('bearish');
+    expect(hack.severity).toBeGreaterThan(0.8);
+    expect(hack.eventConfidence).toBeGreaterThan(0.8);
+    expect(listing.eventType).toBe('Listing');
+    expect(listing.polarity).toBe('bullish');
+
+    expect(rumor.eventType).toBe('Rumor');
+    expect(rumor.polarity).toBe('neutral');
+    expect(rumor.eventConfidence).toBeLessThan(0.6);
   });
 
-  it('falls back when AI response is malformed', async () => {
-    await insertNews([
-      { title: 't2', link: 'l2', pubDate: new Date(), tokens: ['BTC'] },
-    ]);
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, text: async () => '{"output":[]}' });
-    const orig = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
-    const res = await getTokenNewsSummary('BTC', 'gpt', 'key', mockLogger());
-    expect(res.analysis?.comment).toBe('Analysis unavailable');
-    expect(res.analysis?.score).toBe(0);
-    (globalThis as any).fetch = orig;
+  it('sorts derived items by score, severity, and recency', () => {
+    const now = new Date('2025-01-04T00:00:00Z');
+    const shared = { domain: 'coindesk.com', link: 'x', weight: 0.9 };
+    const derived = [
+      computeDerivedItem({
+        title: 'Macro update keeps markets calm',
+        pubDate: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+        ...shared,
+      }),
+      computeDerivedItem({
+        title: 'Binance halts withdrawals amid outage',
+        pubDate: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
+        ...shared,
+      }),
+      computeDerivedItem({
+        title: 'Whale moves 10,000 BTC to Coinbase',
+        pubDate: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
+        ...shared,
+      }),
+    ];
+
+    const ordered = sortDerivedItems(derived);
+    expect(ordered[0].eventType).toBe('Outage');
+    expect(ordered[1].eventType).toBe('WhaleMove');
+    expect(ordered[2].eventType).toBe('Upgrade');
   });
 
-  it('falls back when AI request fails', async () => {
-    await insertNews([
-      { title: 't3', link: 'l3', pubDate: new Date(), tokens: ['BTC'] },
-    ]);
-    const orig = globalThis.fetch;
-    const fetchMock = vi.fn().mockRejectedValue(new Error('network'));
-    (globalThis as any).fetch = fetchMock;
-    const res = await getTokenNewsSummary('BTC', 'gpt', 'key', mockLogger());
-    expect(res.analysis?.comment).toBe('Analysis unavailable');
-    expect(res.analysis?.score).toBe(0);
-    (globalThis as any).fetch = orig;
-  });
+  it('computes time decay helper', () => {
+    const now = new Date('2025-01-05T00:00:00Z');
+    const recent = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const distant = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
-  it('caches token reviews and dedupes concurrent calls', async () => {
-    await insertNews([
-      { title: 't4', link: 'l4', pubDate: new Date(), tokens: ['BTC'] },
-    ]);
-    const orig = globalThis.fetch;
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, text: async () => responseJson });
-    (globalThis as any).fetch = fetchMock;
-    const p1 = getTokenNewsSummaryCached('BTC', 'gpt', 'key', mockLogger());
-    const p2 = getTokenNewsSummaryCached('BTC', 'gpt', 'key', mockLogger());
-    await Promise.all([p1, p2]);
-    await getTokenNewsSummaryCached('BTC', 'gpt', 'key', mockLogger());
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    (globalThis as any).fetch = orig;
+    expect(computeTimeDecay(recent, now)).toBeGreaterThan(0.4);
+    expect(computeTimeDecay(distant, now)).toBeLessThan(0.05);
   });
 });

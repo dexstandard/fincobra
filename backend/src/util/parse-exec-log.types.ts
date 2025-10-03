@@ -2,10 +2,10 @@ export interface ExecOrder {
   pair: string;
   token: string;
   side: string;
-  quantity: number;
+  qty: number;
   limitPrice?: number;
   basePrice?: number;
-  maxPriceDivergencePct?: number;
+  maxPriceDriftPct?: number;
 }
 
 export interface ParsedExecLogResponse {

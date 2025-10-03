@@ -5,11 +5,12 @@ import {
   getActivePortfolioWorkflowById,
   getPortfolioWorkflow,
 } from '../src/repos/portfolio-workflows.js';
-import { insertUser, insertUserWithKeys } from './repos/users.js';
+import { insertAdminUser, insertUser, insertUserWithKeys } from './repos/users.js';
 import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import {
   setWorkflowStatus,
   getPortfolioWorkflowStatus,
+  insertPortfolioWorkflow,
 } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import {
@@ -804,6 +805,87 @@ describe('portfolio workflow routes', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toContain('minimum allocations');
+    await app.close();
+  });
+
+  it('requires admin role for admin workflows pagination', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('regular');
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/portfolio-workflows/admin/paginated?page=1&pageSize=5',
+      cookies: authCookies(userId),
+    });
+
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('allows admins to list workflows for any user', async () => {
+    const app = await buildServer();
+    const adminId = await insertAdminUser('admin');
+    const firstUser = await insertUser('first');
+    const secondUser = await insertUser('second');
+
+    await insertPortfolioWorkflow({
+      userId: firstUser,
+      model: 'm1',
+      status: 'active',
+      name: 'W1',
+      tokens: [],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'p',
+      manualRebalance: false,
+      useEarn: false,
+    });
+    await insertPortfolioWorkflow({
+      userId: secondUser,
+      model: 'm2',
+      status: 'inactive',
+      name: 'W2',
+      tokens: [],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'p',
+      manualRebalance: false,
+      useEarn: false,
+    });
+
+    const resAll = await app.inject({
+      method: 'GET',
+      url: '/api/portfolio-workflows/admin/paginated?page=1&pageSize=10',
+      cookies: authCookies(adminId),
+    });
+    expect(resAll.statusCode).toBe(200);
+    expect(resAll.json()).toMatchObject({ total: 2, page: 1, pageSize: 10 });
+    const allItems = resAll.json().items as { userId: string; status: string }[];
+    expect(allItems).toHaveLength(2);
+    expect(allItems.map((item) => item.userId).sort()).toEqual(
+      [firstUser, secondUser].sort(),
+    );
+
+    const resActive = await app.inject({
+      method: 'GET',
+      url: '/api/portfolio-workflows/admin/paginated?page=1&pageSize=10&status=active',
+      cookies: authCookies(adminId),
+    });
+    expect(resActive.statusCode).toBe(200);
+    expect(resActive.json()).toMatchObject({ total: 1, page: 1, pageSize: 10 });
+    expect(resActive.json().items).toHaveLength(1);
+    expect(resActive.json().items[0].userId).toBe(firstUser);
+
+    const resFiltered = await app.inject({
+      method: 'GET',
+      url: `/api/portfolio-workflows/admin/paginated?page=1&pageSize=10&userId=${secondUser}`,
+      cookies: authCookies(adminId),
+    });
+    expect(resFiltered.statusCode).toBe(200);
+    expect(resFiltered.json()).toMatchObject({ total: 1, page: 1, pageSize: 10 });
+    expect(resFiltered.json().items).toHaveLength(1);
+    expect(resFiltered.json().items[0].userId).toBe(secondUser);
+
     await app.close();
   });
 

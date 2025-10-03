@@ -7,7 +7,6 @@ import { setAiKey } from '../src/repos/ai-api-key.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/review-raw-log.js';
 import { getRecentReviewResults } from '../src/repos/review-result.js';
 import * as mainTrader from '../src/agents/main-trader.js';
-import * as newsAnalyst from '../src/agents/news-analyst.js';
 
 const sampleTimeseries = vi.hoisted(() => ({
   minute_60: [[1, 2, 3, 4]],
@@ -18,12 +17,10 @@ const sampleTimeseries = vi.hoisted(() => ({
 const runMainTrader = vi.fn();
 vi.spyOn(mainTrader, 'run').mockImplementation(runMainTrader);
 
-const runNewsAnalyst = vi.fn((_params: any, prompt: any) => {
-  const report = prompt.reports?.find((r: any) => r.token === 'BTC');
-  if (report) report.news = { comment: 'news', score: 1 };
-  return Promise.resolve();
-});
-vi.spyOn(newsAnalyst, 'runNewsAnalyst').mockImplementation(runNewsAnalyst);
+const getNewsByTokenMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock('../src/repos/news.js', () => ({
+  getNewsByToken: getNewsByTokenMock,
+}));
 
 import {
   reviewWorkflowPortfolio,
@@ -68,94 +65,94 @@ vi.mock('../src/services/sentiment.js', () => ({
 }));
 
 const sampleMarketOverview = vi.hoisted(() => ({
-  schema_version: 'market_overview.v2' as const,
-  as_of: '2024-01-01T00:00:00Z',
+  schema: 'market_overview.v2' as const,
+  asOf: '2024-01-01T00:00:00Z',
   timeframe: {
-    candle_interval: '1h',
-    review_interval: '30m',
+    candleInterval: '1h',
+    reviewInterval: '30m',
     semantics: '',
   },
   derivations: {
-    trend_slope_rule: '',
-    ret1h_rule: '',
-    ret24h_rule: '',
-    vol_atr_pct_rule: '',
-    vol_anomaly_z_rule: '',
-    rsi14_rule: '',
-    orderbook_spread_bps_rule: '',
-    orderbook_depth_ratio_rule: '',
-    htf_returns_rule: '',
-    htf_trend_rule: '',
-    regime_vol_state_rule: '',
-    regime_corr_beta_rule: '',
-    risk_flags_rules: {
+    trendSlopeRule: '',
+    ret1hRule: '',
+    ret24hRule: '',
+    volAtrPctRule: '',
+    volAnomalyZRule: '',
+    rsi14Rule: '',
+    orderbookSpreadBpsRule: '',
+    orderbookDepthRatioRule: '',
+    htfReturnsRule: '',
+    htfTrendRule: '',
+    regimeVolStateRule: '',
+    regimeCorrBetaRule: '',
+    riskFlagsRules: {
       overbought: '',
       oversold: '',
-      vol_spike: '',
-      thin_book: '',
+      volSpike: '',
+      thinBook: '',
     },
   },
-  _spec: { units: {}, interpretation: {} },
-  market_overview: {
+  spec: { units: {}, interpretation: {} },
+  marketOverview: {
     BTC: {
-      trend_slope: 'flat' as const,
-      trend_basis: { sma_periods: [50, 200] as [number, number], gap_pct: 0 },
+      trendSlope: 'flat' as const,
+      trendBasis: { smaPeriods: [50, 200] as [number, number], gapPct: 0 },
       ret1h: 0,
       ret24h: 0,
-      vol_atr_pct: 0,
-      vol_anomaly_z: 0,
+      volAtrPct: 0,
+      volAnomalyZ: 0,
       rsi14: 50,
-      orderbook_spread_bps: 0,
-      orderbook_depth_ratio: 1,
-      risk_flags: {
+      orderbookSpreadBps: 0,
+      orderbookDepthRatio: 1,
+      riskFlags: {
         overbought: false,
         oversold: false,
-        vol_spike: false,
-        thin_book: false,
+        volSpike: false,
+        thinBook: false,
       },
       htf: {
         returns: { '30d': 0, '90d': 0, '180d': 0, '365d': 0 },
         trend: {
-          '4h': { sma_periods: [50, 200], gap_pct: 0, slope: 'flat' },
-          '1d': { sma_periods: [20, 100], gap_pct: 0, slope: 'flat' },
-          '1w': { sma_periods: [13, 52], gap_pct: 0, slope: 'flat' },
+          '4h': { smaPeriods: [50, 200], gapPct: 0, slope: 'flat' },
+          '1d': { smaPeriods: [20, 100], gapPct: 0, slope: 'flat' },
+          '1w': { smaPeriods: [13, 52], gapPct: 0, slope: 'flat' },
         },
         regime: {
-          vol_state: 'normal' as const,
-          vol_rank_1y: 0,
-          corr_btc_90d: 0,
-          market_beta_90d: 0,
+          volState: 'normal' as const,
+          volRank1y: 0,
+          corrBtc90d: 0,
+          marketBeta90d: 0,
         },
       },
     },
     ETH: {
-      trend_slope: 'flat' as const,
-      trend_basis: { sma_periods: [50, 200] as [number, number], gap_pct: 0 },
+      trendSlope: 'flat' as const,
+      trendBasis: { smaPeriods: [50, 200] as [number, number], gapPct: 0 },
       ret1h: 0,
       ret24h: 0,
-      vol_atr_pct: 0,
-      vol_anomaly_z: 0,
+      volAtrPct: 0,
+      volAnomalyZ: 0,
       rsi14: 50,
-      orderbook_spread_bps: 0,
-      orderbook_depth_ratio: 1,
-      risk_flags: {
+      orderbookSpreadBps: 0,
+      orderbookDepthRatio: 1,
+      riskFlags: {
         overbought: false,
         oversold: false,
-        vol_spike: false,
-        thin_book: false,
+        volSpike: false,
+        thinBook: false,
       },
       htf: {
         returns: { '30d': 0, '90d': 0, '180d': 0, '365d': 0 },
         trend: {
-          '4h': { sma_periods: [50, 200], gap_pct: 0, slope: 'flat' },
-          '1d': { sma_periods: [20, 100], gap_pct: 0, slope: 'flat' },
-          '1w': { sma_periods: [13, 52], gap_pct: 0, slope: 'flat' },
+          '4h': { smaPeriods: [50, 200], gapPct: 0, slope: 'flat' },
+          '1d': { smaPeriods: [20, 100], gapPct: 0, slope: 'flat' },
+          '1w': { smaPeriods: [13, 52], gapPct: 0, slope: 'flat' },
         },
         regime: {
-          vol_state: 'normal' as const,
-          vol_rank_1y: 0,
-          corr_btc_90d: 0,
-          market_beta_90d: 0,
+          volState: 'normal' as const,
+          volRank1y: 0,
+          corrBtc90d: 0,
+          marketBeta90d: 0,
         },
       },
     },
@@ -205,16 +202,23 @@ describe('reviewPortfolio', () => {
   it('saves decision and logs', async () => {
     const { workflowId } = await setupWorkflow(['BTC']);
     const decision = {
-      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', quantity: 1 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', qty: 1 }],
       shortReport: 'ok',
     };
     runMainTrader.mockResolvedValue(decision);
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, workflowId);
     expect(runMainTrader).toHaveBeenCalledTimes(1);
-    expect(runNewsAnalyst).toHaveBeenCalled();
     const rows = await getPortfolioReviewRawPromptsResponses(workflowId);
     const row = rows[0];
+    const promptPayload = JSON.parse(row.prompt!);
+    const btcReport = promptPayload.reports.find(
+      (r: any) => r.token === 'BTC',
+    );
+    expect(btcReport?.news?.version).toBe('news_context.v1');
+    const passedPrompt = runMainTrader.mock.calls[0]?.[1];
+    expect(passedPrompt?.reports?.find((r: any) => r.token === 'BTC')?.news)
+      .toBeDefined();
     expect(JSON.parse(row.response!)).toEqual(decision);
     const [res] = await getRecentReviewResults(workflowId, 1);
     expect(res.rebalance).toBe(true);
@@ -228,8 +232,8 @@ describe('reviewPortfolio', () => {
     ]);
     const decision = {
       orders: [
-        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 },
-        { pair: 'ETHBTC', token: 'ETH', side: 'SELL', quantity: 0.5 },
+        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 },
+        { pair: 'ETHBTC', token: 'ETH', side: 'SELL', qty: 0.5 },
       ],
       shortReport: 's',
     };
@@ -245,7 +249,7 @@ describe('reviewPortfolio', () => {
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
     const { workflowId: agent3 } = await setupWorkflow(['BTC'], true);
     const decision = {
-      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 1 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
@@ -257,7 +261,7 @@ describe('reviewPortfolio', () => {
   it('records error when pair is invalid', async () => {
     const { workflowId: agent4 } = await setupWorkflow(['BTC']);
     const decision = {
-      orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', quantity: 1 }],
+      orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', qty: 1 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);
@@ -270,7 +274,7 @@ describe('reviewPortfolio', () => {
   it('records error when quantity is invalid', async () => {
     const { workflowId: agent5 } = await setupWorkflow(['BTC']);
     const decision = {
-      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', quantity: 0 }],
+      orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 0 }],
       shortReport: 's',
     };
     runMainTrader.mockResolvedValue(decision);

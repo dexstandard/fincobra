@@ -8,16 +8,36 @@ export async function insertNews(items: NewsInsert[]): Promise<void> {
   const params: (string | string[] | null)[] = [];
   const values: string[] = [];
   filtered.forEach((item, i) => {
-    const base = i * 4;
-    values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
-    params.push(item.title, item.link, item.pubDate ?? null, item.tokens);
+    const base = i * 6;
+    values.push(
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`,
+    );
+    params.push(
+      item.title,
+      item.link,
+      item.pubDate ?? null,
+      item.tokens,
+      item.domain,
+      item.simhash,
+    );
   });
   await db.query(
-    `INSERT INTO news (title, link, pub_date, tokens)
+    `INSERT INTO news (title, link, pub_date, tokens, domain, simhash)
      VALUES ${values.join(', ')}
       ON CONFLICT (link) DO NOTHING`,
     params,
   );
+}
+
+export async function getRecentNewsSimhashes(since: Date): Promise<string[]> {
+  const { rows } = await db.query(
+    `SELECT simhash
+       FROM news
+      WHERE simhash IS NOT NULL
+        AND ((pub_date IS NOT NULL AND pub_date >= $1) OR (pub_date IS NULL AND created_at >= $1))`,
+    [since.toISOString()],
+  );
+  return rows.map((row) => row.simhash as string);
 }
 
 export async function getNewsByToken(
@@ -25,7 +45,7 @@ export async function getNewsByToken(
   limit = 20,
 ): Promise<NewsEntry[]> {
   const { rows } = await db.query(
-    `SELECT title, link, pub_date
+    `SELECT title, link, pub_date, domain
        FROM news
       WHERE tokens @> ARRAY[$1]::text[]
    ORDER BY pub_date DESC NULLS LAST

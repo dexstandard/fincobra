@@ -271,22 +271,39 @@ export default function Dashboard() {
   const { user } = useUser();
   const [page, setPage] = useState(1);
   const [onlyActive, setOnlyActive] = useState(false);
+  const [onlyMy, setOnlyMy] = useState(true);
   const queryClient = useQueryClient();
   const toast = useToast();
   const t = useTranslation();
   const { hasBinanceKey } = usePrerequisites([], {
     includeAiKey: false,
   });
+  const isAdmin = user?.role === 'admin';
 
   const { data } = useQuery({
-    queryKey: ['workflows', page, user?.id, onlyActive],
+    queryKey: [
+      'workflows',
+      isAdmin ? 'admin' : 'user',
+      page,
+      user?.id,
+      onlyActive,
+      isAdmin ? onlyMy : undefined,
+    ],
     queryFn: async () => {
-      const res = await api.get('/portfolio-workflows/paginated', {
-        params: {
-          page,
-          pageSize: 10,
-          status: onlyActive ? 'active' : undefined,
-        },
+      const params: Record<string, string | number | undefined> = {
+        page,
+        pageSize: 10,
+        status: onlyActive ? 'active' : undefined,
+      };
+      const url =
+        isAdmin
+          ? '/portfolio-workflows/admin/paginated'
+          : '/portfolio-workflows/paginated';
+      if (isAdmin && onlyMy && user?.id) {
+        params.userId = user.id;
+      }
+      const res = await api.get(url, {
+        params,
       });
       return res.data as {
         items: WorkflowSummary[];
@@ -371,11 +388,26 @@ export default function Dashboard() {
                   </Link>
                 )}
               </div>
-              <Toggle
-                label={t('only_active')}
-                checked={onlyActive}
-                onChange={setOnlyActive}
-              />
+              <div
+                className={`flex gap-3 ${
+                  isAdmin
+                    ? 'flex-col items-end sm:flex-row sm:items-center'
+                    : 'items-center'
+                }`}
+              >
+                {isAdmin && (
+                  <Toggle
+                    label={t('only_my')}
+                    checked={onlyMy}
+                    onChange={setOnlyMy}
+                  />
+                )}
+                <Toggle
+                  label={t('only_active')}
+                  checked={onlyActive}
+                  onChange={setOnlyActive}
+                />
+              </div>
             </div>
             {items.length === 0 ? (
               <p>

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   getPortfolioWorkflow,
   getPortfolioWorkflowsPaginated,
+  getPortfolioWorkflowsPaginatedAdmin,
   toApi,
   insertPortfolioWorkflow,
   updatePortfolioWorkflow,
@@ -44,7 +45,7 @@ import type {
   MainTraderDecision,
   MainTraderOrder,
 } from '../agents/main-trader.types.js';
-import { getValidatedUserId } from './_shared/guards.js';
+import { adminOnlyPreHandlers, getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
 const idParams = z.object({ id: z.string().regex(/^\d+$/) });
@@ -86,6 +87,10 @@ const paginationQuerySchema = z.object({
   status: z.nativeEnum(PortfolioWorkflowStatus).optional(),
 });
 
+const adminPaginationQuerySchema = paginationQuerySchema.extend({
+  userId: z.string().regex(/^\d+$/).optional(),
+});
+
 const execLogQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).optional(),
   pageSize: z.string().regex(/^\d+$/).optional(),
@@ -98,7 +103,7 @@ const manualPreviewQuerySchema = z.object({
 
 interface ManualRebalanceBody {
   price?: number;
-  quantity?: number;
+  qty?: number;
   manuallyEdited?: boolean;
   orderIndex?: number;
 }
@@ -106,7 +111,7 @@ interface ManualRebalanceBody {
 const manualRebalanceBodySchema = z
   .object({
     price: z.number().optional(),
-    quantity: z.number().optional(),
+    qty: z.number().optional(),
     manuallyEdited: z.boolean().optional(),
     orderIndex: z.number().int().nonnegative().optional(),
   })
@@ -207,10 +212,10 @@ function isValidManualOrder(value: unknown): value is MainTraderOrder {
     typeof record.pair === 'string' &&
     typeof record.token === 'string' &&
     typeof record.side === 'string' &&
-    typeof record.quantity === 'number' &&
+    typeof record.qty === 'number' &&
     typeof record.limitPrice === 'number' &&
     typeof record.basePrice === 'number' &&
-    typeof record.maxPriceDivergencePct === 'number'
+    typeof record.maxPriceDriftPct === 'number'
   );
 }
 
@@ -229,6 +234,28 @@ function parsePaginationQuery(
   const pageNumber = Math.max(Number.parseInt(page, 10), 1);
   const pageSizeNumber = Math.max(Number.parseInt(pageSize, 10), 1);
   return { page: pageNumber, pageSize: pageSizeNumber, status };
+}
+
+function parseAdminPaginationQuery(
+  req: FastifyRequest,
+  reply: FastifyReply,
+):
+  | {
+      page: number;
+      pageSize: number;
+      status?: PortfolioWorkflowStatus;
+      userId?: string;
+    }
+  | undefined {
+  const result = adminPaginationQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    reply.code(400).send(errorResponse('invalid query parameter'));
+    return undefined;
+  }
+  const { page = '1', pageSize = '10', status, userId } = result.data;
+  const pageNumber = Math.max(Number.parseInt(page, 10), 1);
+  const pageSizeNumber = Math.max(Number.parseInt(pageSize, 10), 1);
+  return { page: pageNumber, pageSize: pageSizeNumber, status, userId };
 }
 
 function parseExecLogQuery(
@@ -285,6 +312,37 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         offset,
       );
       log.info('listed workflows');
+      return {
+        items: rows.map(toApi),
+        total,
+        page,
+        pageSize,
+      };
+    },
+  );
+
+  app.get(
+    '/portfolio-workflows/admin/paginated',
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: adminOnlyPreHandlers,
+    },
+    async (req, reply) => {
+      const pagination = parseAdminPaginationQuery(req, reply);
+      if (!pagination) return;
+      const { page, pageSize, status, userId } = pagination;
+      const offset = (page - 1) * pageSize;
+      const log = req.log.child({
+        userId: req.adminUserId,
+        targetUserId: userId,
+      });
+      const { rows, total } = await getPortfolioWorkflowsPaginatedAdmin(
+        status,
+        pageSize,
+        offset,
+        userId,
+      );
+      log.info('admin listed workflows');
       return {
         items: rows.map(toApi),
         total,
@@ -430,12 +488,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           return {
             id: r.orderId,
             side: planned.side,
-            quantity: planned.quantity,
+            qty: planned.qty,
             price: planned.price,
             symbol: planned.symbol,
             status: r.status,
             createdAt: r.createdAt.getTime(),
-            cancellationReason: r.cancellationReason ?? undefined,
+            reason: r.cancellationReason ?? undefined,
           } as const;
         }),
       };
@@ -488,12 +546,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         updatedOrder.basePrice = body.price;
         manuallyEdited = true;
       }
-      if (body.quantity !== undefined) {
-        if (!Number.isFinite(body.quantity) || body.quantity <= 0) {
-          log.error({ execLogId: logId }, 'invalid manual quantity');
-          return reply.code(400).send(errorResponse('invalid quantity'));
+      if (body.qty !== undefined) {
+        if (!Number.isFinite(body.qty) || body.qty <= 0) {
+          log.error({ execLogId: logId }, 'invalid manual qty');
+          return reply.code(400).send(errorResponse('invalid qty'));
         }
-        updatedOrder.quantity = body.quantity;
+        updatedOrder.qty = body.qty;
         manuallyEdited = true;
       }
       if (manuallyEdited) updatedOrder.manuallyEdited = true;
@@ -605,7 +663,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       return {
         order: {
           side: order.side,
-          quantity: order.quantity,
+          qty: order.qty,
           price: order.limitPrice,
         },
       };

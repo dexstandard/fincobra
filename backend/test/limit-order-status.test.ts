@@ -35,7 +35,7 @@ describe('updateLimitOrderStatus', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { side: 'BUY', quantity: 1, price: 100, symbol: 'BTCETH' },
+      planned: { side: 'BUY', qty: 1, price: 100, symbol: 'BTCETH' },
       status: LimitOrderStatus.Open,
       reviewResultId,
       orderId: '42',

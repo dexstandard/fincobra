@@ -1,7 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import type { Analysis } from './news-analyst.types.js';
 import type { MarketOverviewPayload } from '../services/indicators.types.js';
-
 export interface RunParams {
   log: FastifyBaseLogger;
   model: string;
@@ -16,16 +14,17 @@ export interface RebalancePosition {
   valueUsdt: number;
 }
 
+export interface PreviousReportOrder {
+  symbol: string;
+  side: string;
+  qty: number;
+  status: string;
+  reason?: string;
+}
+
 export interface PreviousReport {
-  datetime: string;
-  orders?: {
-    symbol: string;
-    side: string;
-    quantity: number;
-    status: string;
-    datetime: string;
-    cancellationReason?: string;
-  }[];
+  ts: string;
+  orders?: PreviousReportOrder[];
   shortReport?: string;
   error?: unknown;
 }
@@ -42,9 +41,32 @@ export interface MarketTimeseries {
   ret24m: number;
 }
 
+export interface NewsContextItem {
+  title: string;
+  link: string | null;
+  pubDate: string | null;
+  domain: string | null;
+  eventType: string;
+  polarity: 'bullish' | 'bearish' | 'neutral';
+  severity: number;
+  eventConfidence: number;
+  headlineScore: number;
+}
+
+export interface NewsContext {
+  version: 'news_context.v1';
+  bias: number;
+  maxSev: number;
+  maxConf: number;
+  bull: number;
+  bear: number;
+  top: string | null;
+  items: NewsContextItem[];
+}
+
 export interface PromptReport {
   token: string;
-  news: Analysis | null;
+  news: NewsContext;
 }
 
 export interface RebalancePrompt {
@@ -75,10 +97,10 @@ export interface MainTraderOrder {
   pair: string;
   token: string;
   side: string;
-  quantity: number;
+  qty: number;
   limitPrice: number;
   basePrice: number;
-  maxPriceDivergencePct: number;
+  maxPriceDriftPct: number;
 }
 
 export interface MainTraderDecision {

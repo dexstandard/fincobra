@@ -12,60 +12,60 @@ const HOUR_INTERVAL_LIMIT = 1000;
 const HOUR_BASELINE = 24 * 30;
 
 const TIMEFRAME: MarketOverviewPayload['timeframe'] = {
-  candle_interval: '1h',
-  review_interval: '30m',
+  candleInterval: '1h',
+  reviewInterval: '30m',
   semantics:
     'All base fields are computed on 1h candles for a 30m decision cadence. Higher-timeframe (HTF) context adds 4h/1d/1w trend and 30d/90d/180d/365d returns.',
 };
 
 const DERIVATIONS: MarketOverviewPayload['derivations'] = {
-  trend_slope_rule:
-    "Compute SMA50 and SMA200 on 1h candles. gap_pct = (SMA50 - SMA200) / SMA200 * 100. trend_slope = 'up' if gap_pct > +0.5, 'down' if gap_pct < -0.5, else 'flat'.",
-  ret1h_rule: 'ret1h = (last_price / price_1h_ago) - 1 (decimal).',
-  ret24h_rule: 'ret24h = (last_price / price_24h_ago) - 1 (decimal).',
-  vol_atr_pct_rule: 'vol_atr_pct = ATR(14) / last_price * 100 (percent).',
-  vol_anomaly_z_rule: 'Z-score of last 1h volume vs a 30-day hourly baseline.',
-  rsi14_rule: 'Standard 14-period RSI on 1h candles.',
-  orderbook_spread_bps_rule:
-    '((best_ask - best_bid) / mid_price) * 10_000 (basis points).',
-  orderbook_depth_ratio_rule:
-    'bid_top_qty / ask_top_qty (top-of-book sizes).',
-  htf_returns_rule:
-    'On daily closes (UTC): ret_30d = (close_t / close_t-30d) - 1, similarly for 90d/180d/365d (decimals).',
-  htf_trend_rule:
-    "For each frame f in {4h,1d,1w}, compute SMA_fast and SMA_slow on that frame and set: gap_pct_f = (SMA_fast - SMA_slow) / SMA_slow * 100. slope_f = 'up' if gap_pct_f > +0.5, 'down' if gap_pct_f < -0.5, else 'flat'. Recommended pairs: 4h:[50,200], 1d:[20,100], 1w:[13,52].",
-  regime_vol_state_rule:
-    "Compute realized volatility (stdev of log returns) on daily closes over a 30-day lookback. Rank it within a 365-day window to get vol_rank_1y in [0,1]. vol_state = 'depressed' if vol_rank_1y < 0.2, 'normal' if 0.2–0.7, 'elevated' if > 0.7.",
-  regime_corr_beta_rule:
-    'corr_btc_90d = Pearson correlation of daily log returns versus BTC over last 90 days. market_beta_90d from OLS: r_asset = alpha + beta * r_btc using daily log returns over last 90 days.',
-  risk_flags_rules: {
+  trendSlopeRule:
+    "Compute SMA50 and SMA200 on 1h candles. gapPct = (SMA50 - SMA200) / SMA200 * 100. trendSlope = 'up' if gapPct > +0.5, 'down' if gapPct < -0.5, else 'flat'.",
+  ret1hRule: 'ret1h = (lastPrice / price1hAgo) - 1 (decimal).',
+  ret24hRule: 'ret24h = (lastPrice / price24hAgo) - 1 (decimal).',
+  volAtrPctRule: 'volAtrPct = ATR(14) / lastPrice * 100 (percent).',
+  volAnomalyZRule: 'Z-score of last 1h volume vs a 30-day hourly baseline.',
+  rsi14Rule: 'Standard 14-period RSI on 1h candles.',
+  orderbookSpreadBpsRule:
+    '((bestAsk - bestBid) / midPrice) * 10_000 (basis points).',
+  orderbookDepthRatioRule:
+    'bidTopQty / askTopQty (top-of-book sizes).',
+  htfReturnsRule:
+    'On daily closes (UTC): ret30d = (close_t / close_t-30d) - 1, similarly for 90d/180d/365d (decimals).',
+  htfTrendRule:
+    "For each frame f in {4h,1d,1w}, compute SMAfast and SMAslow on that frame and set: gapPct_f = (SMAfast - SMAslow) / SMAslow * 100. slope_f = 'up' if gapPct_f > +0.5, 'down' if gapPct_f < -0.5, else 'flat'. Recommended pairs: 4h:[50,200], 1d:[20,100], 1w:[13,52].",
+  regimeVolStateRule:
+    "Compute realized volatility (stdev of log returns) on daily closes over a 30-day lookback. Rank it within a 365-day window to get volRank1y in [0,1]. volState = 'depressed' if volRank1y < 0.2, 'normal' if 0.2–0.7, 'elevated' if > 0.7.",
+  regimeCorrBetaRule:
+    'corrBtc90d = Pearson correlation of daily log returns versus BTC over last 90 days. marketBeta90d from OLS: r_asset = alpha + beta * r_btc using daily log returns over last 90 days.',
+  riskFlagsRules: {
     overbought: 'rsi14 >= 75',
     oversold: 'rsi14 <= 25',
-    vol_spike: 'vol_atr_pct >= 3.0',
-    thin_book: 'orderbook_spread_bps > 10 OR orderbook_depth_ratio < 0.5',
+    volSpike: 'vol_atr_pct >= 3.0',
+    thinBook: 'orderbookSpreadBps > 10 OR orderbookDepthRatio < 0.5',
   },
 };
 
-const SPEC: MarketOverviewPayload['_spec'] = {
+const SPEC: MarketOverviewPayload['spec'] = {
   units: {
     ret1h: 'decimal (e.g., -0.012 = -1.2%)',
     ret24h: 'decimal',
-    vol_atr_pct: 'percent',
-    vol_anomaly_z: 'z-score',
+    volAtrPct: 'percent',
+    volAnomalyZ: 'z-score',
     rsi14: '0–100',
-    orderbook_spread_bps: 'basis points',
-    orderbook_depth_ratio: 'ratio',
+    orderbookSpreadBps: 'basis points',
+    orderbookDepthRatio: 'ratio',
     'htf.returns.30d|90d|180d|365d': 'decimal',
-    'htf.trend.gap_pct_(4h|1d|1w)': 'percent',
+    'htf.trend.gapPct_(4h|1d|1w)': 'percent',
     "htf.trend.slope_(4h|1d|1w)": "enum('up','flat','down')",
-    'htf.regime.vol_state': "enum('depressed','normal','elevated')",
-    'htf.regime.vol_rank_1y': '0–1 (percentile)',
-    'htf.regime.corr_btc_90d': '[-1,1]',
-    'htf.regime.market_beta_90d': 'float',
+    'htf.regime.volState': "enum('depressed','normal','elevated')",
+    'htf.regime.volRank1y': '0–1 (percentile)',
+    'htf.regime.corrBtc90d': '[-1,1]',
+    'htf.regime.marketBeta90d': 'float',
   },
   interpretation: {
-    trend_slope: 'Multi-day trend on 1h timeframe (SMA50 vs SMA200).',
-    risk_flags: 'Boolean guards for sizing/filters; not trade triggers.',
+    trendSlope: 'Multi-day trend on 1h timeframe (SMA50 vs SMA200).',
+    riskFlags: 'Boolean guards for sizing/filters; not trade triggers.',
     htf: 'Condensed month/quarter/half-year/year context to gate strategies and sizing.',
   },
 };
@@ -174,11 +174,11 @@ async function computeTokenOverview(
   const bidQty = bestBid?.[1] ?? 0;
   const askQty = bestAsk?.[1] ?? 1;
   const mid = (bidPrice + askPrice) / 2 || pair.currentPrice || 1;
-  overview.orderbook_spread_bps = mid
+  overview.orderbookSpreadBps = mid
     ? ((askPrice - bidPrice) / mid) * 10_000
     : 0;
-  overview.orderbook_depth_ratio = askQty === 0 ? 0 : bidQty / askQty;
-  overview.risk_flags = computeRiskFlags(overview);
+  overview.orderbookDepthRatio = askQty === 0 ? 0 : bidQty / askQty;
+  overview.riskFlags = computeRiskFlags(overview);
 
   return {
     overview,
@@ -221,12 +221,12 @@ export function createEmptyMarketOverview(
   asOf: Date = new Date(),
 ): MarketOverviewPayload {
   return {
-    schema_version: 'market_overview.v2',
-    as_of: asOf.toISOString(),
+    schema: 'market_overview.v2',
+    asOf: asOf.toISOString(),
     timeframe: TIMEFRAME,
     derivations: DERIVATIONS,
-    _spec: SPEC,
-    market_overview: {},
+    spec: SPEC,
+    marketOverview: {},
   };
 }
 
@@ -354,7 +354,7 @@ function computeTrendFrame(
   periods: [number, number],
 ): MarketOverviewTrendFrame {
   if (closes.length < slow) {
-    return { sma_periods: periods, gap_pct: 0, slope: 'flat' };
+    return { smaPeriods: periods, gapPct: 0, slope: 'flat' };
   }
   const smaFast = calcSma(closes, fast);
   const smaSlow = calcSma(closes, slow) || 1;
@@ -362,7 +362,7 @@ function computeTrendFrame(
   let slope: MarketOverviewTrendFrame['slope'] = 'flat';
   if (gap > 0.5) slope = 'up';
   else if (gap < -0.5) slope = 'down';
-  return { sma_periods: periods, gap_pct: gap, slope };
+  return { smaPeriods: periods, gapPct: gap, slope };
 }
 
 function calcCorrelation(asset: number[], market: number[]): number {
@@ -405,13 +405,13 @@ function calcBeta(asset: number[], market: number[]): number {
   return cov / varB;
 }
 
-function computeRiskFlags(token: MarketOverviewToken): MarketOverviewToken['risk_flags'] {
+function computeRiskFlags(token: MarketOverviewToken): MarketOverviewToken['riskFlags'] {
   return {
     overbought: token.rsi14 >= 75,
     oversold: token.rsi14 <= 25,
-    vol_spike: token.vol_atr_pct >= 3,
-    thin_book:
-      token.orderbook_spread_bps > 10 || token.orderbook_depth_ratio < 0.5,
+    volSpike: token.volAtrPct >= 3,
+    thinBook:
+      token.orderbookSpreadBps > 10 || token.orderbookDepthRatio < 0.5,
   };
 }
 
@@ -434,7 +434,7 @@ function buildTokenOverview(
   const sma50 = calcSma(closes1h, 50);
   const sma200 = calcSma(closes1h, 200) || 1;
   const gapPct = ((sma50 - sma200) / sma200) * 100;
-  let trendSlope: MarketOverviewToken['trend_slope'] = 'flat';
+  let trendSlope: MarketOverviewToken['trendSlope'] = 'flat';
   if (gapPct > 0.5) trendSlope = 'up';
   else if (gapPct < -0.5) trendSlope = 'down';
   const priceForVol = latestHourClose || current || 1;
@@ -447,16 +447,16 @@ function buildTokenOverview(
   const latestDailyClose = dailyCloses[dailyCloses.length - 1] ?? current;
 
   const token: MarketOverviewToken = {
-    trend_slope: trendSlope,
-    trend_basis: { sma_periods: [50, 200], gap_pct: gapPct },
+    trendSlope,
+    trendBasis: { smaPeriods: [50, 200], gapPct },
     ret1h,
     ret24h,
-    vol_atr_pct: volAtrPct,
-    vol_anomaly_z: volAnomalyZ,
+    volAtrPct,
+    volAnomalyZ,
     rsi14,
-    orderbook_spread_bps: 0,
-    orderbook_depth_ratio: 0,
-    risk_flags: { overbought: false, oversold: false, vol_spike: false, thin_book: false },
+    orderbookSpreadBps: 0,
+    orderbookDepthRatio: 0,
+    riskFlags: { overbought: false, oversold: false, volSpike: false, thinBook: false },
     htf: {
       returns: {
         '30d': calcReturn(dailyCloses, 30, latestDailyClose),
@@ -485,10 +485,10 @@ function buildTokenOverview(
         ),
       },
       regime: {
-        vol_state: 'normal',
-        vol_rank_1y: 0,
-        corr_btc_90d: 0,
-        market_beta_90d: 0,
+        volState: 'normal',
+        volRank1y: 0,
+        corrBtc90d: 0,
+        marketBeta90d: 0,
       },
     },
   };
@@ -502,7 +502,7 @@ function buildTokenOverview(
   }
   const currentVol = volSeries[volSeries.length - 1] ?? realizedVol(dailyLogs);
   const volRank = percentileRank(volSeries, currentVol);
-  let volState: MarketOverviewToken['htf']['regime']['vol_state'] = 'normal';
+  let volState: MarketOverviewToken['htf']['regime']['volState'] = 'normal';
   if (volRank < 0.2) volState = 'depressed';
   else if (volRank > 0.7) volState = 'elevated';
 
@@ -512,13 +512,13 @@ function buildTokenOverview(
   const beta = calcBeta(assetLogs, btcLogs);
 
   token.htf.regime = {
-    vol_state: volState,
-    vol_rank_1y: volRank,
-    corr_btc_90d: corr,
-    market_beta_90d: beta,
+    volState,
+    volRank1y: volRank,
+    corrBtc90d: corr,
+    marketBeta90d: beta,
   };
 
-  token.risk_flags = computeRiskFlags(token);
+  token.riskFlags = computeRiskFlags(token);
 
   return token;
 }
@@ -551,13 +551,13 @@ export async function fetchMarketOverview(
   }, new Date(0));
 
   return {
-    schema_version: 'market_overview.v2',
-    as_of:
+    schema: 'market_overview.v2',
+    asOf:
       latestAsOf.getTime() > 0 ? latestAsOf.toISOString() : new Date().toISOString(),
     timeframe: TIMEFRAME,
     derivations: DERIVATIONS,
-    _spec: SPEC,
-    market_overview: marketOverview,
+    spec: SPEC,
+    marketOverview,
   };
 }
 
