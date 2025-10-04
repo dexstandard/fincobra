@@ -35,13 +35,8 @@ export default function AppShell() {
   return (
     <div className="h-screen flex flex-col">
       <header className="fixed top-0 left-0 right-0 bg-gray-800 text-white p-4 flex justify-between z-10">
-        <Link to="/" className="font-bold flex items-center gap-2">
-          <img
-            src="/logo-min.svg"
-            alt="FinCobra"
-            className="h-8 w-8"
-          />
-          <span className="hidden sm:inline">FinCobra</span>
+        <Link to="/" className="font-bold">
+          FinCobra
         </Link>
         <div className="flex items-center gap-4">
           <span className="hidden md:inline">
