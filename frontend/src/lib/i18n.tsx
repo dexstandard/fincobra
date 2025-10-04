@@ -31,6 +31,9 @@ const translations: Record<Lang, Record<string, string>> = {
     language: 'Language',
     please_log_in: 'Please log in.',
     loading: 'Loading...',
+    ios_add_to_home_screen_title: 'Add FinCobra to your Home Screen',
+    ios_add_to_home_screen_instructions:
+      'Tap the share icon in Safari and choose “Add to Home Screen” to launch FinCobra like an app.',
     twofa_enabled: 'Two-factor authentication is enabled.',
     code: 'Code',
     disable: 'Disable',
@@ -204,6 +207,9 @@ const translations: Record<Lang, Record<string, string>> = {
     language: 'Язык',
     please_log_in: 'Пожалуйста, войдите.',
     loading: 'Загрузка...',
+    ios_add_to_home_screen_title: 'Добавьте FinCobra на главный экран',
+    ios_add_to_home_screen_instructions:
+      'Нажмите на иконку «Поделиться» в Safari и выберите «На экран “Домой”», чтобы запускать FinCobra как приложение.',
     twofa_enabled: 'Двухфакторная аутентификация включена.',
     code: 'Код',
     disable: 'Отключить',
