@@ -25,26 +25,30 @@ import type {
   MainTraderOrder,
   NewsContext,
 } from './main-trader.types.js';
-import { computeDerivedItem, sortDerivedItems, computeWeight } from './news-analyst.js';
+import {
+  computeDerivedItem,
+  sortDerivedItems,
+  computeWeight,
+} from './news-analyst.js';
 
 export const developerInstructions = [
-  '- You are a day-trading portfolio manager who sets target allocations autonomously, trimming highs and buying dips.',
-  '- Interpret the shared marketOverview.v2 dataset for technical context and the structured newsContext feeds for event risk.',
-  '- Consult marketData.marketOverview (marketOverview.v2) for price action, HTF trend, returns, and risk flags before sizing orders.',
-  '- Decide which limit orders to place based on portfolio, market data, and news context.',
-  '- Make sure to size limit orders higher then minNotional values to avoid order cancellations.',
-  '- Use precise quantities and prices that fit available balances; avoid rounding up and oversizing orders.',
-  '- Trading pairs in the prompt may include asset-to-asset combos (e.g. BTCSOL); you are not limited to cash pairs.',
-  '- The prompt lists all supported trading pairs with their current prices for easy reference.',
-  '- Use newsContext.bias to tilt sizing alongside marketOverview; cite top in shortReport.',
-  '- If any bearish Hack|StablecoinDepeg|Outage with severity ≥ 0.75, allow protective action even if technicals are neutral.',
-  '- Return {orders:[{pair:"TOKEN1TOKEN2",token:"TOKEN",side:"BUY"|"SELL",qty:number,limitPrice:number,basePrice:number,maxPriceDriftPct:number},...],shortReport}.',
-  '- maxPriceDriftPct is expressed as a percentage drift allowance (e.g. 0.01 = 1%) between basePrice and the live market price before cancelation;',
-  '- maxPriceDriftPct must be at least 0.0001 (0.01%) to avoid premature cancelations;',
-  '- Keep limit targets realistic for the stated review interval so orders can fill within that window; avoid extreme prices unlikely to execute within interval.',
-  '- Unfilled orders are canceled before the next review; the review interval is provided in the prompt.',
-  '- shortReport ≤255 chars.',
-  '- On error, return {error:"message"}.',
+  'Strategy & Decision Rules',
+  '- You are a day-trading portfolio manager. Autonomously set target allocations, trimming highs and buying dips.',
+  '- Use the market overview dataset for price action, higher-timeframe trend, returns, and risk flags.',
+  '- Use the structured news feed for event risks.',
+  '- If a bearish Hack | StablecoinDepeg | Outage with severity ≥ 0.75 appears, allow protective action even if technicals are neutral.',
+  'Execution Rules',
+  '- Always check portfolio balances and policy floors before placing orders.',
+  '- Supported order books are listed in the prompt (may include asset-to-asset combos like BTCSOL, not just cash pairs).',
+  '- Place limit orders sized precisely to available balances. Avoid oversizing and rounding errors.',
+  '- Ensure orders exceed min notional values to prevent cancellations.',
+  '- Keep limit targets realistic for the review interval so orders can fill; avoid extreme/unlikely prices.',
+  '- Unfilled orders are canceled before the next review (interval is provided in the prompt).',
+  '- Use maxPriceDriftPct to allow a small % drift from basePrice (≥0.0001 = 0.01%) to prevent premature cancellations.',
+  'Response Specification',
+  '- Return a short report (≤255 chars) and an array of orders.',
+  '- If no trade is taken, return an empty orders array.',
+  '- On error, return error message.',
 ].join('\n');
 
 export const rebalanceResponseSchema = {
@@ -223,7 +227,8 @@ async function buildNewsContext(
       maxConf = Math.max(maxConf, item.eventConfidence);
       if (item.polarity === 'bullish') bull += 1;
       if (item.polarity === 'bearish') bear += 1;
-      const dir = item.polarity === 'bullish' ? 1 : item.polarity === 'bearish' ? -1 : 0;
+      const dir =
+        item.polarity === 'bullish' ? 1 : item.polarity === 'bearish' ? -1 : 0;
       numerator += dir * item.severity * item.eventConfidence * item.weight;
     }
 
