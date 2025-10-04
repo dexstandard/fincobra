@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useTranslation } from '../lib/i18n';
 import AgentInstructions from '../components/AgentInstructions';
 import { useNavigate } from 'react-router-dom';
@@ -26,22 +26,28 @@ interface Props {
   workflow?: PortfolioWorkflow;
 }
 
+const DEFAULT_AGENT_INSTRUCTIONS =
+  'Day trade this pair and determine the target allocation yourself. Monitor real-time market data and news, trimming positions after rallies and adding to them after dips to stay within policy floors while exploiting intraday swings.';
+
 export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const navigate = useNavigate();
   const { user } = useUser();
   const toast = useToast();
   const t = useTranslation();
 
-  const defaultValues = workflow
-    ? {
-        tokens: [
-          { token: workflow.cashToken, minAllocation: 0 },
-          ...workflow.tokens,
-        ],
-        risk: workflow.risk,
-        reviewInterval: workflow.reviewInterval,
-      }
-    : portfolioReviewDefaults;
+  const workflowFormValues = useMemo(() => {
+    if (!workflow) return null;
+    return {
+      tokens: [
+        { token: workflow.cashToken, minAllocation: 0 },
+        ...workflow.tokens,
+      ],
+      risk: workflow.risk,
+      reviewInterval: workflow.reviewInterval,
+    } satisfies PortfolioReviewFormValues;
+  }, [workflow]);
+
+  const defaultValues = workflowFormValues ?? portfolioReviewDefaults;
 
   const [model, setModel] = useState(workflow?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
@@ -54,6 +60,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     resolver: zodResolver(portfolioReviewSchema),
     defaultValues,
   });
+  const { reset } = methods;
   const {
     hasOpenAIKey,
     hasBinanceKey,
@@ -86,10 +93,20 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   }, [hasOpenAIKey, models, workflow?.model, model]);
 
   useEffect(() => {
-    if (!workflow) {
-      setName(tokenSymbols.map((t) => t.toUpperCase()).join(' / '));
-    }
-  }, [tokenSymbols, workflow]);
+    if (!workflowFormValues) return;
+
+    reset(workflowFormValues);
+    setTokenSymbols(workflowFormValues.tokens.map((t) => t.token));
+    setUseEarn(workflow?.useEarn ?? false);
+    setInstructions(workflow?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS);
+    setManualRebalance(workflow?.manualRebalance || false);
+  }, [
+    workflowFormValues,
+    workflow?.agentInstructions,
+    workflow?.manualRebalance,
+    workflow?.useEarn,
+    reset,
+  ]);
 
   useEffect(() => {
     if (workflow) {
