@@ -132,9 +132,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-1">{t('workflow_setup')}</h1>
-      <p className="text-sm text-gray-600 uppercase tracking-wide">
-        {tokenSymbols.map((t) => t.toUpperCase()).join(' / ')}
-      </p>
       <FormProvider {...methods}>
         <div className="max-w-xl">
           <PortfolioWorkflowFields

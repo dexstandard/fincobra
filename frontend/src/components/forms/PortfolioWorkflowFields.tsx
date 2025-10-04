@@ -248,8 +248,9 @@ export default function PortfolioWorkflowFields({
       <div
         className={`grid ${summaryGridCols} items-center gap-x-4 gap-y-2 mt-2`}
       >
-        <span className="text-left text-md font-bold">Total $:</span>
-        <span>{totalUsd.toFixed(2)}</span>
+        <span className="text-left text-md font-bold">
+          {`Total: $${totalUsd.toFixed(2)}`}
+        </span>
         {SHOW_EARN_FEATURE && (
           <>
             <span className="text-left text-md font-bold">
@@ -264,11 +265,12 @@ export default function PortfolioWorkflowFields({
           </>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-2 mt-2">
+      <div className="grid grid-cols-2 gap-2 mt-2 max-w-md">
         <FormField
           label={t('risk_tolerance')}
           htmlFor="risk"
           labelClassName="block text-md font-bold"
+          className="w-full"
         >
           <Controller
             name="risk"
@@ -287,6 +289,7 @@ export default function PortfolioWorkflowFields({
           label={t('review_interval')}
           htmlFor="reviewInterval"
           labelClassName="block text-md font-bold"
+          className="w-full"
         >
           <Controller
             name="reviewInterval"
