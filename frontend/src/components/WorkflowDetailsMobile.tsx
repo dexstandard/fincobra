@@ -14,16 +14,16 @@ export default function WorkflowDetailsMobile({ workflow }: Props) {
   const t = useTranslation();
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        <h1 className="text-2xl font-bold truncate flex-1">
-          {t('workflow')}: {workflow.name}
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold flex-1 truncate">
+          {t('workflow')}
         </h1>
         <WorkflowStatusLabel status={workflow.status} />
       </div>
-      <p className="text-sm text-gray-500">
+      <p className="text-xs text-gray-500">
         <FormattedDate date={workflow.createdAt} />
       </p>
-      <p className="flex items-center gap-1 mt-2">
+      <p className="flex items-center gap-1 mt-2 text-sm text-gray-600">
         {tokens.map((tok, i) => (
           <span key={tok} className="flex items-center gap-1">
             {i > 0 && <span>/</span>}

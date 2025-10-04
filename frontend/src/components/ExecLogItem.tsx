@@ -55,6 +55,7 @@ interface Props {
   workflowId: string;
   manualRebalance: boolean;
   tokens: string[];
+  developerInstructions?: string;
 }
 
 export default function ExecLogItem({
@@ -62,6 +63,7 @@ export default function ExecLogItem({
   workflowId,
   manualRebalance,
   tokens,
+  developerInstructions,
 }: Props) {
   const [showJson, setShowJson] = useState(false);
   const [showTx, setShowTx] = useState(false);
@@ -126,8 +128,18 @@ export default function ExecLogItem({
         } else if (payload && typeof payload === 'object') {
           parsed = payload as PromptData;
         }
+        const normalized = parsed ? { ...parsed } : null;
+        if (normalized) {
+          const instr =
+            typeof normalized.instructions === 'string' && normalized.instructions.trim()
+              ? normalized.instructions
+              : developerInstructions;
+          if (instr) {
+            normalized.instructions = instr;
+          }
+        }
         setPromptRaw(raw);
-        setPromptData(parsed);
+        setPromptData(normalized);
         setPromptError(null);
         setPromptLoaded(true);
       } catch {
@@ -149,6 +161,17 @@ export default function ExecLogItem({
       setPrice(order.price.toString());
     }
   }, [showPreview, order]);
+
+  useEffect(() => {
+    if (!developerInstructions) return;
+    setPromptData((prev) => {
+      if (!prev) return prev;
+      if (typeof prev.instructions === 'string' && prev.instructions.trim()) {
+        return prev;
+      }
+      return { ...prev, instructions: developerInstructions };
+    });
+  }, [developerInstructions]);
 
   async function handleRebalance() {
     setCreating(true);

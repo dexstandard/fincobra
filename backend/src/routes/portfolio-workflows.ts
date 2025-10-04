@@ -45,6 +45,7 @@ import type {
   MainTraderDecision,
   MainTraderOrder,
 } from '../agents/main-trader.types.js';
+import { developerInstructions } from '../agents/main-trader.js';
 import { adminOnlyPreHandlers, getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
@@ -66,7 +67,6 @@ const workflowUpsertSchema = z
       .string()
       .optional()
       .transform((value) => value ?? ''),
-    name: z.string(),
     cash: z
       .string()
       .optional()
@@ -372,7 +372,6 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         model: validated.model,
         status,
         startBalance,
-        name: validated.name,
         cashToken: validated.cash,
         tokens: validated.tokens,
         risk: validated.risk,
@@ -442,6 +441,18 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         page,
         pageSize,
       };
+    },
+  );
+
+  app.get(
+    '/developer-instructions',
+    {
+      config: { rateLimit: RATE_LIMITS.RELAXED },
+      preHandler: sessionPreHandlers,
+    },
+    async (req) => {
+      req.log.info('fetched developer instructions');
+      return { instructions: developerInstructions };
     },
   );
 
@@ -710,7 +721,6 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         id,
         model: validated.model,
         status,
-        name: validated.name,
         cashToken: validated.cash,
         tokens: validated.tokens,
         risk: validated.risk,

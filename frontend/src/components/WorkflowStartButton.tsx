@@ -10,7 +10,6 @@ import Button from './ui/Button';
 import ConfirmDialog from './ui/ConfirmDialog';
 
 interface WorkflowPreviewDetails {
-  name: string;
   tokens: { token: string; minAllocation: number }[];
   risk: string;
   reviewInterval: string;
@@ -64,7 +63,6 @@ export default function WorkflowStartButton({
         const [cashToken, ...positions] = workflowData.tokens;
         const res = await api.post('/portfolio-workflows', {
           model,
-          name: workflowData.name,
           cash: cashToken.token.toUpperCase(),
           tokens: positions.map((t) => ({
             token: t.token.toUpperCase(),

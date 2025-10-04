@@ -249,7 +249,6 @@ describe('AI API key routes', () => {
       model: 'gpt-5',
       status: 'active',
       startBalance: 100,
-      name: 'A3',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -341,7 +340,6 @@ describe('AI API key effects on agents', () => {
       model: 'gpt-5',
       status: 'active',
       startBalance: 100,
-      name: 'A8',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -426,7 +424,6 @@ describe('AI API key effects on agents', () => {
       model: 'gpt-5',
       status: 'active',
       startBalance: 100,
-      name: 'A5',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -481,7 +478,6 @@ describe('AI API key effects on agents', () => {
       model: 'gpt-5',
       status: 'active',
       startBalance: 100,
-      name: 'A4',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },

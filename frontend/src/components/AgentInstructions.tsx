@@ -8,15 +8,26 @@ interface Props {
   maxLength?: number;
 }
 
+const PREVIEW_LINE_LIMIT = 5;
+
 export default function AgentInstructions({
   value,
   onChange,
-  maxLength = 1000,
+  maxLength = 2000,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(value);
   useEffect(() => setLocal(value), [value]);
   const t = useTranslation();
+
+  const trimmedValue = value.trimEnd();
+  const valueLines = trimmedValue ? trimmedValue.split(/\r?\n/) : [];
+  const previewLines = valueLines.slice(0, PREVIEW_LINE_LIMIT);
+  const hasMoreLines = valueLines.length > PREVIEW_LINE_LIMIT;
+  const previewText = hasMoreLines
+    ? `${previewLines.join('\n')}${previewLines.length ? '\n' : ''}…`
+    : trimmedValue;
+
   return (
     <div className="mt-4">
       <div className="flex items-center gap-1 mb-2">
@@ -54,7 +65,9 @@ export default function AgentInstructions({
           </div>
         </>
       ) : (
-        <pre className="whitespace-pre-wrap">{value}</pre>
+        <pre className="whitespace-pre-wrap">
+          {previewLines.length || hasMoreLines ? previewText : value}
+        </pre>
       )}
     </div>
   );

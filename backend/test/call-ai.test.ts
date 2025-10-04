@@ -15,8 +15,8 @@ describe('callAi structured output', () => {
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
     const prompt: RebalancePrompt = {
-      instructions: 'inst',
       policy: { floor: { USDT: 20 } },
+      cash: 'USDT',
       portfolio: {
         ts: new Date().toISOString(),
         positions: [{ sym: 'USDT', qty: 1, priceUsdt: 1, valueUsdt: 1 }],
@@ -52,8 +52,10 @@ describe('callAi structured output', () => {
     const [, opts] = fetchMock.mock.calls[0];
     const body = JSON.parse(opts.body);
     expect(opts.body).toBe(JSON.stringify(body));
-    expect(body.instructions).toMatch(/- Decide which limit orders to place/i);
-    expect(body.instructions).toMatch(/On error, return \{error:"message"\}/i);
+    expect(body.instructions).toMatch(
+      /You are a day-trading portfolio manager. Autonomously set target allocations/i,
+    );
+    expect(body.instructions).toMatch(/On error, return error message/i);
     expect(typeof body.input).toBe('string');
     const parsed = JSON.parse(body.input);
     expect(parsed.previousReports).toEqual([
@@ -86,11 +88,22 @@ describe('callAi structured output', () => {
       .mockResolvedValue({ ok: true, text: async () => '' });
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
+    const prompt: RebalancePrompt = {
+      reviewInterval: '1h',
+      policy: { floor: {} },
+      cash: 'USDT',
+      portfolio: {
+        ts: new Date().toISOString(),
+        positions: [{ sym: 'USDT', qty: 1, priceUsdt: 1, valueUsdt: 1 }],
+      },
+      routes: [],
+      marketData: {},
+    };
     await callAi(
       'gpt-test',
       developerInstructions,
       rebalanceResponseSchema,
-      {},
+      prompt,
       'key',
       true,
     );

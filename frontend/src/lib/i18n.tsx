@@ -57,8 +57,8 @@ const translations: Record<Lang, Record<string, string>> = {
     no_workflows_yet_connected:
       'Click the + above to create your first Portfolio Workflow.',
     tokens: 'Tokens',
-    balance_usd: 'Balance (USD)',
-    pnl_usd: 'PnL (USD)',
+    balance_usd: 'Balance',
+    pnl_usd: 'PnL',
     model: 'Model',
     interval: 'Interval',
     owner: 'Owner',
@@ -231,8 +231,8 @@ const translations: Record<Lang, Record<string, string>> = {
     no_workflows_yet_connected:
       'Нажмите на + выше, чтобы создать первый Workflow портфолио.',
     tokens: 'Токены',
-    balance_usd: 'Баланс (USD)',
-    pnl_usd: 'PnL (USD)',
+    balance_usd: 'Баланс',
+    pnl_usd: 'PnL',
     model: 'Модель',
     interval: 'Интервал',
     owner: 'Владелец',
