@@ -20,7 +20,6 @@ describe('portfolio workflow manual review endpoint', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -53,7 +52,6 @@ describe('portfolio workflow manual review endpoint', () => {
       model: 'gpt',
       status: 'active',
       startBalance: null,
-      name: 'A2',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },

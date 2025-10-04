@@ -5,7 +5,6 @@ export interface PortfolioWorkflowTokenInput {
 
 export interface PortfolioWorkflowInput {
   model: string;
-  name: string;
   cash: string;
   tokens: PortfolioWorkflowTokenInput[];
   risk: string;

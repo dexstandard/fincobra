@@ -20,7 +20,6 @@ export function toApi(row: PortfolioWorkflow) {
     status: row.status,
     createdAt: new Date(row.createdAt).getTime(),
     startBalanceUsd: row.startBalance ?? null,
-    name: row.name,
     cashToken: row.cashToken,
     tokens: row.tokens.map((t) => ({
       token: t.token,
@@ -41,7 +40,7 @@ export function toApi(row: PortfolioWorkflow) {
 }
 
 const baseSelect = `
-  SELECT pw.id, pw.user_id, pw.model, pw.status, pw.created_at, pw.start_balance, pw.name, pw.cash_token,
+  SELECT pw.id, pw.user_id, pw.model, pw.status, pw.created_at, pw.start_balance, pw.cash_token,
          COALESCE(json_agg(json_build_object('token', t.token, 'min_allocation', t.min_allocation) ORDER BY t.position)
                   FILTER (WHERE t.token IS NOT NULL), '[]') AS tokens,
          pw.risk, pw.review_interval, pw.agent_instructions, pw.manual_rebalance, pw.use_earn,
@@ -150,21 +149,20 @@ export async function findIdenticalInactiveWorkflow(
   data: PortfolioWorkflowInactiveSearch,
   excludeId?: string,
 ) {
-  const query = `SELECT pw.id, pw.name FROM portfolio_workflow pw
+  const query = `SELECT pw.id FROM portfolio_workflow pw
     LEFT JOIN (
       SELECT portfolio_workflow_id,
              json_agg(json_build_object('token', token, 'min_allocation', min_allocation) ORDER BY position) AS tokens
         FROM portfolio_workflow_tokens GROUP BY portfolio_workflow_id
     ) t ON t.portfolio_workflow_id = pw.id
     WHERE pw.user_id = $1 AND pw.status = 'inactive' AND ($2::bigint IS NULL OR pw.id != $2)
-      AND pw.model = $3 AND pw.name = $4 AND pw.cash_token = $5
-      AND pw.risk = $6 AND pw.review_interval = $7 AND pw.agent_instructions = $8 AND pw.manual_rebalance = $9 AND pw.use_earn = $10
-      AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $11::jsonb`;
+      AND pw.model = $3 AND pw.cash_token = $4
+      AND pw.risk = $5 AND pw.review_interval = $6 AND pw.agent_instructions = $7 AND pw.manual_rebalance = $8 AND pw.use_earn = $9
+      AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $10::jsonb`;
   const params: unknown[] = [
     data.userId,
     excludeId ?? null,
     data.model,
-    data.name,
     data.cashToken,
     data.risk,
     data.reviewInterval,
@@ -179,7 +177,7 @@ export async function findIdenticalInactiveWorkflow(
     ),
   ];
   const { rows } = await db.query(query, params as any[]);
-  return rows[0] as { id: string; name: string } | undefined;
+  return rows[0] as { id: string } | undefined;
 }
 
 export async function findActiveTokenConflicts(
@@ -187,16 +185,16 @@ export async function findActiveTokenConflicts(
   tokens: string[],
   excludeId?: string,
 ) {
-  const query = `SELECT id, name, token
+  const query = `SELECT id, token
       FROM (
-            SELECT pw.id, pw.name, pw.cash_token AS token
+            SELECT pw.id, pw.cash_token AS token
               FROM portfolio_workflow pw
              WHERE pw.user_id = $1
                AND pw.status = 'active'
                AND ($2::bigint IS NULL OR pw.id != $2)
                AND pw.cash_token = ANY($3::text[])
             UNION
-            SELECT pw.id, pw.name, t.token
+            SELECT pw.id, t.token
               FROM portfolio_workflow pw
               JOIN portfolio_workflow_tokens t ON t.portfolio_workflow_id = pw.id
              WHERE pw.user_id = $1
@@ -206,7 +204,7 @@ export async function findActiveTokenConflicts(
            ) conflicts`;
   const params: unknown[] = [userId, excludeId ?? null, tokens];
   const { rows } = await db.query(query, params as any[]);
-  return rows as { id: string; name: string; token: string }[];
+  return rows as { id: string; token: string }[];
 }
 
 export async function getUserApiKeys(userId: string) {
@@ -224,15 +222,14 @@ export async function insertPortfolioWorkflow(
   let id = '';
   await withTransaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO portfolio_workflow (user_id, model, status, start_balance, name, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO portfolio_workflow (user_id, model, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id`,
       [
         data.userId,
         data.model,
         data.status,
         data.startBalance,
-        data.name,
         data.cashToken,
         data.risk,
         data.reviewInterval,
@@ -262,11 +259,10 @@ export async function updatePortfolioWorkflow(
 ): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `UPDATE portfolio_workflow SET model = $1, status = $2, name = $3, cash_token = $4, risk = $5, review_interval = $6, agent_instructions = $7, start_balance = $8, manual_rebalance = $9, use_earn = $10 WHERE id = $11`,
+      `UPDATE portfolio_workflow SET model = $1, status = $2, cash_token = $3, risk = $4, review_interval = $5, agent_instructions = $6, start_balance = $7, manual_rebalance = $8, use_earn = $9 WHERE id = $10`,
       [
         data.model,
         data.status,
-        data.name,
         data.cashToken,
         data.risk,
         data.reviewInterval,

@@ -109,7 +109,6 @@ export default function WorkflowUpdateModal({
       await api.put(`/portfolio-workflows/${workflow.id}`, {
         model,
         status: workflow.status,
-        name: workflow.name,
         cash: cashToken.token.toUpperCase(),
         tokens: positions.map((t) => ({
           token: t.token.toUpperCase(),

@@ -40,7 +40,6 @@ describe('portfolio workflow creation', () => {
 
     const payload = {
       model: 'm',
-      name: 'Workflow',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -81,7 +80,6 @@ describe('portfolio workflow creation', () => {
 
     const payload = {
       model: 'm',
-      name: 'Multi',
       tokens: [
         { token: 'BTC', minAllocation: 30 },
         { token: 'ETH', minAllocation: 30 },
@@ -143,7 +141,6 @@ describe('portfolio workflow creation', () => {
 
     const firstPayload = {
       model: 'm',
-      name: 'First',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'ETH', minAllocation: 20 },
@@ -173,13 +170,12 @@ describe('portfolio workflow creation', () => {
         cookies: authCookies(userId),
         payload: {
           ...firstPayload,
-          name: 'Second',
           tokens: [{ token: 'BNB', minAllocation: 30 }],
         },
       });
       expect(secondRes.statusCode).toBe(400);
       expect(secondRes.json()).toEqual({
-        error: `token USDT used by ${firstPayload.name} (${firstId}) already used`,
+        error: `token USDT used by workflow ${firstId} already used`,
       });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
@@ -208,7 +204,6 @@ describe('portfolio workflow creation', () => {
 
     const firstPayload = {
       model: 'm',
-      name: 'First',
       tokens: [{ token: 'USDT', minAllocation: 10 }],
       risk: 'low',
       reviewInterval: '1h',
@@ -235,14 +230,13 @@ describe('portfolio workflow creation', () => {
         cookies: authCookies(userId),
         payload: {
           ...firstPayload,
-          name: 'Second',
           cash: 'USDT',
           tokens: [{ token: 'BTC', minAllocation: 20 }],
         },
       });
       expect(secondRes.statusCode).toBe(400);
       expect(secondRes.json()).toEqual({
-        error: `token USDT used by ${firstPayload.name} (${firstId}) already used`,
+        error: `token USDT used by workflow ${firstId} already used`,
       });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {

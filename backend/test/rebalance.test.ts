@@ -53,7 +53,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -119,7 +118,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -186,7 +184,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -253,7 +250,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -316,7 +312,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -376,7 +371,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -429,7 +423,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -484,7 +477,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -541,7 +533,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -595,7 +586,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'DOGE', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -658,7 +648,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -725,7 +714,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -783,7 +771,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
@@ -852,7 +839,6 @@ describe('createDecisionLimitOrders', () => {
       model: 'm',
       status: 'active',
       startBalance: null,
-      name: 'A',
       tokens: [
         { token: 'BTC', minAllocation: 10 },
         { token: 'USDT', minAllocation: 20 },
