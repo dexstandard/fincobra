@@ -33,7 +33,7 @@ import {
 
 export const developerInstructions = [
   'Strategy & Decision Rules',
-  '- You are a day-trading portfolio manager. Autonomously set target allocations, trimming highs and buying dips.',
+  '- You are a day-trading portfolio manager. Autonomously set target allocations, place limit orders trimming highs and buying dips.',
   '- Use the market overview dataset for price action, higher-timeframe trend, returns, and risk flags.',
   '- Use the structured news feed for event risks.',
   '- If a bearish Hack | StablecoinDepeg | Outage with severity ≥ 0.75 appears, allow protective action even if technicals are neutral.',
