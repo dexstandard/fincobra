@@ -23,7 +23,7 @@ import {
   reviewWorkflowPortfolio,
   removeWorkflowFromSchedule,
 } from '../workflows/portfolio-review.js';
-import { requireUserId } from '../util/auth.js';
+import { requireAdmin, requireUserId } from '../util/auth.js';
 import { RATE_LIMITS } from '../rate-limit.js';
 import {
   PortfolioWorkflowStatus,
@@ -132,32 +132,64 @@ const sessionPreHandlers = [requireAuthenticatedUser];
 
 type WorkflowRequestContext = {
   userId: string;
+  sessionUserId: string;
   id: string;
   log: FastifyBaseLogger;
   workflow: PortfolioWorkflow;
+  adminId?: string;
 };
+
+interface WorkflowRequestOptions {
+  allowAdmin?: boolean;
+}
 
 async function getWorkflowForRequest(
   req: FastifyRequest,
   reply: FastifyReply,
+  options: WorkflowRequestOptions = {},
 ): Promise<WorkflowRequestContext | undefined> {
-  const userId = getValidatedUserId(req);
+  const sessionUserId = getValidatedUserId(req);
   const params = parseRequestParams(idParams, req, reply);
   if (!params) return;
   const { id } = params;
-  const log = req.log.child({ userId, workflowId: id });
   const workflow = await getPortfolioWorkflow(id);
   if (!workflow || workflow.status === PortfolioWorkflowStatus.Retired) {
-    log.error('workflow not found');
+    req.log
+      .child({ workflowId: id, userId: sessionUserId })
+      .error('workflow not found');
     reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
     return;
   }
-  if (workflow.userId !== userId) {
-    log.error('forbidden');
-    reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
-    return;
+  const baseLogContext = {
+    workflowId: id,
+    userId: workflow.userId,
+  } as Record<string, unknown>;
+  if (workflow.userId !== sessionUserId) {
+    if (!options.allowAdmin) {
+      req.log
+        .child({ ...baseLogContext, requesterId: sessionUserId })
+        .error('forbidden');
+      reply.code(403).send(errorResponse(ERROR_MESSAGES.forbidden));
+      return;
+    }
+    const adminId = await requireAdmin(req, reply);
+    if (!adminId) return;
+    const log = req.log.child({
+      ...baseLogContext,
+      adminUserId: adminId,
+      requesterId: sessionUserId,
+    });
+    return {
+      userId: workflow.userId,
+      sessionUserId,
+      id,
+      log,
+      workflow,
+      adminId,
+    };
   }
-  return { userId, id, log, workflow };
+  const log = req.log.child(baseLogContext);
+  return { userId: workflow.userId, sessionUserId, id, log, workflow };
 }
 
 async function loadManualDecision(
@@ -396,7 +428,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       preHandler: sessionPreHandlers,
     },
     async (req, reply) => {
-      const ctx = await getWorkflowForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply, { allowAdmin: true });
       if (!ctx) return;
       const { id, log } = ctx;
       const query = parseExecLogQuery(req, reply);
@@ -463,7 +495,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       preHandler: sessionPreHandlers,
     },
     async (req, reply) => {
-      const ctx = await getWorkflowForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply, { allowAdmin: true });
       if (!ctx) return;
       const { id, log } = ctx;
       const lp = parseRequestParams(logIdParams, req, reply);
@@ -485,7 +517,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       preHandler: sessionPreHandlers,
     },
     async (req, reply) => {
-      const ctx = await getWorkflowForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply, { allowAdmin: true });
       if (!ctx) return;
       const { id, log } = ctx;
       const lp = parseRequestParams(logIdParams, req, reply);
@@ -688,7 +720,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       preHandler: sessionPreHandlers,
     },
     async (req, reply) => {
-      const ctx = await getWorkflowForRequest(req, reply);
+      const ctx = await getWorkflowForRequest(req, reply, { allowAdmin: true });
       if (!ctx) return;
       const { log, workflow: row } = ctx;
       log.info('fetched workflow');

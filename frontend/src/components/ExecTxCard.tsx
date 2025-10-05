@@ -12,6 +12,7 @@ interface Props {
   logId: string;
   orders: LimitOrder[];
   onCancel?: () => Promise<unknown> | void;
+  readOnly?: boolean;
 }
 
 export default function ExecTxCard({
@@ -19,6 +20,7 @@ export default function ExecTxCard({
   logId,
   orders,
   onCancel,
+  readOnly = false,
 }: Props) {
   const [canceling, setCanceling] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export default function ExecTxCard({
                 )}
               </td>
               <td>
-                {o.status === LIMIT_ORDER_STATUS.Open && (
+                {o.status === LIMIT_ORDER_STATUS.Open && !readOnly && (
                   <Button
                     aria-label="Cancel order"
                     title="Cancel order"

@@ -63,6 +63,9 @@ export default function WorkflowView() {
   });
 
   if (!workflow) return <div className="p-4">{t('loading')}</div>;
+  const isOwner = workflow.userId === user?.id;
+  const viewingAsAdmin = user?.role === 'admin' && !isOwner;
+  const readOnly = !isOwner;
   const isActive = workflow.status === 'active';
   return (
     <div className="p-4">
@@ -72,44 +75,54 @@ export default function WorkflowView() {
       <div className="md:hidden">
         <WorkflowDetailsMobile workflow={workflow} />
       </div>
-      {isActive ? (
-        <div className="mt-4 flex gap-2">
-          <Button onClick={() => setShowUpdate(true)}>
-            <span className="hidden md:inline">{t('update_workflow')}</span>
-            <span className="md:hidden">{t('edit')}</span>
-          </Button>
-          <Button
-            disabled={stopMut.isPending}
-            loading={stopMut.isPending}
-            onClick={() => stopMut.mutate()}
-          >
-            <span className="hidden md:inline">{t('stop_workflow')}</span>
-            <span className="md:hidden">{t('stop_workflow_short')}</span>
-          </Button>
-          <Button
-            disabled={reviewMut.isPending}
-            loading={reviewMut.isPending}
-            onClick={() => id && reviewMut.mutate(id)}
-          >
-            {t('run_review')}
-          </Button>
+      {viewingAsAdmin && workflow.ownerEmail && (
+        <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          {t('admin_viewing_workflow')}{' '}
+          <span className="font-semibold">{workflow.ownerEmail}</span>
         </div>
-      ) : (
-        <div className="mt-4 flex gap-2">
-          <Button onClick={() => setShowUpdate(true)}>
-            <span className="hidden md:inline">{t('update_workflow')}</span>
-            <span className="md:hidden">{t('edit')}</span>
-          </Button>
-          {hasOpenAIKey && hasBinanceKey && (
-            <Button
-              disabled={startMut.isPending}
-              loading={startMut.isPending}
-              onClick={() => startMut.mutate()}
-            >
-              {t('start_workflow')}
-            </Button>
+      )}
+      {!readOnly && (
+        <>
+          {isActive ? (
+            <div className="mt-4 flex gap-2">
+              <Button onClick={() => setShowUpdate(true)}>
+                <span className="hidden md:inline">{t('update_workflow')}</span>
+                <span className="md:hidden">{t('edit')}</span>
+              </Button>
+              <Button
+                disabled={stopMut.isPending}
+                loading={stopMut.isPending}
+                onClick={() => stopMut.mutate()}
+              >
+                <span className="hidden md:inline">{t('stop_workflow')}</span>
+                <span className="md:hidden">{t('stop_workflow_short')}</span>
+              </Button>
+              <Button
+                disabled={reviewMut.isPending}
+                loading={reviewMut.isPending}
+                onClick={() => id && reviewMut.mutate(id)}
+              >
+                {t('run_review')}
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-4 flex gap-2">
+              <Button onClick={() => setShowUpdate(true)}>
+                <span className="hidden md:inline">{t('update_workflow')}</span>
+                <span className="md:hidden">{t('edit')}</span>
+              </Button>
+              {hasOpenAIKey && hasBinanceKey && (
+                <Button
+                  disabled={startMut.isPending}
+                  loading={startMut.isPending}
+                  onClick={() => startMut.mutate()}
+                >
+                  {t('start_workflow')}
+                </Button>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
       {logData && (
         <div className="mt-6">
@@ -160,6 +173,7 @@ export default function WorkflowView() {
                                 ].filter(Boolean) as string[]
                               }
                               developerInstructions={workflow.agentInstructions}
+                              readOnly={readOnly}
                             />
                           </td>
                         </tr>
@@ -187,6 +201,7 @@ export default function WorkflowView() {
                         ) as string[]
                       }
                       developerInstructions={workflow.agentInstructions}
+                      readOnly={readOnly}
                     />
                   </div>
                 ))}
@@ -213,16 +228,18 @@ export default function WorkflowView() {
           )}
         </div>
       )}
-      <WorkflowUpdateModal
-        workflow={workflow}
-        open={showUpdate}
-        onClose={() => setShowUpdate(false)}
-        onUpdated={() =>
-          queryClient.invalidateQueries({
-            queryKey: ['workflow', id, user?.id],
-          })
-        }
-      />
+      {!readOnly && (
+        <WorkflowUpdateModal
+          workflow={workflow}
+          open={showUpdate}
+          onClose={() => setShowUpdate(false)}
+          onUpdated={() =>
+            queryClient.invalidateQueries({
+              queryKey: ['workflow', id, user?.id],
+            })
+          }
+        />
+      )}
     </div>
   );
 }
