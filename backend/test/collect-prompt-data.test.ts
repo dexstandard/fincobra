@@ -6,9 +6,54 @@ import {
   collectPromptData,
   __resetNewsContextCacheForTest,
 } from '../src/agents/main-trader.js';
-import { fetchAccount } from '../src/services/binance-client.js';
+import {
+  fetchAccount,
+  fetchPairInfo,
+  fetchPairPrice,
+} from '../src/services/binance-client.js';
 
 const getNewsByTokenMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+
+function defaultFetchPairPrice(t1: string, t2: string) {
+  if (t1 === 'USDT') {
+    return Promise.resolve({ symbol: `${t2}USDT`, currentPrice: 20000 });
+  }
+  if (t2 === 'USDT') {
+    return Promise.resolve({ symbol: `${t1}USDT`, currentPrice: 20000 });
+  }
+  return Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 });
+}
+
+function defaultFetchPairInfo(t1: string, t2: string) {
+  if (t1 === 'USDT') {
+    return Promise.resolve({
+      symbol: `${t2}USDT`,
+      baseAsset: t2,
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 2,
+      minNotional: 10,
+    });
+  }
+  if (t2 === 'USDT') {
+    return Promise.resolve({
+      symbol: `${t1}USDT`,
+      baseAsset: t1,
+      quoteAsset: 'USDT',
+      quantityPrecision: 8,
+      pricePrecision: 2,
+      minNotional: 10,
+    });
+  }
+  return Promise.resolve({
+    symbol: `${t1}${t2}`,
+    baseAsset: t1,
+    quoteAsset: t2,
+    quantityPrecision: 8,
+    pricePrecision: 2,
+    minNotional: 10,
+  });
+}
 
 vi.mock('../src/services/binance-client.js', () => ({
   fetchAccount: vi.fn().mockResolvedValue({
@@ -18,45 +63,8 @@ vi.mock('../src/services/binance-client.js', () => ({
       { asset: 'ETH', free: '5', locked: '0' },
     ],
   }),
-  fetchPairPrice: vi.fn().mockImplementation((t1: string, t2: string) => {
-    if (t1 === 'USDT') {
-      return Promise.resolve({ symbol: `${t2}USDT`, currentPrice: 20000 });
-    }
-    if (t2 === 'USDT') {
-      return Promise.resolve({ symbol: `${t1}USDT`, currentPrice: 20000 });
-    }
-    return Promise.resolve({ symbol: `${t1}${t2}`, currentPrice: 20000 });
-  }),
-  fetchPairInfo: vi.fn().mockImplementation((t1: string, t2: string) => {
-    if (t1 === 'USDT') {
-      return Promise.resolve({
-        symbol: `${t2}USDT`,
-        baseAsset: t2,
-        quoteAsset: 'USDT',
-        quantityPrecision: 8,
-        pricePrecision: 2,
-        minNotional: 10,
-      });
-    }
-    if (t2 === 'USDT') {
-      return Promise.resolve({
-        symbol: `${t1}USDT`,
-        baseAsset: t1,
-        quoteAsset: 'USDT',
-        quantityPrecision: 8,
-        pricePrecision: 2,
-        minNotional: 10,
-      });
-    }
-    return Promise.resolve({
-      symbol: `${t1}${t2}`,
-      baseAsset: t1,
-      quoteAsset: t2,
-      quantityPrecision: 8,
-      pricePrecision: 2,
-      minNotional: 10,
-    });
-  }),
+  fetchPairPrice: vi.fn().mockImplementation(defaultFetchPairPrice),
+  fetchPairInfo: vi.fn().mockImplementation(defaultFetchPairInfo),
   fetchOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -109,6 +117,8 @@ describe('collectPromptData', () => {
         { asset: 'DOGE', free: '100', locked: '0' },
       ],
     });
+    vi.mocked(fetchPairPrice).mockImplementation(defaultFetchPairPrice);
+    vi.mocked(fetchPairInfo).mockImplementation(defaultFetchPairInfo);
   });
 
   it('includes start balance and PnL in prompt', async () => {
@@ -242,6 +252,72 @@ describe('collectPromptData', () => {
     const usdt = prompt?.portfolio.positions.find((p) => p.sym === 'USDT');
     expect(btc?.qty).toBe(1);
     expect(usdt?.qty).toBe(1000);
+  });
+
+  it('skips malformed routes with zero price', async () => {
+    const priceMock = vi.mocked(fetchPairPrice);
+    priceMock.mockImplementation((t1: string, t2: string) => {
+      if (t1 === 'BTC' && t2 === 'ETH') {
+        return Promise.resolve({ symbol: 'BTCETH', currentPrice: 0 });
+      }
+      return defaultFetchPairPrice(t1, t2);
+    });
+
+    const row: ActivePortfolioWorkflow = {
+      id: 'route-skip',
+      userId: 'user',
+      model: 'model',
+      cashToken: 'USDT',
+      tokens: [
+        { token: 'BTC', minAllocation: 40 },
+        { token: 'ETH', minAllocation: 30 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyId: null,
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: 'route-skip',
+    };
+
+    const prompt = await collectPromptData(row, mockLogger());
+    expect(prompt?.routes).toHaveLength(2);
+    expect(prompt?.routes?.map((r) => r.pair)).toEqual(
+      expect.arrayContaining(['BTCUSDT', 'ETHUSDT']),
+    );
+  });
+
+  it('throws when every attempted route is malformed', async () => {
+    const priceMock = vi.mocked(fetchPairPrice);
+    priceMock.mockImplementation(() =>
+      Promise.resolve({ symbol: 'BTCUSDT', currentPrice: 0 }),
+    );
+
+    const row: ActivePortfolioWorkflow = {
+      id: 'route-fail',
+      userId: 'user',
+      model: 'model',
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 40 }],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyId: null,
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: 'route-fail',
+    };
+
+    await expect(collectPromptData(row, mockLogger())).rejects.toThrow(
+      'no valid trading routes available',
+    );
   });
 
   it('builds structured news context with aggregates', async () => {

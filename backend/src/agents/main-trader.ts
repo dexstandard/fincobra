@@ -284,6 +284,8 @@ export async function collectPromptData(
   const floor: Record<string, number> = { [cash]: 0 };
   const positions: RebalancePosition[] = [];
   const routes: RebalancePrompt['routes'] = [];
+  let malformedRoutes = 0;
+  let attemptedRoutes = 0;
 
   const balCash = account.balances.find((b) => b.asset === cash);
   const cashQty = balCash ? Number(balCash.free) : 0;
@@ -309,13 +311,23 @@ export async function collectPromptData(
   for (let i = 0; i < allTokens.length; i++) {
     for (let j = i + 1; j < allTokens.length; j++) {
       try {
+        attemptedRoutes += 1;
         const [info, data] = await Promise.all([
           fetchPairInfo(allTokens[i], allTokens[j]),
           fetchPairPrice(allTokens[i], allTokens[j]),
         ]);
-        const baseMin = data.currentPrice
-          ? info.minNotional / data.currentPrice
-          : 0;
+        if (!Number.isFinite(data.currentPrice) || data.currentPrice <= 0) {
+          malformedRoutes += 1;
+          log.warn(
+            {
+              pair: data.symbol,
+              currentPrice: data.currentPrice,
+            },
+            'skipping trading route: received zero/invalid price from Binance',
+          );
+          continue;
+        }
+        const baseMin = info.minNotional / data.currentPrice;
         routes.push({
           pair: data.symbol,
           price: data.currentPrice,
@@ -326,6 +338,10 @@ export async function collectPromptData(
         log.error({ err }, 'failed to fetch pair data');
       }
     }
+  }
+
+  if (attemptedRoutes > 0 && routes.length === 0 && malformedRoutes === attemptedRoutes) {
+    throw new Error('no valid trading routes available');
   }
 
   const portfolio: RebalancePrompt['portfolio'] = {
