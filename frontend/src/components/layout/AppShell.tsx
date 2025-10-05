@@ -2,6 +2,7 @@ import { Link, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from '../../lib/axios';
 import GoogleLoginButton from '../GoogleLoginButton';
+import AddToHomeScreenHint from '../AddToHomeScreenHint';
 import {
   Bot,
   Key,
@@ -115,6 +116,7 @@ export default function AppShell() {
           </button>
         </nav>
         <main className="flex-1 p-3 pt-0 bg-white overflow-y-auto">
+          <AddToHomeScreenHint isLoggedIn={Boolean(user)} />
           <Outlet />
         </main>
       </div>
