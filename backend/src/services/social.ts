@@ -177,6 +177,18 @@ export async function fetchAndStoreSocialPosts(
       } catch (err) {
         perSource[source.username] = 0;
         log.error({ err, source: source.username }, 'failed to fetch tweets for source');
+        scraperInstance = null;
+        scraperPromise = null;
+
+        try {
+          scraper = await getScraper(log);
+          if (!scraper) {
+            break;
+          }
+        } catch (reauthError) {
+          log.error({ err: reauthError }, 'failed to reauthenticate twitter scraper');
+          throw reauthError;
+        }
       }
     }
 
