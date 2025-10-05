@@ -56,6 +56,7 @@ interface Props {
   manualRebalance: boolean;
   tokens: string[];
   developerInstructions?: string;
+  readOnly?: boolean;
 }
 
 export default function ExecLogItem({
@@ -64,6 +65,7 @@ export default function ExecLogItem({
   manualRebalance,
   tokens,
   developerInstructions,
+  readOnly = false,
 }: Props) {
   const [showJson, setShowJson] = useState(false);
   const [showTx, setShowTx] = useState(false);
@@ -88,7 +90,8 @@ export default function ExecLogItem({
     enabled: showTx || (!!response?.rebalance && manualRebalance),
   });
   const hasOrders = !!orders && orders.length > 0;
-  const txEnabled = !!response?.rebalance && (!manualRebalance || hasOrders);
+  const txEnabled =
+    !!response?.rebalance && (!manualRebalance || hasOrders || readOnly);
   const [creating, setCreating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [order, setOrder] = useState<{
@@ -276,7 +279,10 @@ export default function ExecLogItem({
             onClick={handleShowPrompt}
           />
         )}
-        {manualRebalance && !!response?.rebalance && !hasOrders && (
+        {manualRebalance &&
+          !!response?.rebalance &&
+          !hasOrders &&
+          !readOnly && (
           <Button
             variant="secondary"
             className="ml-2 self-center"
@@ -326,6 +332,7 @@ export default function ExecLogItem({
           logId={log.id}
           orders={orders}
           onCancel={refetchOrders}
+          readOnly={readOnly}
         />
       )}
       {showPreview && order && (
