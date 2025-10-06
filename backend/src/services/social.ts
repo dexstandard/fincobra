@@ -73,6 +73,7 @@ async function getScraper(log?: FastifyBaseLogger): Promise<Scraper | null> {
   const username = env.TWITTER_USERNAME;
   const password = env.TWITTER_PASSWORD;
   const email = env.TWITTER_EMAIL;
+  const twoFactorSecret = env.TWITTER_2FA_SECRET;
 
   if (!username || !password) {
     log?.warn('Twitter credentials are not configured; skipping social sync.');
@@ -93,11 +94,7 @@ async function getScraper(log?: FastifyBaseLogger): Promise<Scraper | null> {
   if (!scraperPromise) {
     const loginTask = (async () => {
       const client = new Scraper();
-      if (email) {
-        await client.login(username, password, email);
-      } else {
-        await client.login(username, password);
-      }
+      await client.login(username, password, email, twoFactorSecret);
       loginFailureCount = 0;
       nextLoginAttemptAt = 0;
       return client;

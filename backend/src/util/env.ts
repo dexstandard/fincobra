@@ -10,6 +10,7 @@ const envSchema = z.object({
   TWITTER_USERNAME: z.string().optional(),
   TWITTER_PASSWORD: z.string().optional(),
   TWITTER_EMAIL: z.string().optional(),
+  TWITTER_2FA_SECRET: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
