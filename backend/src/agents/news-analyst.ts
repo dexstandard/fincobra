@@ -194,7 +194,7 @@ const RULES: Rule[] = [
   {
     id: 'R.W2',
     eventType: 'WhaleMove',
-    regex: /\b(\d[\d,\.]{2,})\s*(btc|eth|sol|usdt|usdc)\b/i,
+    regex: /\b(\d[\d,.]{2,})\s*(btc|eth|sol|usdt|usdc)\b/i,
     basePolarity: 'neutral',
     baseSeverity: 0.45,
     baseConfidence: 0.7,
