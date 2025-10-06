@@ -58,6 +58,16 @@ const SOCIAL_WEIGHTS: Record<string, number> = SOCIAL_SOURCES.reduce(
 
 let scraperPromise: Promise<Scraper> | null = null;
 let scraperInstance: Scraper | null = null;
+let loginFailureCount = 0;
+let nextLoginAttemptAt = 0;
+
+function calculateBackoffDelayMs(attempt: number): number {
+  const baseDelayMs = 10_000;
+  const maxDelayMs = 60 * 60 * 1000;
+  const exponent = Math.max(0, attempt - 1);
+  const delay = baseDelayMs * 2 ** exponent;
+  return Math.min(delay, maxDelayMs);
+}
 
 async function getScraper(log?: FastifyBaseLogger): Promise<Scraper | null> {
   const username = env.TWITTER_USERNAME;
@@ -73,16 +83,36 @@ async function getScraper(log?: FastifyBaseLogger): Promise<Scraper | null> {
     return scraperInstance;
   }
 
+  const now = Date.now();
+  if (now < nextLoginAttemptAt) {
+    const waitMs = nextLoginAttemptAt - now;
+    log?.warn({ waitMs }, 'delaying twitter scraper login after previous failure');
+    return null;
+  }
+
   if (!scraperPromise) {
-    scraperPromise = (async () => {
+    const loginTask = (async () => {
       const client = new Scraper();
       if (email) {
         await client.login(username, password, email);
       } else {
         await client.login(username, password);
       }
+      loginFailureCount = 0;
+      nextLoginAttemptAt = 0;
       return client;
     })();
+
+    scraperPromise = loginTask.catch((err: unknown) => {
+      loginFailureCount += 1;
+      const delayMs = calculateBackoffDelayMs(loginFailureCount);
+      nextLoginAttemptAt = Date.now() + delayMs;
+      log?.error(
+        { err, delayMs, attempt: loginFailureCount },
+        'twitter scraper login failed; scheduling retry',
+      );
+      throw err;
+    });
   }
 
   try {
@@ -114,43 +144,39 @@ async function collectTweetsForSource(
   const posts: SocialPostInsert[] = [];
   let fetched = 0;
 
-  try {
-    for await (const tweet of scraper.getTweets(source.username, 5)) {
-      if (!tweet || !tweet.id || !tweet.text) {
-        continue;
-      }
-      if (tweet.isRetweet) {
-        continue;
-      }
-
-      const postedAt = extractPostedAt(tweet);
-      if (!postedAt) {
-        continue;
-      }
-
-      const trimmed = tweet.text.trim();
-      if (!trimmed.length) {
-        continue;
-      }
-
-      posts.push({
-        tweetId: tweet.id,
-        username: tweet.username ?? source.username,
-        displayName: tweet.name ?? source.displayName ?? null,
-        profileImageUrl: null,
-        text: trimmed,
-        permalink: tweet.permanentUrl ?? null,
-        postedAt,
-        tokens: source.tokens,
-        weight: source.weight,
-      });
-      fetched++;
-      if (fetched >= 3) {
-        break;
-      }
+  for await (const tweet of scraper.getTweets(source.username, 5)) {
+    if (!tweet || !tweet.id || !tweet.text) {
+      continue;
     }
-  } catch (err) {
-    throw err;
+    if (tweet.isRetweet) {
+      continue;
+    }
+
+    const postedAt = extractPostedAt(tweet);
+    if (!postedAt) {
+      continue;
+    }
+
+    const trimmed = tweet.text.trim();
+    if (!trimmed.length) {
+      continue;
+    }
+
+    posts.push({
+      tweetId: tweet.id,
+      username: tweet.username ?? source.username,
+      displayName: tweet.name ?? source.displayName ?? null,
+      profileImageUrl: null,
+      text: trimmed,
+      permalink: tweet.permanentUrl ?? null,
+      postedAt,
+      tokens: source.tokens,
+      weight: source.weight,
+    });
+    fetched++;
+    if (fetched >= 3) {
+      break;
+    }
   }
 
   return posts;
