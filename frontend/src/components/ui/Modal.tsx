@@ -24,16 +24,19 @@ export default function Modal({ open, onClose, children, className }: Props) {
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black bg-opacity-50 p-4">
       <div
         ref={containerRef}
-        className={`bg-white text-gray-900 p-4 rounded shadow max-w-lg w-full relative ${className ?? ''}`}
+        className={`bg-white text-gray-900 p-4 rounded shadow max-w-lg w-full ${className ?? ''}`}
       >
-        {children}
-        <button
-          type="button"
-          className="absolute top-2 right-2 mr-2 text-gray-600"
-          onClick={onClose}
-        >
-          ×
-        </button>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="text-gray-600 hover:text-gray-800"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <div className="mt-2">{children}</div>
       </div>
     </div>
   );
