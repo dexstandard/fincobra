@@ -100,6 +100,11 @@ export interface PromptReport {
   };
 }
 
+export interface PromptFearGreedIndex {
+  value?: number;
+  classification?: string;
+}
+
 export interface PromptPreviousReportOrder {
   symbol: string;
   side: string;
@@ -126,6 +131,7 @@ export interface PromptData {
   routes?: PromptRoute[];
   marketData?: {
     marketOverview?: PromptMarketOverview;
+    fearGreedIndex?: PromptFearGreedIndex;
   };
   reports?: PromptReport[];
   previousReports?: PromptPreviousReport[];

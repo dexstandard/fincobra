@@ -6,6 +6,7 @@ import {
   fetchMarketOverview,
   createEmptyMarketOverview,
 } from '../services/indicators.js';
+import { fetchFearGreedIndex } from '../services/sentiment.js';
 import {
   fetchAccount,
   fetchPairInfo,
@@ -435,6 +436,7 @@ export async function collectPromptData(
   }
 
   let marketOverview = createEmptyMarketOverview();
+  let fearGreedIndex: { value: number; classification: string } | undefined;
   if (nonStableTokens.length) {
     try {
       marketOverview = await fetchMarketOverview(nonStableTokens);
@@ -443,6 +445,18 @@ export async function collectPromptData(
     }
   }
   prompt.marketData.marketOverview = marketOverview;
+
+  try {
+    const res = await fetchFearGreedIndex();
+    if (Number.isFinite(res.value)) {
+      fearGreedIndex = res;
+    }
+  } catch (err) {
+    log.error({ err }, 'failed to fetch fear & greed index');
+  }
+  if (fearGreedIndex) {
+    prompt.marketData.fearGreedIndex = fearGreedIndex;
+  }
 
   return prompt;
 }

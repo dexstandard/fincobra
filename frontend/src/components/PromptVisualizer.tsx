@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   Clock,
   FileText,
+  Gauge,
   Layers3,
   Newspaper,
   PieChart,
@@ -23,6 +24,7 @@ import {
   type PromptRouteAsset,
   type PromptPreviousReport,
   type PromptRiskFlags,
+  type PromptFearGreedIndex,
 } from './PromptVisualizer.types';
 
 interface Props {
@@ -103,6 +105,63 @@ function getRiskFlags(flags?: PromptRiskFlags): string[] {
   return Object.entries(flags)
     .filter(([, value]) => value)
     .map(([key]) => key);
+}
+
+function FearGreedSection({
+  fearGreedIndex,
+}: {
+  fearGreedIndex: PromptFearGreedIndex;
+}) {
+  const rawValue =
+    typeof fearGreedIndex.value === 'number' && Number.isFinite(fearGreedIndex.value)
+      ? fearGreedIndex.value
+      : null;
+  const clampedValue = rawValue === null ? null : Math.min(100, Math.max(0, rawValue));
+  const classification = fearGreedIndex.classification?.trim();
+  const hasValue = clampedValue !== null;
+  const hasClassification = Boolean(classification);
+
+  if (!hasValue && !hasClassification) {
+    return null;
+  }
+
+  return (
+    <div className="rounded border border-gray-200 p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
+        <Gauge className="h-4 w-4 text-emerald-500" />
+        Fear &amp; Greed Index
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
+        {hasValue && (
+          <div>
+            <div className="text-3xl font-bold text-gray-800">
+              {numberFormatter0.format(clampedValue ?? 0)}
+            </div>
+            <div className="text-xs text-gray-500">Score (0-100)</div>
+          </div>
+        )}
+        {hasClassification && (
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">
+            {classification}
+          </span>
+        )}
+      </div>
+      {hasValue && (
+        <div className="mt-4 w-full">
+          <div className="relative h-2 rounded-full bg-gray-200" aria-hidden>
+            <div
+              className="absolute left-0 top-0 h-2 rounded-full bg-emerald-500"
+              style={{ width: `${clampedValue}%` }}
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wide text-gray-400">
+            <span>Fear</span>
+            <span>Greed</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PortfolioPieChart({ positions }: { positions: PromptPosition[] }) {
@@ -440,6 +499,12 @@ export default function PromptVisualizer({ data, raw }: Props) {
   const hasPortfolio = positions.length > 0;
   const floors = data.policy?.floor ?? {};
   const floorEntries = Object.entries(floors);
+  const fearGreedIndex = data.marketData?.fearGreedIndex;
+  const showFearGreed = Boolean(
+    fearGreedIndex &&
+      ((typeof fearGreedIndex.value === 'number' && Number.isFinite(fearGreedIndex.value)) ||
+        (fearGreedIndex.classification && fearGreedIndex.classification.trim())),
+  );
 
   return (
     <div className="min-h-[320px] w-full space-y-6">
@@ -543,6 +608,10 @@ export default function PromptVisualizer({ data, raw }: Props) {
             </table>
           </div>
         </div>
+      )}
+
+      {showFearGreed && fearGreedIndex && (
+        <FearGreedSection fearGreedIndex={fearGreedIndex} />
       )}
 
       {data.marketData?.marketOverview && (
