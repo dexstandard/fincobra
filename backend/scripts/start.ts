@@ -5,7 +5,6 @@ import '../src/util/env.js';
 import reviewPortfolios from '../src/workflows/portfolio-review.js';
 import { syncOpenOrderStatuses } from '../src/services/order-orchestrator.js';
 import { fetchAndStoreNews } from '../src/services/news.js';
-import { fetchAndStoreSocialPosts } from '../src/services/social.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -94,7 +93,6 @@ async function main() {
     const { log } = app;
 
     registerCron('*/10 * * * *', () => fetchAndStoreNews(log));
-    registerCron('*/10 * * * *', () => fetchAndStoreSocialPosts(log));
     registerCron('*/3 * * * *', () => syncOpenOrderStatuses(log));
 
     const schedules: Record<string, string> = {
