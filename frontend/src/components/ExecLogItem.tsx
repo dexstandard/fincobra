@@ -264,6 +264,7 @@ export default function ExecLogItem({
           {hasResponse && (
             <ExecSuccessItem
               response={response}
+              rawLog={log.log}
               promptIcon={
                 <FileText
                   className="h-4 w-4 cursor-pointer flex-shrink-0"
