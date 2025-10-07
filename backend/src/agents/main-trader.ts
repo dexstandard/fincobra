@@ -91,7 +91,7 @@ export const rebalanceResponseSchema = {
             strategyName: { type: 'string' },
             strategyRationale: { type: 'string' },
           },
-          required: ['orders', 'shortReport'],
+          required: ['orders', 'shortReport', 'strategyName', 'strategyRationale'],
           additionalProperties: false,
         },
         {
