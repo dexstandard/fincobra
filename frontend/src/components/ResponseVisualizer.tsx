@@ -1,4 +1,4 @@
-import { CheckCircle, ClipboardList, FileText } from 'lucide-react';
+import { CheckCircle, ClipboardList, FileText, Lightbulb } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from '../lib/i18n';
 import type { ResponseData, ResponseOrder } from './ResponseVisualizer.types';
@@ -81,6 +81,26 @@ export default function ResponseVisualizer({ data }: Props) {
           {data.rebalance ? t('rebalance') : t('hold')}
         </div>
       </div>
+
+      {(data.strategyName || data.strategyRationale) && (
+        <div className="rounded border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-sm text-gray-500">
+            <Lightbulb className="h-4 w-4" />
+            <span>{t('strategy')}</span>
+          </div>
+          {data.strategyName && (
+            <p className="text-sm font-semibold text-gray-800">
+              {t('strategy_name')}: {data.strategyName}
+            </p>
+          )}
+          {data.strategyRationale && (
+            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">
+              <span className="font-semibold">{t('strategy_rationale')}:</span>{' '}
+              {data.strategyRationale}
+            </p>
+          )}
+        </div>
+      )}
 
       {data.shortReport && (
         <div className="rounded border border-gray-200 bg-white p-4 shadow-sm">

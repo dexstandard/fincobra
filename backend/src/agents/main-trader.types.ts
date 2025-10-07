@@ -28,6 +28,8 @@ export interface PreviousReport {
   orders?: PreviousReportOrder[];
   shortReport?: string;
   error?: unknown;
+  strategyName?: string;
+  pnlShiftUsd?: number;
 }
 
 export interface RoutePrice {
@@ -106,4 +108,6 @@ export interface MainTraderOrder {
 export interface MainTraderDecision {
   orders: MainTraderOrder[];
   shortReport: string;
+  strategyName?: string;
+  strategyRationale?: string;
 }
