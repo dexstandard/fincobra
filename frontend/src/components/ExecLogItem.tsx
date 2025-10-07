@@ -45,6 +45,8 @@ export interface ExecLog {
       basePrice: number;
       maxPriceDriftPct: number;
     }[];
+    strategyName?: string;
+    strategyRationale?: string;
   };
   error?: Record<string, unknown>;
   createdAt: number;

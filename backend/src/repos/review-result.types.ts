@@ -27,6 +27,8 @@ export interface ReviewResultSummary {
   rebalance: boolean;
   shortReport?: string;
   error?: ReviewResultError;
+  log?: string;
+  rawLogId?: string;
 }
 
 export interface ReviewRebalanceInfo {

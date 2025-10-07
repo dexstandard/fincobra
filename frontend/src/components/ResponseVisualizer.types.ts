@@ -11,5 +11,7 @@ export interface ResponseOrder {
 export interface ResponseData {
   rebalance: boolean;
   shortReport?: string;
+  strategyName?: string;
+  strategyRationale?: string;
   orders: ResponseOrder[];
 }

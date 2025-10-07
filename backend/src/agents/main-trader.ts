@@ -15,6 +15,7 @@ import {
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import { getNewsByToken } from '../repos/news.js';
+import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import type {
   RunParams,
@@ -34,10 +35,11 @@ import {
 
 export const developerInstructions = [
   'Strategy & Decision Rules',
-  '- You are a day-trading portfolio manager. Autonomously set target allocations, place limit orders trimming highs and buying dips.',
+  '- You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place orders consistent with those targets.',
   '- Use the market overview dataset for price action, higher-timeframe trend, returns, and risk flags.',
   '- Use the structured news feed for event risks.',
   '- If a bearish Hack | StablecoinDepeg | Outage with severity ≥ 0.75 appears, allow protective action even if technicals are neutral.',
+  '- If your chosen strategy overlaps with any recent strategies, do not follow it blindly; provide evidence of expected alpha inside the rationale.',
   'Execution Rules',
   '- Always check portfolio balances and policy floors before placing orders.',
   '- Supported order books are listed in the prompt (may include asset-to-asset combos like BTCSOL, not just cash pairs).',
@@ -47,7 +49,7 @@ export const developerInstructions = [
   '- Unfilled orders are canceled before the next review (interval is provided in the prompt).',
   '- Use maxPriceDriftPct to allow a small % drift from basePrice (≥0.0001 = 0.01%) to prevent premature cancellations.',
   'Response Specification',
-  '- Return a short report (≤255 chars) and an array of orders.',
+  '- Return the chosen strategy name, a short report (≤255 chars), a rationale explaining expected alpha, and an array of orders.',
   '- If no trade is taken, return an empty orders array.',
   '- On error, return error message.',
 ].join('\n');
@@ -86,6 +88,8 @@ export const rebalanceResponseSchema = {
               },
             },
             shortReport: { type: 'string' },
+            strategyName: { type: 'string' },
+            strategyRationale: { type: 'string' },
           },
           required: ['orders', 'shortReport'],
           additionalProperties: false,
@@ -433,8 +437,31 @@ export async function collectPromptData(
   }
 
   const prevRows = await getRecentReviewResults(row.id, 3);
+  const promptSnapshots = await Promise.all(
+    prevRows.map(async (r) => {
+      const promptJson = await getPromptForReviewResult(row.id, r.id);
+      if (!promptJson) {
+        return { pnlUsd: undefined };
+      }
+      try {
+        const parsed = JSON.parse(promptJson) as any;
+        const pnlUsd = parsed?.portfolio?.pnlUsd;
+        return {
+          pnlUsd: typeof pnlUsd === 'number' ? pnlUsd : undefined,
+        };
+      } catch (err) {
+        log.warn(
+          { err, reviewResultId: r.id },
+          'failed to parse previous prompt payload',
+        );
+        return { pnlUsd: undefined };
+      }
+    }),
+  );
+
   const previousReports: PreviousReport[] = [];
-  for (const r of prevRows) {
+  for (let index = 0; index < prevRows.length; index += 1) {
+    const r = prevRows[index];
     const ordersRows = await getLimitOrdersByReviewResult(row.id, r.id);
     const orders: PreviousReportOrder[] = [];
     for (const o of ordersRows) {
@@ -480,12 +507,38 @@ export async function collectPromptData(
       }
       orders.push(order);
     }
+    let strategyName: string | undefined;
+    if (r.log) {
+      try {
+        const parsedLog = JSON.parse(r.log) as Partial<MainTraderDecision>;
+        if (parsedLog && typeof parsedLog.strategyName === 'string') {
+          strategyName = parsedLog.strategyName;
+        }
+      } catch (err) {
+        log.warn(
+          { err, reviewResultId: r.id },
+          'failed to parse previous decision log',
+        );
+      }
+    }
+
     const report: PreviousReport = {
       ts: r.createdAt.toISOString(),
       ...(r.shortReport !== undefined ? { shortReport: r.shortReport } : {}),
       ...(r.error !== undefined ? { error: r.error } : {}),
       ...(orders.length ? { orders } : {}),
+      ...(strategyName ? { strategyName } : {}),
     };
+    const currentSnapshot = promptSnapshots[index];
+    const previousSnapshot = promptSnapshots[index + 1];
+    if (
+      currentSnapshot &&
+      typeof currentSnapshot.pnlUsd === 'number' &&
+      previousSnapshot &&
+      typeof previousSnapshot.pnlUsd === 'number'
+    ) {
+      report.pnlShiftUsd = currentSnapshot.pnlUsd - previousSnapshot.pnlUsd;
+    }
     previousReports.push(report);
   }
 
