@@ -37,7 +37,8 @@ export async function getRecentReviewResults(
     const entity = convertKeysToCamelCase(row) as Pick<
       ReviewResult,
       'id' | 'createdAt' | 'rebalance' | 'shortReport' | 'error'
-    >;
+    > &
+      Partial<Pick<ReviewResult, 'log' | 'rawLogId'>>;
     const summary: ReviewResultSummary = {
       id: entity.id,
       createdAt: entity.createdAt,
