@@ -12,9 +12,12 @@ const HOUR_INTERVAL_LIMIT = 1000;
 const HOUR_BASELINE = 24 * 30;
 const LTF_FETCH_BUFFER = 16;
 
-const LTF_CONFIG: Record<'10m' | '30m', { interval: '10m' | '30m'; fast: number; slow: number }> = {
-  '10m': { interval: '10m', fast: 12, slow: 48 },
-  '30m': { interval: '30m', fast: 6, slow: 24 },
+const LTF_CONFIG: Record<
+  '10m' | '30m',
+  { fetchInterval: '5m' | '30m'; stride: number; fast: number; slow: number }
+> = {
+  '10m': { fetchInterval: '5m', stride: 2, fast: 12, slow: 48 },
+  '30m': { fetchInterval: '30m', stride: 1, fast: 6, slow: 24 },
 };
 
 const DERIVATIONS: MarketOverviewPayload['derivations'] = {
@@ -580,6 +583,18 @@ function slopeToScore(
   return 0;
 }
 
+function downsampleSeries(series: number[], stride: number): number[] {
+  if (stride <= 1 || series.length === 0) {
+    return series;
+  }
+  const result: number[] = [];
+  const start = (series.length - 1) % stride;
+  for (let idx = start; idx < series.length; idx += stride) {
+    result.push(series[idx]);
+  }
+  return result;
+}
+
 async function computeLtfMetrics(
   symbol: string,
   baseOverview: MarketOverviewToken,
@@ -599,13 +614,19 @@ async function computeLtfMetrics(
     computeFrames.map(async (frame) => {
       const config = LTF_CONFIG[frame];
       const limit = Math.max(config.slow, 14) + LTF_FETCH_BUFFER;
-      const klines = await fetchIntervalKlines(symbol, config.interval, limit);
+      const fetchLimit = limit * config.stride;
+      const klines = await fetchIntervalKlines(
+        symbol,
+        config.fetchInterval,
+        fetchLimit,
+      );
       const closes = klines.map((k) => Number(k[4]));
-      const lastClose = closes[closes.length - 1];
+      const downsampled = downsampleSeries(closes, config.stride);
+      const lastClose = downsampled[downsampled.length - 1];
       const retValue =
-        lastClose !== undefined ? calcReturn(closes, 1, lastClose) : 0;
-      const rsiValue = calcRsi(closes);
-      const trend = computeTrendFrame(closes, config.fast, config.slow, [
+        lastClose !== undefined ? calcReturn(downsampled, 1, lastClose) : 0;
+      const rsiValue = calcRsi(downsampled);
+      const trend = computeTrendFrame(downsampled, config.fast, config.slow, [
         config.fast,
         config.slow,
       ]);

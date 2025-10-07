@@ -140,6 +140,18 @@ function calcRsi(closes: number[]) {
   return 100 - 100 / (1 + rs);
 }
 
+function downsampleSeries(series: number[], stride: number) {
+  if (stride <= 1 || series.length === 0) {
+    return series;
+  }
+  const result: number[] = [];
+  const start = (series.length - 1) % stride;
+  for (let idx = start; idx < series.length; idx += stride) {
+    result.push(series[idx]);
+  }
+  return result;
+}
+
 function volumeZ(volumes: number[], lookback: number) {
   const window = Math.min(lookback, volumes.length - 1);
   const slice = volumes.slice(volumes.length - 1 - window, volumes.length - 1);
@@ -500,7 +512,7 @@ describe('fetchMarketOverview', () => {
           volumeStart: 350,
           volumeStep: 1,
         }),
-        '10m': buildKlines(64, {
+        '5m': buildKlines(128, {
           closeStart: 50,
           closeStep: 0.4,
           volumeStart: 500,
@@ -538,7 +550,7 @@ describe('fetchMarketOverview', () => {
           volumeStart: 450,
           volumeStep: 1,
         }),
-        '10m': buildKlines(64, {
+        '5m': buildKlines(128, {
           closeStart: 310,
           closeStep: 0.2,
           volumeStart: 1_500,
@@ -605,7 +617,8 @@ describe('fetchMarketOverview', () => {
     const overview = payload.marketOverview.SOL;
     expect(overview.ltf?.frames).toEqual(['10m', '30m']);
 
-    const closes10 = syntheticIntervals.SOLUSDT['10m'].map((k) => Number(k[4]));
+    const closes5 = syntheticIntervals.SOLUSDT['5m'].map((k) => Number(k[4]));
+    const closes10 = downsampleSeries(closes5, 2);
     const closes30 = syntheticIntervals.SOLUSDT['30m'].map((k) => Number(k[4]));
     const last10 = closes10[closes10.length - 1];
     const last30 = closes30[closes30.length - 1];
@@ -667,7 +680,7 @@ describe('fetchMarketOverview', () => {
           volumeStart: 200,
           volumeStep: 1,
         }),
-        '10m': buildKlines(64, {
+        '5m': buildKlines(128, {
           closeStart: 60,
           closeStep: 0.2,
           volumeStart: 250,
@@ -705,7 +718,7 @@ describe('fetchMarketOverview', () => {
           volumeStart: 300,
           volumeStep: 1,
         }),
-        '10m': buildKlines(64, {
+        '5m': buildKlines(128, {
           closeStart: 305,
           closeStep: 0.1,
           volumeStart: 600,
