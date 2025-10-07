@@ -118,10 +118,16 @@ vi.mock('../src/services/indicators.js', () => ({
   createEmptyMarketOverview: vi
     .fn()
     .mockReturnValue(JSON.parse(JSON.stringify(sampleMarketOverview))),
+  clearMarketOverviewCache: vi.fn(),
 }));
 
 vi.mock('../src/services/rebalance.js', () => ({
-  createDecisionLimitOrders: vi.fn().mockResolvedValue(undefined),
+  createDecisionLimitOrders: vi.fn().mockResolvedValue({
+    placed: 0,
+    canceled: 0,
+    priceDivergenceCancellations: 0,
+    needsPriceDivergenceRetry: false,
+  }),
 }));
 
 describe('cleanup open orders', () => {

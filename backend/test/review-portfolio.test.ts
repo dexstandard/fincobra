@@ -164,10 +164,18 @@ vi.mock('../src/services/indicators.js', () => ({
   createEmptyMarketOverview: vi
     .fn()
     .mockReturnValue(JSON.parse(JSON.stringify(sampleMarketOverview))),
+  clearMarketOverviewCache: vi.fn(),
 }));
 
 const createDecisionLimitOrders = vi.hoisted(() =>
-  vi.fn().mockResolvedValue(undefined),
+  vi
+    .fn()
+    .mockResolvedValue({
+      placed: 0,
+      canceled: 0,
+      priceDivergenceCancellations: 0,
+      needsPriceDivergenceRetry: false,
+    }),
 );
 vi.mock('../src/services/rebalance.js', () => ({
   createDecisionLimitOrders,
@@ -243,6 +251,36 @@ describe('reviewPortfolio', () => {
     const args = createDecisionLimitOrders.mock.calls[0][0];
     expect(args.userId).toBe(user2);
     expect(args.orders).toHaveLength(2);
+  });
+
+  it('retries workflow when every order is canceled for price divergence', async () => {
+    const { workflowId } = await setupWorkflow(['BTC']);
+    const decision = {
+      orders: [
+        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 },
+      ],
+      shortReport: 'retry',
+    };
+    runMainTrader.mockResolvedValue(decision);
+    const clearCachesSpy = vi.spyOn(mainTrader, 'clearMainTraderCaches');
+    createDecisionLimitOrders
+      .mockResolvedValueOnce({
+        placed: 0,
+        canceled: 1,
+        priceDivergenceCancellations: 1,
+        needsPriceDivergenceRetry: true,
+      })
+      .mockResolvedValueOnce({
+        placed: 1,
+        canceled: 0,
+        priceDivergenceCancellations: 0,
+        needsPriceDivergenceRetry: false,
+      });
+    const log = mockLogger();
+    await reviewWorkflowPortfolio(log, workflowId);
+    expect(runMainTrader).toHaveBeenCalledTimes(2);
+    expect(createDecisionLimitOrders).toHaveBeenCalledTimes(2);
+    expect(clearCachesSpy).toHaveBeenCalledTimes(1);
   });
 
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
