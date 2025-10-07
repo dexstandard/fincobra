@@ -72,6 +72,48 @@ const percentFormatter = new Intl.NumberFormat(undefined, {
 
 const palette = ['#7c3aed', '#f97316', '#0ea5e9', '#22c55e', '#facc15', '#14b8a6'];
 
+function formatIsoDuration(value?: string): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const weekMatch = /^P(?:(\d+(?:\.\d+)?)W)$/.exec(trimmed);
+  if (weekMatch) {
+    const weeks = Number(weekMatch[1]);
+    if (Number.isFinite(weeks)) {
+      const formatted = numberFormatter2.format(weeks);
+      return `${formatted} ${Math.abs(weeks) === 1 ? 'week' : 'weeks'}`;
+    }
+    return null;
+  }
+
+  const isoMatch =
+    /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(
+      trimmed,
+    );
+  if (!isoMatch) return null;
+  const [, days, hours, minutes, seconds] = isoMatch;
+
+  const parts: string[] = [];
+
+  const appendPart = (amount: string | undefined, unit: string) => {
+    if (!amount) return;
+    const valueNumber = Number(amount);
+    if (!Number.isFinite(valueNumber)) return;
+    const formatted = numberFormatter2.format(valueNumber);
+    const label = Math.abs(valueNumber) === 1 ? unit : `${unit}s`;
+    parts.push(`${formatted} ${label}`);
+  };
+
+  appendPart(days, 'day');
+  appendPart(hours, 'hour');
+  appendPart(minutes, 'minute');
+  appendPart(seconds, 'second');
+
+  if (parts.length === 0) return null;
+  return parts.join(', ');
+}
+
 function formatDecimalPercent(value?: number): string {
   if (typeof value !== 'number') return '—';
   return `${percentFormatter.format(value * 100)}%`;
@@ -231,6 +273,8 @@ function MarketOverviewSection({
 }) {
   const assets = Object.entries(marketOverview.marketOverview ?? {});
   if (assets.length === 0) return null;
+  const decisionInterval = marketOverview.timeframe?.decisionInterval;
+  const friendlyDecisionInterval = formatIsoDuration(decisionInterval);
 
   return (
     <div>
@@ -247,13 +291,38 @@ function MarketOverviewSection({
         {marketOverview.timeframe?.candleInterval && (
           <span>
             · {marketOverview.timeframe.candleInterval} candles /
-            {` ${marketOverview.timeframe.decisionInterval ?? 'interval'}`}
+            {` ${friendlyDecisionInterval ?? marketOverview.timeframe.decisionInterval ?? 'interval'}`}
           </span>
         )}
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {assets.map(([asset, info]) => {
           const riskFlags = getRiskFlags(info.riskFlags);
+          const ltf = info.ltf;
+          const ltfMetrics: { label: string; value: string }[] = [];
+          if (typeof ltf?.alignmentScore === 'number') {
+            ltfMetrics.push({ label: 'Alignment', value: formatNumber(ltf.alignmentScore) });
+          }
+          if (typeof ltf?.ret10m === 'number') {
+            ltfMetrics.push({ label: 'Return (10m)', value: formatDecimalPercent(ltf.ret10m) });
+          }
+          if (typeof ltf?.ret30m === 'number') {
+            ltfMetrics.push({ label: 'Return (30m)', value: formatDecimalPercent(ltf.ret30m) });
+          }
+          if (typeof ltf?.rsi10m === 'number') {
+            ltfMetrics.push({ label: 'RSI (10m)', value: formatNumber(ltf.rsi10m) });
+          }
+          if (typeof ltf?.rsi30m === 'number') {
+            ltfMetrics.push({ label: 'RSI (30m)', value: formatNumber(ltf.rsi30m) });
+          }
+          if (typeof ltf?.slope10m === 'string') {
+            ltfMetrics.push({ label: 'Slope (10m)', value: ltf.slope10m });
+          }
+          if (typeof ltf?.slope30m === 'string') {
+            ltfMetrics.push({ label: 'Slope (30m)', value: ltf.slope30m });
+          }
+          const hasLtfContent =
+            (ltf?.frames && ltf.frames.length > 0) || typeof ltf?.alignmentScore === 'number' || ltfMetrics.length > 0;
           return (
             <div key={asset} className="rounded border border-gray-200 p-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -340,6 +409,27 @@ function MarketOverviewSection({
                   </div>
                 ))}
               </div>
+              {hasLtfContent && (
+                <div className="mt-3 rounded border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <Clock className="h-3.5 w-3.5" />
+                    LTF snapshot
+                  </div>
+                  {ltf?.frames && ltf.frames.length > 0 && (
+                    <p className="text-xs text-slate-600">Frames: {ltf.frames.join(', ')}</p>
+                  )}
+                  {ltfMetrics.length > 0 && (
+                    <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                      {ltfMetrics.map((metric) => (
+                        <div key={`${asset}-${metric.label}`}>
+                          <p className="text-slate-500">{metric.label}</p>
+                          <p className="font-semibold text-slate-700">{metric.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -525,6 +615,16 @@ export default function PromptVisualizer({ data, raw }: Props) {
       ((typeof fearGreedIndex.value === 'number' && Number.isFinite(fearGreedIndex.value)) ||
         (fearGreedIndex.classification && fearGreedIndex.classification.trim())),
   );
+  const reviewIntervalLabel = formatIsoDuration(data.reviewInterval);
+  const rawPnlPct = data.portfolio?.pnlPct;
+  const computedPnlPct =
+    typeof rawPnlPct === 'number'
+      ? rawPnlPct
+      : typeof data.portfolio?.pnlUsd === 'number' &&
+          typeof data.portfolio?.startBalanceUsd === 'number' &&
+          data.portfolio.startBalanceUsd !== 0
+        ? data.portfolio.pnlUsd / data.portfolio.startBalanceUsd
+        : null;
 
   return (
     <div className="min-h-[320px] w-full space-y-6">
@@ -543,7 +643,7 @@ export default function PromptVisualizer({ data, raw }: Props) {
             {data.reviewInterval && (
               <span className="flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5">
                 <Clock className="h-3 w-3" />
-                Review every {data.reviewInterval}
+                Review every {reviewIntervalLabel ?? data.reviewInterval}
               </span>
             )}
             {data.cash && (
@@ -576,7 +676,18 @@ export default function PromptVisualizer({ data, raw }: Props) {
                 Start Balance: {formatCurrency(data.portfolio?.startBalanceUsd)}
               </span>
               <span>
-                PnL: {formatCurrency(data.portfolio?.pnlUsd)}
+                PnL: {formatCurrency(data.portfolio?.pnlUsd)}{' '}
+                {typeof computedPnlPct === 'number' && (
+                  <span
+                    className={
+                      computedPnlPct >= 0
+                        ? 'font-semibold text-green-600'
+                        : 'font-semibold text-red-600'
+                    }
+                  >
+                    ({formatDecimalPercent(computedPnlPct)})
+                  </span>
+                )}
               </span>
             </div>
           </div>
