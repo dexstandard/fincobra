@@ -70,11 +70,15 @@ vi.mock('../src/services/binance-client.js', () => ({
 
 vi.mock('../src/repos/review-result.js', () => ({
   getRecentReviewResults: vi.fn().mockImplementation(async (_workflowId, limit) =>
-    Array.from({ length: 5 }, (_, i) => ({
-      id: `r${i + 1}`,
-      createdAt: new Date(`2025-01-0${i + 1}T00:00:00.000Z`),
-      shortReport: `p${i + 1}`,
-    })).slice(0, limit),
+    Array.from({ length: 5 }, (_, i) => {
+      const day = 5 - i;
+      return {
+        id: `r${day}`,
+        createdAt: new Date(`2025-01-0${day}T00:00:00.000Z`),
+        shortReport: `p${day}`,
+        log: JSON.stringify({ strategyName: `Strategy ${day}` }),
+      };
+    }).slice(0, limit),
   ),
 }));
 
@@ -102,6 +106,15 @@ vi.mock('../src/repos/limit-orders.js', () => ({
 
 vi.mock('../src/repos/news.js', () => ({
   getNewsByToken: getNewsByTokenMock,
+}));
+
+vi.mock('../src/repos/review-raw-log.js', () => ({
+  getPromptForReviewResult: vi
+    .fn()
+    .mockImplementation(async (_workflowId: string, resultId: string) => {
+      const idx = Number(resultId.slice(1));
+      return JSON.stringify({ portfolio: { pnlUsd: idx * 100 } });
+    }),
 }));
 
 describe('collectPromptData', () => {
@@ -170,19 +183,21 @@ describe('collectPromptData', () => {
     const prompt = await collectPromptData(row, mockLogger());
     expect(prompt?.previousReports).toHaveLength(3);
     expect(prompt?.previousReports?.[0]).toMatchObject({
-      ts: '2025-01-01T00:00:00.000Z',
+      ts: '2025-01-05T00:00:00.000Z',
       orders: [
         {
           symbol: 'BTCUSDT',
           side: 'BUY',
-          qty: 1,
-          price: 50001,
+          qty: 5,
+          price: 50005,
           status: LimitOrderStatus.Filled,
           reason: 'price limit',
         },
       ],
-      shortReport: 'p1',
+      shortReport: 'p5',
+      strategyName: 'Strategy 5',
     });
+    expect(prompt?.previousReports?.[0]?.pnlShiftUsd).toBeCloseTo(100);
   });
 
   it('handles three-token portfolio', async () => {

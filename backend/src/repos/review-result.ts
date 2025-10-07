@@ -30,14 +30,15 @@ export async function getRecentReviewResults(
   limit: number,
 ): Promise<ReviewResultSummary[]> {
   const { rows } = await db.query(
-    'SELECT id, created_at, rebalance, short_report, error, raw_log_id FROM review_result WHERE portfolio_workflow_id = $1 ORDER BY created_at DESC LIMIT $2',
+    'SELECT id, created_at, rebalance, short_report, error, raw_log_id, log FROM review_result WHERE portfolio_workflow_id = $1 ORDER BY created_at DESC LIMIT $2',
     [portfolioWorkflowId, limit],
   );
   return rows.map((row) => {
     const entity = convertKeysToCamelCase(row) as Pick<
       ReviewResult,
       'id' | 'createdAt' | 'rebalance' | 'shortReport' | 'error'
-    >;
+    > &
+      Partial<Pick<ReviewResult, 'log' | 'rawLogId'>>;
     const summary: ReviewResultSummary = {
       id: entity.id,
       createdAt: entity.createdAt,
@@ -45,6 +46,8 @@ export async function getRecentReviewResults(
       ...(entity.shortReport !== null
         ? { shortReport: entity.shortReport }
         : {}),
+      ...(entity.rawLogId ? { rawLogId: entity.rawLogId } : {}),
+      ...(entity.log ? { log: entity.log } : {}),
     };
     if (entity.error !== null) {
       try {

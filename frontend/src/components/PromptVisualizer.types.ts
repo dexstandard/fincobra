@@ -117,6 +117,8 @@ export interface PromptPreviousReportOrder {
 export interface PromptPreviousReport {
   ts: string;
   shortReport?: string;
+  strategyName?: string;
+  pnlShiftUsd?: number;
   orders?: PromptPreviousReportOrder[];
 }
 

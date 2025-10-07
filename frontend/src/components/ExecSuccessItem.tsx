@@ -62,6 +62,31 @@ function toResponseData(value: unknown): ResponseData | null {
     shortReport = String((value as { short_report: string }).short_report);
   }
 
+  let strategyName: string | undefined;
+  if (typeof (value as { strategyName?: unknown }).strategyName === 'string') {
+    strategyName = String((value as { strategyName: string }).strategyName);
+  } else if (
+    typeof (value as { strategy_name?: unknown }).strategy_name === 'string'
+  ) {
+    strategyName = String((value as { strategy_name: string }).strategy_name);
+  }
+
+  let strategyRationale: string | undefined;
+  if (
+    typeof (value as { strategyRationale?: unknown }).strategyRationale === 'string'
+  ) {
+    strategyRationale = String(
+      (value as { strategyRationale: string }).strategyRationale,
+    );
+  } else if (
+    typeof (value as { strategy_rationale?: unknown }).strategy_rationale ===
+    'string'
+  ) {
+    strategyRationale = String(
+      (value as { strategy_rationale: string }).strategy_rationale,
+    );
+  }
+
   let rebalance: boolean | undefined;
   if (typeof value.rebalance === 'boolean') {
     rebalance = value.rebalance;
@@ -82,6 +107,8 @@ function toResponseData(value: unknown): ResponseData | null {
   return {
     rebalance: rebalance ?? false,
     ...(shortReport ? { shortReport } : {}),
+    ...(strategyName ? { strategyName } : {}),
+    ...(strategyRationale ? { strategyRationale } : {}),
     orders: ordersValue,
   };
 }

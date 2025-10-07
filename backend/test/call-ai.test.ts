@@ -53,7 +53,7 @@ describe('callAi structured output', () => {
     const body = JSON.parse(opts.body);
     expect(opts.body).toBe(JSON.stringify(body));
     expect(body.instructions).toMatch(
-      /You are a day-trading portfolio manager. Autonomously set target allocations/i,
+      /You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place orders consistent with those targets/i,
     );
     expect(body.instructions).toMatch(/On error, return error message/i);
     expect(typeof body.input).toBe('string');

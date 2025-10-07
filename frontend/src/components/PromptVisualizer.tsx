@@ -413,6 +413,26 @@ function PreviousReportsSection({
             <CalendarClock className="h-4 w-4" />
             <FormattedDate date={report.ts} />
           </div>
+          {(report.strategyName || typeof report.pnlShiftUsd === 'number') && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+              {report.strategyName && (
+                <span className="rounded bg-purple-100 px-2 py-0.5 font-semibold text-purple-700">
+                  {report.strategyName}
+                </span>
+              )}
+              {typeof report.pnlShiftUsd === 'number' && (
+                <span
+                  className={
+                    report.pnlShiftUsd >= 0
+                      ? 'font-semibold text-green-600'
+                      : 'font-semibold text-red-600'
+                  }
+                >
+                  ΔPnL: {formatCurrency(report.pnlShiftUsd)}
+                </span>
+              )}
+            </div>
+          )}
           {report.shortReport && (
             <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
               {report.shortReport}
