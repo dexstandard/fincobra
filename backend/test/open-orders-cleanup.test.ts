@@ -12,9 +12,9 @@ import { setAiKey } from '../src/repos/ai-api-key.js';
 import { reviewWorkflowPortfolio } from '../src/workflows/portfolio-review.js';
 
 const sampleMarketOverview = vi.hoisted(() => ({
-  schema: 'market_overview.v2' as const,
+  schema: 'market_overview.v2.1' as const,
   asOf: '2024-01-01T00:00:00Z',
-  timeframe: { candleInterval: '1h', reviewInterval: '30m', semantics: '' },
+  timeframe: { candleInterval: '1h', decisionInterval: 'PT30M', semantics: '' },
   derivations: {
     trendSlopeRule: '',
     ret1hRule: '',

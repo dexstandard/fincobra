@@ -144,7 +144,7 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.startBalanceUsd).toBe(20000);
     expect(prompt?.portfolio.startBalanceTs).toBe('2025-01-01T00:00:00.000Z');
     expect(prompt?.portfolio.pnlUsd).toBeCloseTo(1000);
-    expect(prompt?.reviewInterval).toBe('1h');
+    expect(prompt?.reviewInterval).toBe('PT1H');
     expect(prompt).not.toHaveProperty('instructions');
   });
 
@@ -317,6 +317,30 @@ describe('collectPromptData', () => {
 
     await expect(collectPromptData(row, mockLogger())).rejects.toThrow(
       'no valid trading routes available',
+    );
+  });
+
+  it('throws when review interval is missing', async () => {
+    const row: ActivePortfolioWorkflow = {
+      id: 'missing-interval',
+      userId: 'user',
+      model: 'model',
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 40 }],
+      risk: 'low',
+      reviewInterval: '  ',
+      agentInstructions: 'inst',
+      aiApiKeyId: null,
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: 'missing-interval',
+    };
+
+    await expect(collectPromptData(row, mockLogger())).rejects.toThrow(
+      'workflow review interval is required',
     );
   });
 

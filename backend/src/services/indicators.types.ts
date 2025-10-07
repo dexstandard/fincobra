@@ -40,6 +40,17 @@ export interface MarketOverviewHtf {
   regime: MarketOverviewRegime;
 }
 
+export interface MarketOverviewLtf {
+  frames: Array<'10m' | '30m' | '1h'>;
+  ret10m?: number;
+  ret30m?: number;
+  rsi10m?: number;
+  rsi30m?: number;
+  slope10m?: 'up' | 'flat' | 'down';
+  slope30m?: 'up' | 'flat' | 'down';
+  alignmentScore: number;
+}
+
 export interface MarketOverviewToken {
   trendSlope: 'up' | 'flat' | 'down';
   trendBasis: MarketOverviewTrendBasis;
@@ -52,11 +63,12 @@ export interface MarketOverviewToken {
   orderbookDepthRatio: number;
   riskFlags: MarketOverviewRiskFlags;
   htf: MarketOverviewHtf;
+  ltf?: MarketOverviewLtf;
 }
 
 export interface MarketOverviewTimeframe {
   candleInterval: string;
-  reviewInterval: string;
+  decisionInterval: string;
   semantics: string;
 }
 
@@ -87,7 +99,7 @@ export interface MarketOverviewSpec {
 }
 
 export interface MarketOverviewPayload {
-  schema: 'market_overview.v2';
+  schema: 'market_overview.v2.1';
   asOf: string;
   timeframe: MarketOverviewTimeframe;
   derivations: MarketOverviewDerivations;

@@ -10,12 +10,14 @@ import type {
 
 const HOUR_INTERVAL_LIMIT = 1000;
 const HOUR_BASELINE = 24 * 30;
+const LTF_FETCH_BUFFER = 16;
 
-const TIMEFRAME: MarketOverviewPayload['timeframe'] = {
-  candleInterval: '1h',
-  reviewInterval: '30m',
-  semantics:
-    'All base fields are computed on 1h candles for a 30m decision cadence. Higher-timeframe (HTF) context adds 4h/1d/1w trend and 30d/90d/180d/365d returns.',
+const LTF_CONFIG: Record<
+  '10m' | '30m',
+  { fetchInterval: '5m' | '30m'; stride: number; fast: number; slow: number }
+> = {
+  '10m': { fetchInterval: '5m', stride: 2, fast: 12, slow: 48 },
+  '30m': { fetchInterval: '30m', stride: 1, fast: 6, slow: 24 },
 };
 
 const DERIVATIONS: MarketOverviewPayload['derivations'] = {
@@ -62,6 +64,10 @@ const SPEC: MarketOverviewPayload['spec'] = {
     'htf.regime.volRank1y': '0–1 (percentile)',
     'htf.regime.corrBtc90d': '[-1,1]',
     'htf.regime.marketBeta90d': 'float',
+    'ltf.ret10m|ret30m': 'decimal',
+    'ltf.rsi10m|rsi30m': '0–100',
+    "ltf.slope10m|slope30m": "enum('up','flat','down')",
+    'ltf.alignmentScore': '[-1,1]',
   },
   interpretation: {
     trendSlope: 'Multi-day trend on 1h timeframe (SMA50 vs SMA200).',
@@ -107,12 +113,34 @@ const btcContextCache = new NodeCache({
 const pendingTokenFetches = new Map<string, Promise<CachedTokenOverview>>();
 let pendingBtcContext: Promise<CachedBtcContext> | null = null;
 
-function buildTokenPendingKey(token: string, contextKey: string): string {
-  return `${token}|${contextKey}`;
+function buildOptionsKey(decisionInterval: string, ltfFrames: readonly string[]): string {
+  return `${decisionInterval}|${ltfFrames.join(',')}`;
 }
 
-function setTokenCache(token: string, value: CachedTokenOverview) {
-  tokenOverviewCache.set<CachedTokenOverview>(token, value);
+function buildTokenCacheKey(token: string, optionsKey: string): string {
+  return `${token}|${optionsKey}`;
+}
+
+function buildTokenPendingKey(cacheKey: string, contextKey: string): string {
+  return `${cacheKey}|${contextKey}`;
+}
+
+function setTokenCache(key: string, value: CachedTokenOverview) {
+  tokenOverviewCache.set<CachedTokenOverview>(key, value);
+}
+
+export function buildTimeframe(
+  decisionInterval: string,
+): MarketOverviewPayload['timeframe'] {
+  if (!decisionInterval) {
+    throw new Error('decision interval is required to build timeframe');
+  }
+  return {
+    candleInterval: '1h',
+    decisionInterval,
+    semantics:
+      'Base fields computed on candleInterval; decisions run every decisionInterval. LTF (optional) derives from requested frames.',
+  };
 }
 
 async function getBtcContext(): Promise<CachedBtcContext> {
@@ -143,9 +171,15 @@ async function getBtcContext(): Promise<CachedBtcContext> {
   return pendingBtcContext!;
 }
 
+interface TokenOverviewOptions {
+  requestedFrames: Array<'10m' | '30m' | '1h'>;
+  computeFrames: Array<'10m' | '30m'>;
+}
+
 async function computeTokenOverview(
   token: string,
   btcContext: CachedBtcContext,
+  options: TokenOverviewOptions,
 ): Promise<CachedTokenOverview> {
   const pair =
     token === 'BTC' ? btcContext.pair : await fetchPairData(token, 'USDT');
@@ -180,6 +214,18 @@ async function computeTokenOverview(
   overview.orderbookDepthRatio = askQty === 0 ? 0 : bidQty / askQty;
   overview.riskFlags = computeRiskFlags(overview);
 
+  if (options.requestedFrames.length) {
+    const ltf = await computeLtfMetrics(
+      symbol,
+      overview,
+      options.requestedFrames,
+      options.computeFrames,
+    );
+    if (ltf) {
+      overview.ltf = ltf;
+    }
+  }
+
   return {
     overview,
     generatedAt: new Date().toISOString(),
@@ -190,19 +236,20 @@ async function computeTokenOverview(
 async function loadTokenOverview(
   token: string,
   btcContext: CachedBtcContext,
+  options: TokenOverviewOptions,
+  tokenCacheKey: string,
 ): Promise<CachedTokenOverview> {
-  const cacheKey = token.toUpperCase();
-  const cached = tokenOverviewCache.get<CachedTokenOverview>(cacheKey);
+  const cached = tokenOverviewCache.get<CachedTokenOverview>(tokenCacheKey);
   if (cached && cached.contextKey === btcContext.cacheKey) {
     return cached;
   }
 
-  const pendingKey = buildTokenPendingKey(cacheKey, btcContext.cacheKey);
+  const pendingKey = buildTokenPendingKey(tokenCacheKey, btcContext.cacheKey);
   let pending = pendingTokenFetches.get(pendingKey);
   if (!pending) {
-    pending = computeTokenOverview(cacheKey, btcContext)
+    pending = computeTokenOverview(token, btcContext, options)
       .then((result) => {
-        setTokenCache(cacheKey, result);
+        setTokenCache(tokenCacheKey, result);
         return result;
       })
       .finally(() => {
@@ -212,18 +259,22 @@ async function loadTokenOverview(
   }
   const result = await pending;
   if (result.contextKey !== btcContext.cacheKey) {
-    return loadTokenOverview(token, btcContext);
+    return loadTokenOverview(token, btcContext, options, tokenCacheKey);
   }
   return result;
 }
 
 export function createEmptyMarketOverview(
   asOf: Date = new Date(),
+  decisionInterval: string,
 ): MarketOverviewPayload {
+  if (!decisionInterval) {
+    throw new Error('decision interval is required to create market overview');
+  }
   return {
-    schema: 'market_overview.v2',
+    schema: 'market_overview.v2.1',
     asOf: asOf.toISOString(),
-    timeframe: TIMEFRAME,
+    timeframe: buildTimeframe(decisionInterval),
     derivations: DERIVATIONS,
     spec: SPEC,
     marketOverview: {},
@@ -523,12 +574,123 @@ function buildTokenOverview(
   return token;
 }
 
+function slopeToScore(
+  slope: MarketOverviewTrendFrame['slope'] | undefined,
+  weight: number,
+): number {
+  if (slope === 'up') return weight;
+  if (slope === 'down') return -weight;
+  return 0;
+}
+
+function downsampleSeries(series: number[], stride: number): number[] {
+  if (stride <= 1 || series.length === 0) {
+    return series;
+  }
+  const result: number[] = [];
+  const start = (series.length - 1) % stride;
+  for (let idx = start; idx < series.length; idx += stride) {
+    result.push(series[idx]);
+  }
+  return result;
+}
+
+async function computeLtfMetrics(
+  symbol: string,
+  baseOverview: MarketOverviewToken,
+  requestedFrames: Array<'10m' | '30m' | '1h'>,
+  computeFrames: Array<'10m' | '30m'>,
+): Promise<MarketOverviewToken['ltf'] | null> {
+  if (!requestedFrames.length) {
+    return null;
+  }
+
+  const ltf: MarketOverviewToken['ltf'] = {
+    frames: requestedFrames,
+    alignmentScore: 0,
+  };
+
+  await Promise.all(
+    computeFrames.map(async (frame) => {
+      const config = LTF_CONFIG[frame];
+      const limit = Math.max(config.slow, 14) + LTF_FETCH_BUFFER;
+      const fetchLimit = limit * config.stride;
+      const klines = await fetchIntervalKlines(
+        symbol,
+        config.fetchInterval,
+        fetchLimit,
+      );
+      const closes = klines.map((k) => Number(k[4]));
+      const downsampled = downsampleSeries(closes, config.stride);
+      const lastClose = downsampled[downsampled.length - 1];
+      const retValue =
+        lastClose !== undefined ? calcReturn(downsampled, 1, lastClose) : 0;
+      const rsiValue = calcRsi(downsampled);
+      const trend = computeTrendFrame(downsampled, config.fast, config.slow, [
+        config.fast,
+        config.slow,
+      ]);
+
+      if (frame === '10m') {
+        ltf.ret10m = retValue;
+        ltf.rsi10m = rsiValue;
+        ltf.slope10m = trend.slope;
+      } else if (frame === '30m') {
+        ltf.ret30m = retValue;
+        ltf.rsi30m = rsiValue;
+        ltf.slope30m = trend.slope;
+      }
+    }),
+  );
+
+  const contributions: number[] = [
+    slopeToScore(baseOverview.trendSlope, 1),
+    slopeToScore(baseOverview.htf.trend['4h'].slope, 1),
+  ];
+  if (computeFrames.includes('10m')) {
+    contributions.push(slopeToScore(ltf.slope10m, 0.5));
+  }
+  if (computeFrames.includes('30m')) {
+    contributions.push(slopeToScore(ltf.slope30m, 0.5));
+  }
+  const alignment =
+    contributions.reduce((sum, value) => sum + value, 0) / contributions.length;
+  ltf.alignmentScore = Math.max(-1, Math.min(1, alignment));
+
+  return ltf;
+}
+
 export async function fetchMarketOverview(
   tokens: string[],
+  opts?: {
+    decisionInterval?: string;
+    ltfFrames?: Array<'10m' | '30m' | '1h'>;
+  },
 ): Promise<MarketOverviewPayload> {
-  if (!tokens.length) {
-    return createEmptyMarketOverview();
+  const decisionInterval = opts?.decisionInterval;
+  if (!decisionInterval) {
+    throw new Error('decisionInterval is required when fetching market overview');
   }
+  if (!tokens.length) {
+    return createEmptyMarketOverview(new Date(), decisionInterval);
+  }
+  const frameOrder: Record<'10m' | '30m' | '1h', number> = {
+    '10m': 0,
+    '30m': 1,
+    '1h': 2,
+  };
+  const requestedFrames = Array.from(
+    new Set(
+      (opts?.ltfFrames ?? []).filter(
+        (frame): frame is '10m' | '30m' | '1h' =>
+          frame === '10m' || frame === '30m' || frame === '1h',
+      ),
+    ),
+  ).sort((a, b) => frameOrder[a] - frameOrder[b]);
+  const computeFrames = requestedFrames.filter(
+    (frame): frame is '10m' | '30m' => frame === '10m' || frame === '30m',
+  );
+  const optionsKey = buildOptionsKey(decisionInterval, requestedFrames);
 
   const dedupedSet = new Set(tokens.map((t) => t.toUpperCase()));
   dedupedSet.add('BTC');
@@ -536,7 +698,13 @@ export async function fetchMarketOverview(
   const btcContext = await getBtcContext();
   const entries = await Promise.all(
     deduped.map(async (token) => {
-      const data = await loadTokenOverview(token, btcContext);
+      const tokenKey = buildTokenCacheKey(token.toUpperCase(), optionsKey);
+      const data = await loadTokenOverview(
+        token,
+        btcContext,
+        { requestedFrames, computeFrames },
+        tokenKey,
+      );
       return [token, data] as const;
     }),
   );
@@ -551,10 +719,10 @@ export async function fetchMarketOverview(
   }, new Date(0));
 
   return {
-    schema: 'market_overview.v2',
+    schema: 'market_overview.v2.1',
     asOf:
       latestAsOf.getTime() > 0 ? latestAsOf.toISOString() : new Date().toISOString(),
-    timeframe: TIMEFRAME,
+    timeframe: buildTimeframe(decisionInterval),
     derivations: DERIVATIONS,
     spec: SPEC,
     marketOverview,

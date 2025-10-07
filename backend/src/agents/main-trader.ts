@@ -119,6 +119,81 @@ const newsContextCache = new NodeCache({
   useClones: false,
 });
 
+function formatDecisionInterval(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    throw new Error('decision interval must be a positive number of minutes');
+  }
+  const wholeMinutes = Math.floor(minutes);
+  const hours = Math.floor(wholeMinutes / 60);
+  const remainingMinutes = wholeMinutes % 60;
+  let iso = 'PT';
+  if (hours > 0) {
+    iso += `${hours}H`;
+  }
+  if (remainingMinutes > 0) {
+    iso += `${remainingMinutes}M`;
+  }
+  if (iso === 'PT') {
+    throw new Error('decision interval must be at least one minute');
+  }
+  return iso;
+}
+
+function normalizeDecisionInterval(value?: string | null): string {
+  const minutes = parseDecisionIntervalMinutes(value);
+  if (minutes === null) {
+    throw new Error('workflow review interval is required');
+  }
+  return formatDecisionInterval(minutes);
+}
+
+function parseDecisionIntervalMinutes(value?: string | null): number | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const isoMatch = trimmed.toUpperCase().match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/);
+  if (isoMatch) {
+    const hours = isoMatch[1] ? Number(isoMatch[1]) : 0;
+    const minutes = isoMatch[2] ? Number(isoMatch[2]) : 0;
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return null;
+    }
+    const total = hours * 60 + minutes;
+    return total > 0 ? total : null;
+  }
+  const legacyMatch = trimmed.match(/^(\d+)\s*([mh])$/i);
+  if (legacyMatch) {
+    const amount = Number(legacyMatch[1]);
+    if (!Number.isFinite(amount)) return null;
+    if (amount <= 0) {
+      return null;
+    }
+    return legacyMatch[2].toLowerCase() === 'h' ? amount * 60 : amount;
+  }
+  return null;
+}
+
+function pickLtf(decisionInterval: string): Array<'10m' | '30m' | '1h'> {
+  const minutes = parseDecisionIntervalMinutes(decisionInterval);
+  if (minutes === null) {
+    return [];
+  }
+  if (minutes <= 30) {
+    return ['10m', '30m'];
+  }
+  if (minutes <= 90) {
+    return ['30m', '1h'];
+  }
+  if (minutes <= 240) {
+    return ['30m'];
+  }
+  return [];
+}
+
 const pendingNewsContexts = new Map<string, Promise<NewsContext>>();
 
 function getCachedNewsContext(token: string, now: number): NewsContext | null {
@@ -415,6 +490,8 @@ export async function collectPromptData(
   }
 
   const nonStableTokens = tokens.filter((t) => !isStablecoin(t));
+  const decisionInterval = normalizeDecisionInterval(row.reviewInterval);
+  const ltfFrames = pickLtf(decisionInterval);
   const reports = await Promise.all(
     nonStableTokens.map(async (token) => ({
       token,
@@ -423,7 +500,7 @@ export async function collectPromptData(
   );
 
   const prompt: RebalancePrompt = {
-    reviewInterval: row.reviewInterval,
+    reviewInterval: decisionInterval,
     policy: { floor },
     cash,
     portfolio,
@@ -435,11 +512,14 @@ export async function collectPromptData(
     prompt.previousReports = previousReports;
   }
 
-  let marketOverview = createEmptyMarketOverview();
+  let marketOverview = createEmptyMarketOverview(new Date(), decisionInterval);
   let fearGreedIndex: { value: number; classification: string } | undefined;
   if (nonStableTokens.length) {
     try {
-      marketOverview = await fetchMarketOverview(nonStableTokens);
+      marketOverview = await fetchMarketOverview(nonStableTokens, {
+        decisionInterval,
+        ltfFrames,
+      });
     } catch (err) {
       log.error({ err }, 'failed to fetch market overview');
     }
