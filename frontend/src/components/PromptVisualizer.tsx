@@ -247,7 +247,7 @@ function MarketOverviewSection({
         {marketOverview.timeframe?.candleInterval && (
           <span>
             · {marketOverview.timeframe.candleInterval} candles /
-            {` ${marketOverview.timeframe.reviewInterval ?? 'interval'}`}
+            {` ${marketOverview.timeframe.decisionInterval ?? 'interval'}`}
           </span>
         )}
       </div>

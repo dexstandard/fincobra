@@ -4,6 +4,7 @@ import {
   createEmptyMarketOverview,
   fetchMarketOverview,
   clearMarketOverviewCache,
+  buildTimeframe,
 } from '../src/services/indicators.js';
 import { fetchPairData } from '../src/services/binance-client.js';
 
@@ -328,9 +329,11 @@ describe('fetchMarketOverview', () => {
     });
     vi.stubGlobal('fetch', fetchStub);
 
-    const payload = await fetchMarketOverview(['SOL']);
+    const payload = await fetchMarketOverview(['SOL'], {
+      decisionInterval: 'PT30M',
+    });
 
-    expect(payload.schema).toBe('market_overview.v2');
+    expect(payload.schema).toBe('market_overview.v2.1');
     expect(payload.asOf).toBe('2025-09-20T06:15:00.000Z');
     expect(Object.keys(payload.marketOverview)).toEqual(['SOL', 'BTC']);
 
@@ -447,9 +450,194 @@ describe('fetchMarketOverview', () => {
   });
 
   it('provides an empty overview when no tokens are requested', () => {
-    const payload = createEmptyMarketOverview(new Date('2024-01-01T00:00:00Z'));
+    const payload = createEmptyMarketOverview(
+      new Date('2024-01-01T00:00:00Z'),
+      'PT30M',
+    );
     expect(payload.marketOverview).toEqual({});
     expect(payload.asOf).toBe('2024-01-01T00:00:00.000Z');
+    expect(payload.timeframe).toEqual(buildTimeframe('PT30M'));
+  });
+
+  it('throws when decision interval is missing', async () => {
+    await expect(fetchMarketOverview(['SOL'])).rejects.toThrow(
+      'decisionInterval is required when fetching market overview',
+    );
+  });
+
+  it('builds timeframe metadata for arbitrary decision intervals', () => {
+    const timeframe = buildTimeframe('PT45M');
+    expect(timeframe.candleInterval).toBe('1h');
+    expect(timeframe.decisionInterval).toBe('PT45M');
+    expect(timeframe.semantics).toContain('Base fields computed on candleInterval');
+    expect(timeframe.semantics).toContain('decisions run every decisionInterval');
+  });
+
+  it('attaches low timeframe metrics when requested', async () => {
+    const syntheticIntervals: Record<string, Record<string, NumericKline[]>> = {
+      SOLUSDT: {
+        '1h': buildKlines(HOUR_LIMIT, {
+          closeStart: 100,
+          closeStep: 0.8,
+          volumeStart: 2_000,
+          volumeStep: 3,
+        }),
+        '4h': buildKlines(FOUR_HOUR_LIMIT, {
+          closeStart: 140,
+          closeStep: 0.6,
+          volumeStart: 900,
+          volumeStep: 2,
+        }),
+        '1d': buildKlines(DAY_LIMIT, {
+          closeStart: 180,
+          closeStep: 1.4,
+          volumeStart: 700,
+          volumeStep: 2,
+        }),
+        '1w': buildKlines(WEEK_LIMIT, {
+          closeStart: 220,
+          closeStep: 1.2,
+          volumeStart: 350,
+          volumeStep: 1,
+        }),
+        '10m': buildKlines(64, {
+          closeStart: 50,
+          closeStep: 0.4,
+          volumeStart: 500,
+          volumeStep: 5,
+        }),
+        '30m': buildKlines(40, {
+          closeStart: 75,
+          closeStep: 0.6,
+          volumeStart: 400,
+          volumeStep: 4,
+        }),
+      },
+      BTCUSDT: {
+        '1h': buildKlines(HOUR_LIMIT, {
+          closeStart: 300,
+          closeStep: 0.3,
+          volumeStart: 3_000,
+          volumeStep: 2,
+        }),
+        '4h': buildKlines(FOUR_HOUR_LIMIT, {
+          closeStart: 320,
+          closeStep: 0.3,
+          volumeStart: 1_200,
+          volumeStep: 1,
+        }),
+        '1d': buildKlines(DAY_LIMIT, {
+          closeStart: 340,
+          closeStep: 0.3,
+          volumeStart: 900,
+          volumeStep: 1,
+        }),
+        '1w': buildKlines(WEEK_LIMIT, {
+          closeStart: 360,
+          closeStep: 0.3,
+          volumeStart: 450,
+          volumeStep: 1,
+        }),
+        '10m': buildKlines(64, {
+          closeStart: 310,
+          closeStep: 0.2,
+          volumeStart: 1_500,
+          volumeStep: 2,
+        }),
+        '30m': buildKlines(40, {
+          closeStart: 315,
+          closeStep: 0.2,
+          volumeStart: 1_200,
+          volumeStep: 2,
+        }),
+      },
+    };
+
+    const syntheticPairs: Record<string, SyntheticPair> = {
+      SOL: {
+        symbol: 'SOLUSDT',
+        year: buildYearSeries(366, 100, 0.6),
+        currentPrice: Number((100 + 0.6 * (366 - 1)).toFixed(6)),
+        orderBook: {
+          bids: [[Number((100 + 0.6 * (366 - 1) - 0.3).toFixed(6)), 40]],
+          asks: [[Number((100 + 0.6 * (366 - 1) + 0.3).toFixed(6)), 36]],
+        },
+      },
+      BTC: {
+        symbol: 'BTCUSDT',
+        year: buildYearSeries(366, 200, 0.4),
+        currentPrice: Number((200 + 0.4 * (366 - 1)).toFixed(6)),
+        orderBook: {
+          bids: [[Number((200 + 0.4 * (366 - 1) - 0.4).toFixed(6)), 20]],
+          asks: [[Number((200 + 0.4 * (366 - 1) + 0.4).toFixed(6)), 18]],
+        },
+      },
+    };
+
+    (fetchPairData as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (token: string) => {
+        const key = token.toUpperCase();
+        const pair = syntheticPairs[key];
+        if (!pair) throw new Error(`missing synthetic pair for ${token}`);
+        return pair;
+      },
+    );
+
+    const fetchStub = vi.fn(async (url: string) => {
+      const parsed = new URL(url, 'https://api.binance.com');
+      const symbol = parsed.searchParams.get('symbol');
+      const interval = parsed.searchParams.get('interval');
+      const limit = Number(parsed.searchParams.get('limit'));
+      if (!symbol || !interval) throw new Error('missing params');
+      const data = syntheticIntervals[symbol]?.[interval];
+      if (!data) throw new Error(`no data for ${symbol} ${interval}`);
+      expect(limit).toBe(data.length);
+      return { ok: true, json: async () => data } as any;
+    });
+    vi.stubGlobal('fetch', fetchStub);
+
+    const payload = await fetchMarketOverview(['SOL'], {
+      decisionInterval: 'PT15M',
+      ltfFrames: ['30m', '10m'],
+    });
+
+    expect(payload.timeframe.decisionInterval).toBe('PT15M');
+    const overview = payload.marketOverview.SOL;
+    expect(overview.ltf?.frames).toEqual(['10m', '30m']);
+
+    const closes10 = syntheticIntervals.SOLUSDT['10m'].map((k) => Number(k[4]));
+    const closes30 = syntheticIntervals.SOLUSDT['30m'].map((k) => Number(k[4]));
+    const last10 = closes10[closes10.length - 1];
+    const last30 = closes30[closes30.length - 1];
+    const expectedRet10 = calcReturn(closes10, 1, last10);
+    const expectedRet30 = calcReturn(closes30, 1, last30);
+    expect(overview.ltf?.ret10m).toBeCloseTo(expectedRet10, 10);
+    expect(overview.ltf?.ret30m).toBeCloseTo(expectedRet30, 10);
+
+    const expectedRsi10 = calcRsi(closes10);
+    const expectedRsi30 = calcRsi(closes30);
+    expect(overview.ltf?.rsi10m).toBeCloseTo(expectedRsi10, 10);
+    expect(overview.ltf?.rsi30m).toBeCloseTo(expectedRsi30, 10);
+
+    const trend10 = computeTrendFrame(closes10, 12, 48, [12, 48]);
+    const trend30 = computeTrendFrame(closes30, 6, 24, [6, 24]);
+    expect(overview.ltf?.slope10m).toBe(trend10.slope);
+    expect(overview.ltf?.slope30m).toBe(trend30.slope);
+
+    const slopeScore = (slope: 'up' | 'flat' | 'down', weight: number) => {
+      if (slope === 'up') return weight;
+      if (slope === 'down') return -weight;
+      return 0;
+    };
+    const contributions = [
+      slopeScore(overview.trendSlope, 1),
+      slopeScore(overview.htf.trend['4h'].slope, 1),
+      slopeScore(overview.ltf?.slope10m ?? 'flat', 0.5),
+      slopeScore(overview.ltf?.slope30m ?? 'flat', 0.5),
+    ];
+    const expectedAlignment =
+      contributions.reduce((sum, value) => sum + value, 0) / contributions.length;
+    expect(overview.ltf?.alignmentScore).toBeCloseTo(expectedAlignment, 10);
   });
 
   it('caches token overviews to avoid duplicate fetches within the TTL', async () => {
@@ -479,6 +667,18 @@ describe('fetchMarketOverview', () => {
           volumeStart: 200,
           volumeStep: 1,
         }),
+        '10m': buildKlines(64, {
+          closeStart: 60,
+          closeStep: 0.2,
+          volumeStart: 250,
+          volumeStep: 2,
+        }),
+        '30m': buildKlines(40, {
+          closeStart: 70,
+          closeStep: 0.3,
+          volumeStart: 220,
+          volumeStep: 2,
+        }),
       },
       BTCUSDT: {
         '1h': buildKlines(HOUR_LIMIT, {
@@ -503,6 +703,18 @@ describe('fetchMarketOverview', () => {
           closeStart: 380,
           closeStep: 0.25,
           volumeStart: 300,
+          volumeStep: 1,
+        }),
+        '10m': buildKlines(64, {
+          closeStart: 305,
+          closeStep: 0.1,
+          volumeStart: 600,
+          volumeStep: 1,
+        }),
+        '30m': buildKlines(40, {
+          closeStart: 310,
+          closeStep: 0.15,
+          volumeStart: 550,
           volumeStep: 1,
         }),
       },
@@ -547,16 +759,30 @@ describe('fetchMarketOverview', () => {
     });
     vi.stubGlobal('fetch', fetchStub);
 
-    await fetchMarketOverview(['SOL']);
+    await fetchMarketOverview(['SOL'], { decisionInterval: 'PT30M' });
     expect(pairMock).toHaveBeenCalledTimes(2);
     expect(fetchStub).toHaveBeenCalled();
 
     pairMock.mockClear();
     fetchStub.mockClear();
 
-    await fetchMarketOverview(['SOL']);
+    await fetchMarketOverview(['SOL'], { decisionInterval: 'PT30M' });
 
     expect(pairMock).not.toHaveBeenCalled();
     expect(fetchStub).not.toHaveBeenCalled();
+
+    await fetchMarketOverview(['SOL'], { decisionInterval: 'PT1H' });
+    expect(pairMock).toHaveBeenCalled();
+    expect(fetchStub).toHaveBeenCalled();
+
+    pairMock.mockClear();
+    fetchStub.mockClear();
+
+    await fetchMarketOverview(['SOL'], {
+      decisionInterval: 'PT1H',
+      ltfFrames: ['10m'],
+    });
+    expect(pairMock).toHaveBeenCalled();
+    expect(fetchStub).toHaveBeenCalled();
   });
 });

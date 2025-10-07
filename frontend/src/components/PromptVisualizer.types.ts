@@ -73,7 +73,7 @@ export interface PromptMarketOverview {
   asOf?: string;
   timeframe?: {
     candleInterval?: string;
-    reviewInterval?: string;
+    decisionInterval?: string;
     semantics?: string;
   };
   marketOverview?: Record<string, PromptMarketOverviewAsset>;
