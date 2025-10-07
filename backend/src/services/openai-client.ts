@@ -5,9 +5,17 @@ import type {
 } from './openai-client.types.js';
 
 const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
+const RETRYABLE_STATUS = 502;
+const RETRY_DELAY_MS = 2_000;
 
 interface OpenAiModel {
   id: string;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 export async function callAi(
@@ -32,17 +40,25 @@ export async function callAi(
     },
   };
   if (webSearch) body.tools = [{ type: 'web_search_preview' }];
-  const res = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: compactJson(body),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`AI request failed: ${res.status} ${text}`);
-  return text;
+  let attempt = 0;
+  while (true) {
+    const res = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: compactJson(body),
+    });
+    const text = await res.text();
+    if (res.ok) return text;
+    if (res.status === RETRYABLE_STATUS && attempt === 0) {
+      attempt += 1;
+      await delay(RETRY_DELAY_MS);
+      continue;
+    }
+    throw new Error(`AI request failed: ${res.status} ${text}`);
+  }
 }
 
 export function compactJson(value: unknown): string {
