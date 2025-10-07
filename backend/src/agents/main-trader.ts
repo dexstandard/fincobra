@@ -5,6 +5,7 @@ import { isStablecoin } from '../util/tokens.js';
 import {
   fetchMarketOverview,
   createEmptyMarketOverview,
+  clearMarketOverviewCache,
 } from '../services/indicators.js';
 import { fetchFearGreedIndex } from '../services/sentiment.js';
 import {
@@ -248,6 +249,12 @@ async function getNewsContextWithCache(
 export function __resetNewsContextCacheForTest(): void {
   newsContextCache.flushAll();
   pendingNewsContexts.clear();
+}
+
+export function clearMainTraderCaches(): void {
+  newsContextCache.flushAll();
+  pendingNewsContexts.clear();
+  clearMarketOverviewCache();
 }
 
 function createEmptyNewsContext(): NewsContext {

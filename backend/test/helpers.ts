@@ -10,6 +10,7 @@ export function mockLogger(): FastifyBaseLogger {
   const log = {
     info: () => {},
     error: () => {},
+    warn: () => {},
     child: () => log,
   } as unknown as FastifyBaseLogger;
   return log;

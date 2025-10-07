@@ -10,6 +10,13 @@ import {
 } from './binance-client.js';
 import { TOKEN_SYMBOLS } from '../util/tokens.js';
 
+interface CreateDecisionLimitOrdersResult {
+  placed: number;
+  canceled: number;
+  priceDivergenceCancellations: number;
+  needsPriceDivergenceRetry: boolean;
+}
+
 const TOKEN_SYMBOLS_BY_LENGTH = [...TOKEN_SYMBOLS].sort(
   (a, b) => b.length - a.length,
 );
@@ -117,7 +124,13 @@ export async function createDecisionLimitOrders(opts: {
   orders: (MainTraderOrder & { manuallyEdited?: boolean })[];
   reviewResultId: string;
   log: FastifyBaseLogger;
-}) {
+}): Promise<CreateDecisionLimitOrdersResult> {
+  const result: CreateDecisionLimitOrdersResult = {
+    placed: 0,
+    canceled: 0,
+    priceDivergenceCancellations: 0,
+    needsPriceDivergenceRetry: false,
+  };
   for (const o of opts.orders) {
     const [a, b] = splitPair(o.pair);
     if (!a || !b) continue;
@@ -149,6 +162,7 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: `Invalid order side: ${requestedSide}`,
       });
+      result.canceled += 1;
       continue;
     }
 
@@ -163,6 +177,7 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: `Malformed qty: ${o.qty}`,
       });
+      result.canceled += 1;
       continue;
     }
 
@@ -175,6 +190,7 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: `Malformed basePrice: ${o.basePrice}`,
       });
+      result.canceled += 1;
       continue;
     }
 
@@ -187,6 +203,7 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: `Malformed limitPrice: ${o.limitPrice}`,
       });
+      result.canceled += 1;
       continue;
     }
 
@@ -202,6 +219,7 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: `Malformed maxPriceDriftPct: ${o.maxPriceDriftPct}`,
       });
+      result.canceled += 1;
       continue;
     }
 
@@ -223,6 +241,8 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: 'price divergence too high',
       });
+      result.canceled += 1;
+      result.priceDivergenceCancellations += 1;
       continue;
     }
 
@@ -250,6 +270,7 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: `Malformed adjusted limitPrice: ${adjustedLimit}`,
       });
+      result.canceled += 1;
       continue;
     }
 
@@ -322,6 +343,7 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: 'order below min notional',
       });
+      result.canceled += 1;
       continue;
     }
 
@@ -336,6 +358,7 @@ export async function createDecisionLimitOrders(opts: {
           orderId: String(Date.now()),
           cancellationReason: 'order id missing',
         });
+        result.canceled += 1;
         continue;
       }
       await insertLimitOrder({
@@ -345,6 +368,7 @@ export async function createDecisionLimitOrders(opts: {
         reviewResultId: opts.reviewResultId,
         orderId: String(res.orderId),
       });
+      result.placed += 1;
       opts.log.info(
         { step: 'createLimitOrder', orderId: res.orderId },
         'step success',
@@ -361,7 +385,11 @@ export async function createDecisionLimitOrders(opts: {
         orderId: String(Date.now()),
         cancellationReason: reason,
       });
+      result.canceled += 1;
       opts.log.error({ err, step: 'createLimitOrder' }, 'step failed');
     }
   }
+  result.needsPriceDivergenceRetry =
+    result.priceDivergenceCancellations > 0 && result.placed === 0;
+  return result;
 }

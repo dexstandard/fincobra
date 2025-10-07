@@ -7,6 +7,7 @@ import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types
 import {
   run as runMainTrader,
   collectPromptData,
+  clearMainTraderCaches,
 } from '../agents/main-trader.js';
 import type { MainTraderDecision } from '../agents/main-trader.types.js';
 import { insertReviewRawLog } from '../repos/review-raw-log.js';
@@ -25,6 +26,8 @@ import { randomUUID } from 'crypto';
 
 /** Workflows currently running. Used to avoid concurrent runs. */
 const runningWorkflows = new Set<string>();
+
+const PRICE_DIVERGENCE_RETRY_LIMIT = 1;
 
 export function removeWorkflowFromSchedule(id: string): boolean {
   return runningWorkflows.delete(id);
@@ -135,14 +138,58 @@ function buildReviewResultEntry({
   };
 }
 
+interface WorkflowAttemptResult {
+  kind: 'success' | 'retry' | 'error';
+  canceledOrders?: number;
+}
+
 export async function executeWorkflow(
   wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ) {
   const execLogId = randomUUID();
-  const runLog = log.child({ execLogId });
-  runLog.info('workflow run start');
+  const baseLog = log.child({ execLogId });
+  let lastRetry: WorkflowAttemptResult | null = null;
 
+  let attempt = 0;
+  while (attempt <= PRICE_DIVERGENCE_RETRY_LIMIT) {
+    const attemptLog =
+      attempt === 0 ? baseLog : baseLog.child({ attempt: attempt + 1 });
+    if (attempt === 0) {
+      attemptLog.info('workflow run start');
+    } else {
+      attemptLog.info(
+        { attempt: attempt + 1 },
+        'retrying workflow run after price divergence',
+      );
+      clearMainTraderCaches();
+    }
+
+    const result = await runWorkflowAttempt(wf, attemptLog);
+    if (result.kind === 'success') {
+      return;
+    }
+    if (result.kind === 'retry') {
+      lastRetry = result;
+      attempt += 1;
+      continue;
+    }
+    return;
+  }
+
+  baseLog.error(
+    {
+      attempts: PRICE_DIVERGENCE_RETRY_LIMIT + 1,
+      canceledOrders: lastRetry?.canceledOrders ?? 0,
+    },
+    'workflow run failed: price divergence retry limit reached',
+  );
+}
+
+async function runWorkflowAttempt(
+  wf: ActivePortfolioWorkflow,
+  runLog: FastifyBaseLogger,
+): Promise<WorkflowAttemptResult> {
   const runStep = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
     runLog.info({ step: name }, 'step start');
     try {
@@ -161,11 +208,11 @@ export async function executeWorkflow(
 
     if (!wf.aiApiKeyEnc) {
       runLog.error('workflow run failed: missing AI API key');
-      return;
+      return { kind: 'error' };
     }
     if (!wf.model) {
       runLog.error('workflow run failed: missing model');
-      return;
+      return { kind: 'error' };
     }
 
     const key = decrypt(wf.aiApiKeyEnc, env.KEY_PASSWORD);
@@ -175,7 +222,7 @@ export async function executeWorkflow(
     );
     if (!prompt) {
       runLog.error('workflow run failed: could not collect prompt data');
-      return;
+      return { kind: 'error' };
     }
 
     const params = {
@@ -215,19 +262,33 @@ export async function executeWorkflow(
       !wf.manualRebalance &&
       decision.orders.length
     ) {
-      await createDecisionLimitOrders({
+      const orderResult = await createDecisionLimitOrders({
         userId: wf.userId,
         orders: decision.orders,
         reviewResultId: resultId,
         log: runLog,
       });
+      if (orderResult.needsPriceDivergenceRetry) {
+        runLog.warn(
+          {
+            canceledOrders: orderResult.priceDivergenceCancellations,
+          },
+          'orders canceled due to price divergence',
+        );
+        return {
+          kind: 'retry',
+          canceledOrders: orderResult.priceDivergenceCancellations,
+        };
+      }
     }
     runLog.info('workflow run complete');
+    return { kind: 'success' };
   } catch (err) {
     if (prompt) {
       await saveFailure(wf, String(err), prompt);
     }
     runLog.error({ err }, 'workflow run failed');
+    return { kind: 'error' };
   }
 }
 
