@@ -157,6 +157,7 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.startBalanceUsd).toBe(20000);
     expect(prompt?.portfolio.startBalanceTs).toBe('2025-01-01T00:00:00.000Z');
     expect(prompt?.portfolio.pnlUsd).toBeCloseTo(1000);
+    expect(prompt?.portfolio.pnlPct).toBeCloseTo(0.05);
     expect(prompt?.reviewInterval).toBe('PT1H');
     expect(prompt).not.toHaveProperty('instructions');
   });

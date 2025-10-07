@@ -434,6 +434,9 @@ export async function collectPromptData(
     portfolio.startBalanceUsd = row.startBalance;
     portfolio.startBalanceTs = row.createdAt;
     portfolio.pnlUsd = totalValue - row.startBalance;
+    if (row.startBalance !== 0) {
+      portfolio.pnlPct = portfolio.pnlUsd / row.startBalance;
+    }
   }
 
   const prevRows = await getRecentReviewResults(row.id, 3);

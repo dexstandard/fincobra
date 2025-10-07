@@ -40,6 +40,42 @@ function toOrder(value: unknown): ResponseOrder | null {
   return Object.keys(order).length > 0 ? order : null;
 }
 
+function toErrorMessage(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (isRecord(value)) {
+    if (typeof (value as { message?: unknown }).message === 'string') {
+      return String((value as { message: string }).message);
+    }
+    if (typeof (value as { error?: unknown }).error === 'string') {
+      return String((value as { error: string }).error);
+    }
+  }
+  return null;
+}
+
+function toErrorMessages(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => toErrorMessage(item) ?? (typeof item === 'string' ? item : null))
+      .filter((msg): msg is string => Boolean(msg));
+  }
+  if (isRecord(value)) {
+    const direct = toErrorMessage(value);
+    if (direct) return [direct];
+    const entries = Object.entries(value)
+      .map(([key, val]) => {
+        const message = toErrorMessage(val) ?? (typeof val === 'string' ? val : null);
+        return message ? `${key}: ${message}` : null;
+      })
+      .filter((msg): msg is string => Boolean(msg));
+    return entries;
+  }
+  if (typeof value === 'string') return [value];
+  return [];
+}
+
 function toResponseData(value: unknown): ResponseData | null {
   if (!value) return null;
   if (isRecord(value) && 'result' in value) {
@@ -55,6 +91,9 @@ function toResponseData(value: unknown): ResponseData | null {
   const ordersValue = Array.isArray(value.orders)
     ? (value.orders.map(toOrder).filter(Boolean) as ResponseOrder[])
     : [];
+
+  const errorMessage = toErrorMessage(value.error);
+  const errorsList = toErrorMessages((value as { errors?: unknown }).errors);
 
   let shortReport: string | undefined;
   if (typeof value.shortReport === 'string') shortReport = value.shortReport;
@@ -100,7 +139,15 @@ function toResponseData(value: unknown): ResponseData | null {
     rebalance = ordersValue.length > 0;
   }
 
-  if (rebalance === undefined && shortReport === undefined && ordersValue.length === 0) {
+  if (
+    rebalance === undefined &&
+    shortReport === undefined &&
+    ordersValue.length === 0 &&
+    !errorMessage &&
+    errorsList.length === 0 &&
+    !strategyName &&
+    !strategyRationale
+  ) {
     return null;
   }
 
@@ -109,6 +156,8 @@ function toResponseData(value: unknown): ResponseData | null {
     ...(shortReport ? { shortReport } : {}),
     ...(strategyName ? { strategyName } : {}),
     ...(strategyRationale ? { strategyRationale } : {}),
+    ...(errorMessage ? { error: errorMessage } : {}),
+    ...(errorsList.length > 0 ? { errors: errorsList } : {}),
     orders: ordersValue,
   };
 }

@@ -14,4 +14,6 @@ export interface ResponseData {
   strategyName?: string;
   strategyRationale?: string;
   orders: ResponseOrder[];
+  error?: string;
+  errors?: string[];
 }
