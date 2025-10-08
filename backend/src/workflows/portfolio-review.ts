@@ -126,13 +126,14 @@ function buildReviewResultEntry({
   validationError?: string;
 }): ReviewResultInsert {
   const ok = !!decision && !validationError;
+  const orders = decision?.orders ?? [];
 
   return {
     portfolioWorkflowId: workflowId,
     log: decision ? JSON.stringify(decision) : '',
     rawLogId: logId,
-    rebalance: ok ? decision.orders.length > 0 : false,
-    ...(ok
+    rebalance: ok ? orders.length > 0 : false,
+    ...(ok && decision
       ? { shortReport: decision.shortReport }
       : { error: { message: validationError ?? 'decision unavailable' } }),
   };
@@ -234,6 +235,19 @@ async function runWorkflowAttempt(
     const decision = await runStep('runMainTrader', () =>
       runMainTrader(params, prompt!, wf.agentInstructions),
     );
+    const normalizedDecision =
+      decision && !Array.isArray(decision.orders)
+        ? {
+            ...decision,
+            orders: [],
+          }
+        : decision;
+    if (decision && !Array.isArray(decision.orders)) {
+      runLog.info(
+        { response: decision },
+        'ai decision missing orders; treating as hold',
+      );
+    }
     const logId = await runStep('insertReviewRawLog', () =>
       insertReviewRawLog({
         portfolioWorkflowId: wf.id,
@@ -242,29 +256,30 @@ async function runWorkflowAttempt(
       }),
     );
     const validationError = validateExecResponse(
-      decision ?? undefined,
+      normalizedDecision ?? undefined,
       prompt!.portfolio.positions.map((p) => p.sym),
     );
     if (validationError)
       runLog.error({ err: validationError }, 'validation failed');
     const resultEntry = buildReviewResultEntry({
       workflowId: wf.id,
-      decision,
+      decision: normalizedDecision,
       logId,
       validationError,
     });
     const resultId = await runStep('insertReviewResult', () =>
       insertReviewResult(resultEntry),
     );
+    const normalizedOrders = normalizedDecision?.orders ?? [];
     if (
-      decision &&
+      normalizedDecision &&
       !validationError &&
       !wf.manualRebalance &&
-      decision.orders.length
+      normalizedOrders.length
     ) {
       const orderResult = await createDecisionLimitOrders({
         userId: wf.userId,
-        orders: decision.orders,
+        orders: normalizedOrders,
         reviewResultId: resultId,
         log: runLog,
       });
