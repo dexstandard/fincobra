@@ -110,13 +110,24 @@ export function parseExecLog(log: unknown): ParsedExecLog {
                 const orders = Array.isArray(ordersValue)
                   ? ordersValue.filter(isExecOrder)
                   : [];
-                response = {
-                  orders,
-                  shortReport:
-                    typeof result.shortReport === 'string'
-                      ? result.shortReport
-                      : '',
-                };
+                const shortReportValue =
+                  typeof result.shortReport === 'string'
+                    ? result.shortReport
+                    : typeof (result as { short_report?: unknown }).short_report ===
+                        'string'
+                      ? String((result as { short_report: string }).short_report)
+                      : undefined;
+                if (typeof shortReportValue === 'string') {
+                  response = {
+                    orders,
+                    shortReport: shortReportValue,
+                  };
+                } else {
+                  error = {
+                    message: 'AI response missing shortReport',
+                    response: result,
+                  };
+                }
               }
             }
           }
