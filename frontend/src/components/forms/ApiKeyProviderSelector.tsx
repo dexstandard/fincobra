@@ -50,6 +50,22 @@ const exchangeConfigs: ProviderConfig[] = [
       />
     ),
   },
+  {
+    value: 'bybit',
+    label: 'Bybit',
+    queryKey: 'bybit-key',
+    getKeyPath: (id) => `/users/${id}/bybit-key`,
+    renderForm: () => (
+      <ExchangeApiKeySection
+        exchange="bybit"
+        label={
+          <>
+            Bybit API <span className="hidden sm:inline">Credentials</span>
+          </>
+        }
+      />
+    ),
+  },
 ];
 
 interface Props {

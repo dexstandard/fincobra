@@ -6,7 +6,10 @@ import { insertAdminUser, insertUser } from './repos/users.js';
 import { getUser } from '../src/repos/users.js';
 import { authCookies } from './helpers.js';
 import { setAiKey } from '../src/repos/ai-api-key.js';
-import { setBinanceKey } from '../src/repos/exchange-api-keys.js';
+import {
+  setBinanceKey,
+  setBybitKey,
+} from '../src/repos/exchange-api-keys.js';
 
 describe('admin user routes', () => {
   it('lists users for admin only', async () => {
@@ -29,6 +32,11 @@ describe('admin user routes', () => {
       apiKeyEnc: encrypt('binance-key', env.KEY_PASSWORD),
       apiSecretEnc: encrypt('binance-secret', env.KEY_PASSWORD),
     });
+    await setBybitKey({
+      userId,
+      apiKeyEnc: encrypt('bybit-key', env.KEY_PASSWORD),
+      apiSecretEnc: encrypt('bybit-secret', env.KEY_PASSWORD),
+    });
 
     const resForbidden = await app.inject({
       method: 'GET',
@@ -49,9 +57,11 @@ describe('admin user routes', () => {
     expect(typeof user.createdAt).toBe('string');
     expect(user.hasAiKey).toBe(true);
     expect(user.hasBinanceKey).toBe(true);
+    expect(user.hasBybitKey).toBe(true);
     const admin = body.find((u) => u.id === adminId);
     expect(admin.hasAiKey).toBe(false);
     expect(admin.hasBinanceKey).toBe(false);
+    expect(admin.hasBybitKey).toBe(false);
     await app.close();
   });
 

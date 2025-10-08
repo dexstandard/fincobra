@@ -11,6 +11,7 @@ interface AdminUser {
   isEnabled: boolean;
   hasAiKey: boolean;
   hasBinanceKey: boolean;
+  hasBybitKey: boolean;
 }
 
 export default function Users() {
@@ -50,6 +51,7 @@ export default function Users() {
             <th className="text-left">Role</th>
             <th className="text-left">OpenAI Key</th>
             <th className="text-left">Binance Key</th>
+            <th className="text-left">Bybit Key</th>
             <th className="text-left">Created</th>
             <th className="text-left">Enabled</th>
           </tr>
@@ -62,6 +64,7 @@ export default function Users() {
               <td>{u.role}</td>
               <td>{u.hasAiKey ? 'Yes' : 'No'}</td>
               <td>{u.hasBinanceKey ? 'Yes' : 'No'}</td>
+              <td>{u.hasBybitKey ? 'Yes' : 'No'}</td>
               <td>
                 <FormattedDate date={u.createdAt} />
               </td>

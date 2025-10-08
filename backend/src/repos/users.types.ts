@@ -23,4 +23,5 @@ export interface UserListEntry {
   createdAt: string;
   hasAiKey: boolean;
   hasBinanceKey: boolean;
+  hasBybitKey: boolean;
 }

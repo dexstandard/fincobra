@@ -12,6 +12,7 @@ import { insertUser } from './repos/users.js';
 import {
   getBinanceKey,
   setBinanceKey,
+  getBybitKey,
 } from '../src/repos/exchange-api-keys.js';
 import { setAiKey } from '../src/repos/ai-api-key.js';
 import {
@@ -164,6 +165,134 @@ describe('Exchange API key routes', () => {
     res = await app.inject({
       method: 'GET',
       url: `/api/users/${userId}/binance-key`,
+      cookies: authCookies(userId),
+    });
+    expect(res.statusCode).toBe(404);
+
+    await app.close();
+    (globalThis as any).fetch = originalFetch;
+  });
+
+  it('performs CRUD operations for bybit keys', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('22');
+
+    const fetchMock = vi.fn();
+    const originalFetch = globalThis.fetch;
+    (globalThis as any).fetch = fetchMock;
+
+    const k = (c: string) => c.repeat(64);
+    const badKey = k('I');
+    const badSecret = k('j');
+    const key1 = k('K');
+    const secret1 = k('l');
+    const key2 = k('M');
+    const secret2 = k('n');
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ retMsg: 'Invalid signature' }),
+    } as any);
+
+    let res = await app.inject({
+      method: 'POST',
+      url: `/api/users/${userId}/bybit-key`,
+      cookies: authCookies(userId),
+      payload: { key: badKey, secret: badSecret },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      error: 'verification failed: Invalid signature',
+    });
+
+    let bybitKey = await getBybitKey(userId);
+    expect(bybitKey).toBeNull();
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ retCode: 0 }),
+    } as any);
+
+    res = await app.inject({
+      method: 'POST',
+      url: `/api/users/${userId}/bybit-key`,
+      cookies: authCookies(userId),
+      payload: { key: key1, secret: secret1 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      key: '<REDACTED>',
+      secret: '<REDACTED>',
+    });
+
+    bybitKey = await getBybitKey(userId);
+    expect(bybitKey).not.toBeNull();
+    if (!bybitKey) throw new Error('bybit key missing');
+    expect(bybitKey.apiKeyEnc).not.toBe(key1);
+    expect(bybitKey.apiSecretEnc).not.toBe(secret1);
+
+    res = await app.inject({
+      method: 'GET',
+      url: `/api/users/${userId}/bybit-key`,
+      cookies: authCookies(userId),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      key: '<REDACTED>',
+      secret: '<REDACTED>',
+    });
+
+    res = await app.inject({
+      method: 'POST',
+      url: `/api/users/${userId}/bybit-key`,
+      cookies: authCookies(userId),
+      payload: { key: k('O'), secret: k('p') },
+    });
+    expect(res.statusCode).toBe(409);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ retCode: 10003, retMsg: 'Permission denied' }),
+    } as any);
+
+    res = await app.inject({
+      method: 'PUT',
+      url: `/api/users/${userId}/bybit-key`,
+      cookies: authCookies(userId),
+      payload: { key: badKey, secret: badSecret },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      error: 'verification failed: Permission denied',
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ retCode: 0 }),
+    } as any);
+
+    res = await app.inject({
+      method: 'PUT',
+      url: `/api/users/${userId}/bybit-key`,
+      cookies: authCookies(userId),
+      payload: { key: key2, secret: secret2 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      key: '<REDACTED>',
+      secret: '<REDACTED>',
+    });
+
+    res = await app.inject({
+      method: 'DELETE',
+      url: `/api/users/${userId}/bybit-key`,
+      cookies: authCookies(userId),
+    });
+    expect(res.statusCode).toBe(200);
+
+    res = await app.inject({
+      method: 'GET',
+      url: `/api/users/${userId}/bybit-key`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(404);
