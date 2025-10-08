@@ -11,7 +11,15 @@ import {
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
 import { errorResponse, lengthMessage } from '../util/error-messages.js';
 import type { ErrorResponse } from '../util/error-messages.types.js';
-import { fetchTokensBalanceUsd } from './binance-client.js';
+import {
+  fetchPairInfo,
+  fetchTokensBalanceUsd,
+  isInvalidSymbolError,
+} from './binance-client.js';
+
+function normalizeTokenSymbol(token: string): string {
+  return token.trim().toUpperCase();
+}
 
 function validateAllocations(tokens: PortfolioWorkflowTokenInput[]) {
   let total = 0;
@@ -22,6 +30,32 @@ function validateAllocations(tokens: PortfolioWorkflowTokenInput[]) {
   }
   if (total > 95) throw new Error('invalid minimum allocations');
   return tokens;
+}
+
+export async function validateTradingPairs(
+  log: FastifyBaseLogger,
+  cash: string,
+  tokens: string[],
+): Promise<ValidationErr | null> {
+  for (const token of tokens) {
+    try {
+      await fetchPairInfo(token, cash);
+    } catch (err) {
+      if (isInvalidSymbolError(err)) {
+        log.error({ token, cash }, 'unsupported trading pair');
+        return {
+          code: 400,
+          body: errorResponse(`unsupported trading pair: ${token}/${cash}`),
+        };
+      }
+      log.error({ err, token, cash }, 'failed to validate trading pair');
+      return {
+        code: 502,
+        body: errorResponse('failed to validate trading pair'),
+      };
+    }
+  }
+  return null;
 }
 
 export enum PortfolioWorkflowStatus {
@@ -172,7 +206,12 @@ export async function preparePortfolioWorkflowForUpsert(
   try {
     body.manualRebalance = !!body.manualRebalance;
     body.useEarn = body.useEarn === true;
-    body.tokens = validateAllocations(body.tokens);
+    body.tokens = validateAllocations(
+      body.tokens.map((t) => ({
+        token: normalizeTokenSymbol(t.token),
+        minAllocation: t.minAllocation,
+      })),
+    );
   } catch {
     log.error('invalid allocations');
     return { code: 400, body: errorResponse('invalid minimum allocations') };
@@ -181,6 +220,12 @@ export async function preparePortfolioWorkflowForUpsert(
   if (err) return err;
   let startBalance: number | null = null;
   if (body.status === PortfolioWorkflowStatus.Active) {
+    const pairErr = await validateTradingPairs(
+      log,
+      body.cash,
+      body.tokens.map((t) => t.token),
+    );
+    if (pairErr) return pairErr;
     const keyErr = await ensureApiKeys(log, userId);
     if (keyErr) return keyErr;
     const bal = await getStartBalance(log, userId, [

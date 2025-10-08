@@ -8,33 +8,92 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
   reviewWorkflowPortfolio: reviewWorkflowPortfolioMock,
 }));
 
+vi.mock('../src/util/output-ip.js', () => ({
+  fetchOutputIp: vi.fn().mockResolvedValue('127.0.0.1'),
+}));
+
 import buildServer from '../src/server.js';
 import { authCookies } from './helpers.js';
 import { db } from '../src/db/index.js';
+
+function toUrl(input: unknown): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  if (input && typeof input === 'object' && 'url' in input) {
+    return String((input as { url: unknown }).url);
+  }
+  return String(input);
+}
+
+function mockExchangeInfo(symbol: string, base: string, quote: string) {
+  return {
+    ok: true,
+    json: async () => ({
+      symbols: [
+        {
+          symbol,
+          baseAsset: base,
+          quoteAsset: quote,
+          filters: [
+            { filterType: 'LOT_SIZE', stepSize: '0.0001' },
+            { filterType: 'PRICE_FILTER', tickSize: '0.01' },
+            { filterType: 'MIN_NOTIONAL', minNotional: '10' },
+          ],
+        },
+      ],
+    }),
+  } as any;
+}
+
+function mockInvalidSymbolResponse() {
+  return {
+    ok: false,
+    text: async () => JSON.stringify({ code: -1121, msg: 'Invalid symbol.' }),
+  } as any;
+}
+
+function mockAccountResponse(
+  balances: Array<{ asset: string; free: string; locked: string }>,
+) {
+  return {
+    ok: true,
+    json: async () => ({ balances }),
+  } as any;
+}
+
+function mockPriceResponse(price: string) {
+  return {
+    ok: true,
+    json: async () => ({ price }),
+  } as any;
+}
 
 describe('portfolio workflow creation', () => {
   it('does not await initial review', async () => {
     const app = await buildServer();
     const userId = await insertUserWithKeys('1');
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          balances: [
-            { asset: 'BTC', free: '1', locked: '0' },
-            { asset: 'ETH', free: '1', locked: '0' },
-          ],
-        }),
-      } as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ price: '60' }),
-      } as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ price: '40' }),
-      } as any);
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = toUrl(input);
+      if (url.includes('/exchangeInfo?symbol=BTCUSDT')) {
+        return mockExchangeInfo('BTCUSDT', 'BTC', 'USDT');
+      }
+      if (url.includes('/exchangeInfo?symbol=ETHUSDT')) {
+        return mockExchangeInfo('ETHUSDT', 'ETH', 'USDT');
+      }
+      if (url.includes('/api/v3/account')) {
+        return mockAccountResponse([
+          { asset: 'BTC', free: '1', locked: '0' },
+          { asset: 'ETH', free: '1', locked: '0' },
+        ]);
+      }
+      if (url.includes('/ticker/price?symbol=BTCUSDT')) {
+        return mockPriceResponse('60');
+      }
+      if (url.includes('/ticker/price?symbol=ETHUSDT')) {
+        return mockPriceResponse('40');
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
 
@@ -81,9 +140,9 @@ describe('portfolio workflow creation', () => {
     const payload = {
       model: 'm',
       tokens: [
-        { token: 'BTC', minAllocation: 30 },
-        { token: 'ETH', minAllocation: 30 },
-        { token: 'BNB', minAllocation: 35 },
+        { token: 'btc', minAllocation: 30 },
+        { token: 'eth', minAllocation: 30 },
+        { token: 'bnb', minAllocation: 35 },
       ],
       risk: 'low',
       reviewInterval: '1h',
@@ -116,25 +175,28 @@ describe('portfolio workflow creation', () => {
     const app = await buildServer();
     const userId = await insertUserWithKeys('3');
 
-    const fetchMock = vi.fn();
-    fetchMock
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          balances: [
-            { asset: 'BTC', free: '1', locked: '0' },
-            { asset: 'ETH', free: '1', locked: '0' },
-          ],
-        }),
-      } as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ price: '60' }),
-      } as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ price: '40' }),
-      } as any);
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = toUrl(input);
+      if (url.includes('/exchangeInfo?symbol=BTCUSDT')) {
+        return mockExchangeInfo('BTCUSDT', 'BTC', 'USDT');
+      }
+      if (url.includes('/exchangeInfo?symbol=ETHUSDT')) {
+        return mockExchangeInfo('ETHUSDT', 'ETH', 'USDT');
+      }
+      if (url.includes('/api/v3/account')) {
+        return mockAccountResponse([
+          { asset: 'BTC', free: '1', locked: '0' },
+          { asset: 'ETH', free: '1', locked: '0' },
+        ]);
+      }
+      if (url.includes('/ticker/price?symbol=BTCUSDT')) {
+        return mockPriceResponse('60');
+      }
+      if (url.includes('/ticker/price?symbol=ETHUSDT')) {
+        return mockPriceResponse('40');
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
 
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
@@ -188,16 +250,22 @@ describe('portfolio workflow creation', () => {
     const app = await buildServer();
     const userId = await insertUserWithKeys('4');
 
-    const fetchMock = vi.fn();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        balances: [
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = toUrl(input);
+      if (url.includes('/exchangeInfo?symbol=USDTUSDC')) {
+        return mockInvalidSymbolResponse();
+      }
+      if (url.includes('/exchangeInfo?symbol=USDCUSDT')) {
+        return mockExchangeInfo('USDCUSDT', 'USDC', 'USDT');
+      }
+      if (url.includes('/api/v3/account')) {
+        return mockAccountResponse([
           { asset: 'USDC', free: '100', locked: '0' },
           { asset: 'USDT', free: '50', locked: '0' },
-        ],
-      }),
-    } as any);
+        ]);
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
 
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
@@ -239,6 +307,49 @@ describe('portfolio workflow creation', () => {
         error: `token USDT used by workflow ${firstId} already used`,
       });
       expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as any).fetch = originalFetch;
+      await app.close();
+    }
+  });
+
+  it('rejects tokens without matching cash trading pair', async () => {
+    const app = await buildServer();
+    const userId = await insertUserWithKeys('5');
+
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = toUrl(input);
+      if (
+        url.includes('/exchangeInfo?symbol=DOGEUSDC') ||
+        url.includes('/exchangeInfo?symbol=USDCDOGE')
+      ) {
+        return mockInvalidSymbolResponse();
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+
+    const originalFetch = globalThis.fetch;
+    (globalThis as any).fetch = fetchMock;
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/portfolio-workflows',
+        cookies: authCookies(userId),
+        payload: {
+          model: 'm',
+          tokens: [{ token: 'DOGE', minAllocation: 10 }],
+          risk: 'low',
+          reviewInterval: '1h',
+          agentInstructions: 'prompt',
+          cash: 'USDC',
+          status: 'active',
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({
+        error: 'unsupported trading pair: DOGE/USDC',
+      });
     } finally {
       (globalThis as any).fetch = originalFetch;
       await app.close();

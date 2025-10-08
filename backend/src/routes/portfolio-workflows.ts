@@ -29,6 +29,7 @@ import {
   PortfolioWorkflowStatus,
   preparePortfolioWorkflowForUpsert,
   validateTokenConflicts,
+  validateTradingPairs,
   ensureApiKeys,
   getStartBalance,
 } from '../services/portfolio-workflows.js';
@@ -807,6 +808,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('model required'));
       }
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
+      const pairErr = await validateTradingPairs(
+        log,
+        existing.cashToken,
+        tokens,
+      );
+      if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
       const conflict = await validateTokenConflicts(log, userId, tokens, id);
       if (conflict) return reply.code(conflict.code).send(conflict.body);
       const keyErr = await ensureApiKeys(log, userId);

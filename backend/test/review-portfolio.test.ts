@@ -56,6 +56,11 @@ vi.mock('../src/services/binance-client.js', () => ({
   cancelOrder: vi.fn().mockResolvedValue(undefined),
   parseBinanceError: vi.fn().mockReturnValue({}),
   fetchOrder: vi.fn().mockResolvedValue(undefined),
+  isInvalidSymbolError: vi
+    .fn((err: unknown) =>
+      err instanceof Error && /Invalid symbol/i.test(err.message),
+    )
+    .mockName('isInvalidSymbolError'),
 }));
 
 vi.mock('../src/services/sentiment.js', () => ({

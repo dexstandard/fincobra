@@ -111,6 +111,11 @@ vi.mock('../src/services/binance-client.js', () => ({
   cancelOrder,
   parseBinanceError,
   fetchOrder,
+  isInvalidSymbolError: vi
+    .fn((err: unknown) =>
+      err instanceof Error && /Invalid symbol/i.test(err.message),
+    )
+    .mockName('isInvalidSymbolError'),
 }));
 
 vi.mock('../src/services/indicators.js', () => ({

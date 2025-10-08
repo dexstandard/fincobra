@@ -28,6 +28,11 @@ vi.mock('../src/services/binance-client.js', () => ({
   }),
   createLimitOrder: vi.fn().mockResolvedValue({ orderId: 1 }),
   fetchOrder: vi.fn().mockResolvedValue(undefined),
+  isInvalidSymbolError: vi
+    .fn((err: unknown) =>
+      err instanceof Error && /Invalid symbol/i.test(err.message),
+    )
+    .mockName('isInvalidSymbolError'),
 }));
 
 import { createDecisionLimitOrders } from '../src/services/rebalance.js';

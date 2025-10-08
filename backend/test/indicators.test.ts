@@ -12,6 +12,11 @@ vi.mock('../src/services/binance-client.js', () => ({
   fetchPairData: vi.fn(),
   fetchPairInfo: vi.fn().mockResolvedValue({ minNotional: 0 }),
   fetchOrder: vi.fn().mockResolvedValue(undefined),
+  isInvalidSymbolError: vi
+    .fn((err: unknown) =>
+      err instanceof Error && /Invalid symbol/i.test(err.message),
+    )
+    .mockName('isInvalidSymbolError'),
 }));
 
 type NumericKline = [number, number, number, number, number, number];
