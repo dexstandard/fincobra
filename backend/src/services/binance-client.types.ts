@@ -16,6 +16,11 @@ export interface BinanceAccount {
   balances: BinanceBalance[];
 }
 
+export interface BinanceUserCreds {
+  key: string;
+  secret: string;
+}
+
 export interface PairInfo {
   symbol: string;
   baseAsset: string;
