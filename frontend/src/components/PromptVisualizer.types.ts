@@ -11,6 +11,7 @@ export interface PromptPortfolio {
   startBalanceUsd?: number;
   startBalanceTs?: string;
   pnlUsd?: number;
+  pnlPct?: number;
 }
 
 export interface PromptRouteAsset {
@@ -66,6 +67,16 @@ export interface PromptMarketOverviewAsset {
       ['180d']?: number;
       ['365d']?: number;
     };
+  };
+  ltf?: {
+    frames?: string[];
+    alignmentScore?: number;
+    ret10m?: number;
+    ret30m?: number;
+    rsi10m?: number;
+    rsi30m?: number;
+    slope10m?: string;
+    slope30m?: string;
   };
 }
 

@@ -1,4 +1,10 @@
-import { CheckCircle, ClipboardList, FileText, Lightbulb } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle,
+  ClipboardList,
+  FileText,
+  Lightbulb,
+} from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from '../lib/i18n';
 import type { ResponseData, ResponseOrder } from './ResponseVisualizer.types';
@@ -81,6 +87,23 @@ export default function ResponseVisualizer({ data }: Props) {
           {data.rebalance ? t('rebalance') : t('hold')}
         </div>
       </div>
+
+      {(data.error || (data.errors && data.errors.length > 0)) && (
+        <div className="rounded border border-red-200 bg-red-50 p-4 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-red-700">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{t('error')}</span>
+          </div>
+          {data.error && <p className="text-sm text-red-800">{data.error}</p>}
+          {data.errors && data.errors.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-red-800">
+              {data.errors.map((err, index) => (
+                <li key={`${err}-${index}`}>{err}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {(data.strategyName || data.strategyRationale) && (
         <div className="rounded border border-gray-200 bg-white p-4 shadow-sm">

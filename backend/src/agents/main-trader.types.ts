@@ -82,6 +82,7 @@ export interface RebalancePrompt {
     startBalanceUsd?: number;
     startBalanceTs?: string;
     pnlUsd?: number;
+    pnlPct?: number;
   };
   routes: RoutePrice[];
   marketData: {

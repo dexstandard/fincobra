@@ -72,6 +72,48 @@ const percentFormatter = new Intl.NumberFormat(undefined, {
 
 const palette = ['#7c3aed', '#f97316', '#0ea5e9', '#22c55e', '#facc15', '#14b8a6'];
 
+function formatIsoDuration(value?: string): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const weekMatch = /^P(?:(\d+(?:\.\d+)?)W)$/.exec(trimmed);
+  if (weekMatch) {
+    const weeks = Number(weekMatch[1]);
+    if (Number.isFinite(weeks)) {
+      const formatted = numberFormatter2.format(weeks);
+      return `${formatted} ${Math.abs(weeks) === 1 ? 'week' : 'weeks'}`;
+    }
+    return null;
+  }
+
+  const isoMatch =
+    /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(
+      trimmed,
+    );
+  if (!isoMatch) return null;
+  const [, days, hours, minutes, seconds] = isoMatch;
+
+  const parts: string[] = [];
+
+  const appendPart = (amount: string | undefined, unit: string) => {
+    if (!amount) return;
+    const valueNumber = Number(amount);
+    if (!Number.isFinite(valueNumber)) return;
+    const formatted = numberFormatter2.format(valueNumber);
+    const label = Math.abs(valueNumber) === 1 ? unit : `${unit}s`;
+    parts.push(`${formatted} ${label}`);
+  };
+
+  appendPart(days, 'day');
+  appendPart(hours, 'hour');
+  appendPart(minutes, 'minute');
+  appendPart(seconds, 'second');
+
+  if (parts.length === 0) return null;
+  return parts.join(', ');
+}
+
 function formatDecimalPercent(value?: number): string {
   if (typeof value !== 'number') return '—';
   return `${percentFormatter.format(value * 100)}%`;
@@ -231,6 +273,8 @@ function MarketOverviewSection({
 }) {
   const assets = Object.entries(marketOverview.marketOverview ?? {});
   if (assets.length === 0) return null;
+  const decisionInterval = marketOverview.timeframe?.decisionInterval;
+  const friendlyDecisionInterval = formatIsoDuration(decisionInterval);
 
   return (
     <div>
@@ -247,13 +291,76 @@ function MarketOverviewSection({
         {marketOverview.timeframe?.candleInterval && (
           <span>
             · {marketOverview.timeframe.candleInterval} candles /
-            {` ${marketOverview.timeframe.decisionInterval ?? 'interval'}`}
+            {` ${friendlyDecisionInterval ?? marketOverview.timeframe.decisionInterval ?? 'interval'}`}
           </span>
         )}
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {assets.map(([asset, info]) => {
           const riskFlags = getRiskFlags(info.riskFlags);
+          const ltf = info.ltf;
+          const htf = info.htf;
+          const htfTrend = htf?.trend;
+          const htfReturns = htf?.returns;
+          const htfRegime = htf?.regime;
+
+          const htfTrendFrames: Array<{ label: string; slope?: string; gapPct?: number }> = [];
+          if (htfTrend?.['4h']) {
+            htfTrendFrames.push({ label: '4h', slope: htfTrend['4h']?.slope, gapPct: htfTrend['4h']?.gapPct });
+          }
+          if (htfTrend?.['1d']) {
+            htfTrendFrames.push({ label: '1d', slope: htfTrend['1d']?.slope, gapPct: htfTrend['1d']?.gapPct });
+          }
+          if (htfTrend?.['1w']) {
+            htfTrendFrames.push({ label: '1w', slope: htfTrend['1w']?.slope, gapPct: htfTrend['1w']?.gapPct });
+          }
+
+          const htfReturnFrames: Array<{ label: string; value: number }> = [];
+          if (typeof htfReturns?.['30d'] === 'number') {
+            htfReturnFrames.push({ label: '30d', value: htfReturns['30d']! });
+          }
+          if (typeof htfReturns?.['90d'] === 'number') {
+            htfReturnFrames.push({ label: '90d', value: htfReturns['90d']! });
+          }
+          if (typeof htfReturns?.['180d'] === 'number') {
+            htfReturnFrames.push({ label: '180d', value: htfReturns['180d']! });
+          }
+          if (typeof htfReturns?.['365d'] === 'number') {
+            htfReturnFrames.push({ label: '365d', value: htfReturns['365d']! });
+          }
+
+          const hasHtfContent =
+            htfTrendFrames.length > 0 ||
+            htfReturnFrames.length > 0 ||
+            typeof htfRegime?.volState === 'string' ||
+            typeof htfRegime?.volRank1y === 'number' ||
+            typeof htfRegime?.corrBtc90d === 'number' ||
+            typeof htfRegime?.marketBeta90d === 'number';
+
+          const ltfMetrics: { label: string; value: string }[] = [];
+          if (typeof ltf?.alignmentScore === 'number') {
+            ltfMetrics.push({ label: 'Alignment', value: formatNumber(ltf.alignmentScore) });
+          }
+          if (typeof ltf?.ret10m === 'number') {
+            ltfMetrics.push({ label: 'Return (10m)', value: formatDecimalPercent(ltf.ret10m) });
+          }
+          if (typeof ltf?.ret30m === 'number') {
+            ltfMetrics.push({ label: 'Return (30m)', value: formatDecimalPercent(ltf.ret30m) });
+          }
+          if (typeof ltf?.rsi10m === 'number') {
+            ltfMetrics.push({ label: 'RSI (10m)', value: formatNumber(ltf.rsi10m) });
+          }
+          if (typeof ltf?.rsi30m === 'number') {
+            ltfMetrics.push({ label: 'RSI (30m)', value: formatNumber(ltf.rsi30m) });
+          }
+          if (typeof ltf?.slope10m === 'string') {
+            ltfMetrics.push({ label: 'Slope (10m)', value: ltf.slope10m });
+          }
+          if (typeof ltf?.slope30m === 'string') {
+            ltfMetrics.push({ label: 'Slope (30m)', value: ltf.slope30m });
+          }
+          const hasLtfContent =
+            (ltf?.frames && ltf.frames.length > 0) || typeof ltf?.alignmentScore === 'number' || ltfMetrics.length > 0;
           return (
             <div key={asset} className="rounded border border-gray-200 p-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -294,52 +401,103 @@ function MarketOverviewSection({
                   <p className="text-gray-500">Depth Ratio</p>
                   <p className="font-semibold">{formatNumber(info.orderbookDepthRatio)}</p>
                 </div>
-                <div>
-                  <p className="text-gray-500">HTF Regime</p>
-                  <p className="font-semibold">{info.htf?.regime?.volState ?? '—'}</p>
-                </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                <div className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">
-                  4h: {info.htf?.trend?.['4h']?.slope ?? '—'} ({formatPercent(
-                    info.htf?.trend?.['4h']?.gapPct,
-                  )})
+              {riskFlags.map((flag) => (
+                <div
+                  key={flag}
+                  className="mt-3 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs text-red-700"
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  {flag}
                 </div>
-                <div className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">
-                  1d: {info.htf?.trend?.['1d']?.slope ?? '—'} ({formatPercent(
-                    info.htf?.trend?.['1d']?.gapPct,
-                  )})
+              ))}
+              {hasHtfContent && (
+                <div className="mt-3 rounded border border-dashed border-violet-200 bg-violet-50 p-3 text-sm text-violet-700">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-violet-600">
+                    <Layers3 className="h-3.5 w-3.5" />
+                    HTF snapshot
+                  </div>
+                  {(typeof htfRegime?.volState === 'string' ||
+                    typeof htfRegime?.volRank1y === 'number' ||
+                    typeof htfRegime?.corrBtc90d === 'number' ||
+                    typeof htfRegime?.marketBeta90d === 'number') && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {typeof htfRegime?.volState === 'string' && (
+                        <span className="rounded-full bg-violet-200 px-2 py-0.5 font-medium text-violet-800">
+                          Regime: {htfRegime.volState}
+                        </span>
+                      )}
+                      {typeof htfRegime?.volRank1y === 'number' && (
+                        <span className="rounded bg-white/80 px-2 py-0.5">
+                          Vol Rank 1y: {percentFormatter.format(htfRegime.volRank1y * 100)}%
+                        </span>
+                      )}
+                      {typeof htfRegime?.corrBtc90d === 'number' && (
+                        <span className="rounded bg-white/80 px-2 py-0.5">
+                          Corr BTC 90d: {formatNumber(htfRegime.corrBtc90d)}
+                        </span>
+                      )}
+                      {typeof htfRegime?.marketBeta90d === 'number' && (
+                        <span className="rounded bg-white/80 px-2 py-0.5">
+                          Beta 90d: {formatNumber(htfRegime.marketBeta90d)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {htfTrendFrames.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">Trend</p>
+                      <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                        {htfTrendFrames.map((frame) => (
+                          <div key={`${asset}-${frame.label}`} className="rounded bg-white/70 p-2">
+                            <p className="text-violet-500">{frame.label}</p>
+                            <p className="font-semibold text-violet-800">
+                              {frame.slope ?? '—'}
+                              {typeof frame.gapPct === 'number' && (
+                                <span className="ml-1 text-xs text-violet-500">({formatPercent(frame.gapPct)})</span>
+                              )}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {htfReturnFrames.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">Returns</p>
+                      <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                        {htfReturnFrames.map((frame) => (
+                          <div key={`${asset}-${frame.label}`} className="rounded bg-white/70 p-2">
+                            <p className="text-violet-500">{frame.label}</p>
+                            <p className="font-semibold text-violet-800">{formatDecimalPercent(frame.value)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">
-                  1w: {info.htf?.trend?.['1w']?.slope ?? '—'} ({formatPercent(
-                    info.htf?.trend?.['1w']?.gapPct,
-                  )})
+              )}
+              {hasLtfContent && (
+                <div className="mt-3 rounded border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <Clock className="h-3.5 w-3.5" />
+                    LTF snapshot
+                  </div>
+                  {ltf?.frames && ltf.frames.length > 0 && (
+                    <p className="text-xs text-slate-600">Frames: {ltf.frames.join(', ')}</p>
+                  )}
+                  {ltfMetrics.length > 0 && (
+                    <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                      {ltfMetrics.map((metric) => (
+                        <div key={`${asset}-${metric.label}`}>
+                          <p className="text-slate-500">{metric.label}</p>
+                          <p className="font-semibold text-slate-700">{metric.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {typeof info.htf?.regime?.volRank1y === 'number' && (
-                  <div className="rounded bg-sky-100 px-2 py-0.5 text-sky-700">
-                    Vol Rank 1y: {percentFormatter.format(info.htf.regime.volRank1y * 100)}%
-                  </div>
-                )}
-                {typeof info.htf?.regime?.corrBtc90d === 'number' && (
-                  <div className="rounded bg-sky-100 px-2 py-0.5 text-sky-700">
-                    Corr BTC 90d: {formatNumber(info.htf.regime.corrBtc90d)}
-                  </div>
-                )}
-                {typeof info.htf?.regime?.marketBeta90d === 'number' && (
-                  <div className="rounded bg-sky-100 px-2 py-0.5 text-sky-700">
-                    Beta 90d: {formatNumber(info.htf.regime.marketBeta90d)}
-                  </div>
-                )}
-                {riskFlags.map((flag) => (
-                  <div
-                    key={flag}
-                    className="flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-red-700"
-                  >
-                    <AlertTriangle className="h-3 w-3" />
-                    {flag}
-                  </div>
-                ))}
-              </div>
+              )}
             </div>
           );
         })}
@@ -525,6 +683,16 @@ export default function PromptVisualizer({ data, raw }: Props) {
       ((typeof fearGreedIndex.value === 'number' && Number.isFinite(fearGreedIndex.value)) ||
         (fearGreedIndex.classification && fearGreedIndex.classification.trim())),
   );
+  const reviewIntervalLabel = formatIsoDuration(data.reviewInterval);
+  const rawPnlPct = data.portfolio?.pnlPct;
+  const computedPnlPct =
+    typeof rawPnlPct === 'number'
+      ? rawPnlPct
+      : typeof data.portfolio?.pnlUsd === 'number' &&
+          typeof data.portfolio?.startBalanceUsd === 'number' &&
+          data.portfolio.startBalanceUsd !== 0
+        ? data.portfolio.pnlUsd / data.portfolio.startBalanceUsd
+        : null;
 
   return (
     <div className="min-h-[320px] w-full space-y-6">
@@ -543,7 +711,7 @@ export default function PromptVisualizer({ data, raw }: Props) {
             {data.reviewInterval && (
               <span className="flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5">
                 <Clock className="h-3 w-3" />
-                Review every {data.reviewInterval}
+                Review every {reviewIntervalLabel ?? data.reviewInterval}
               </span>
             )}
             {data.cash && (
@@ -576,7 +744,18 @@ export default function PromptVisualizer({ data, raw }: Props) {
                 Start Balance: {formatCurrency(data.portfolio?.startBalanceUsd)}
               </span>
               <span>
-                PnL: {formatCurrency(data.portfolio?.pnlUsd)}
+                PnL: {formatCurrency(data.portfolio?.pnlUsd)}{' '}
+                {typeof computedPnlPct === 'number' && (
+                  <span
+                    className={
+                      computedPnlPct >= 0
+                        ? 'font-semibold text-green-600'
+                        : 'font-semibold text-red-600'
+                    }
+                  >
+                    ({formatDecimalPercent(computedPnlPct)})
+                  </span>
+                )}
               </span>
             </div>
           </div>
