@@ -6,15 +6,11 @@ import { decryptKey } from '../util/crypto.js';
 import type {
   BinanceAccount,
   BinanceKeyVerificationResult,
+  BinanceUserCreds,
   Kline,
   OrderStatusResponse,
   PairInfo,
 } from './binance-client.types.js';
-
-interface UserCreds {
-  key: string;
-  secret: string;
-}
 
 const ACCOUNT_CACHE_TTL_SEC = 15;
 
@@ -188,7 +184,7 @@ export async function fetchPairInfo(
   throw lastErr ?? new Error('failed to fetch exchange info');
 }
 
-async function getUserCreds(id: string): Promise<UserCreds | null> {
+async function getUserCreds(id: string): Promise<BinanceUserCreds | null> {
   const binanceKey = await getBinanceKey(id);
   if (!binanceKey) return null;
   const key = decryptKey(binanceKey.apiKeyEnc);
@@ -196,16 +192,16 @@ async function getUserCreds(id: string): Promise<UserCreds | null> {
   return { key, secret };
 }
 
-async function withUserCreds<T>(
+export async function withUserCreds<T>(
   id: string,
-  fn: (creds: UserCreds) => Promise<T>,
+  fn: (creds: BinanceUserCreds) => Promise<T>,
 ): Promise<T | null> {
   const creds = await getUserCreds(id);
   if (!creds) return null;
   return fn(creds);
 }
 
-function createTimestampedParams(values: Record<string, string> = {}) {
+export function createTimestampedParams(values: Record<string, string> = {}) {
   const timestamp = Date.now();
   return new URLSearchParams({
     ...values,
@@ -217,7 +213,7 @@ function signParams(secret: string, params: URLSearchParams): string {
   return createHmac('sha256', secret).update(params.toString()).digest('hex');
 }
 
-function appendSignature(secret: string, params: URLSearchParams) {
+export function appendSignature(secret: string, params: URLSearchParams) {
   const signature = signParams(secret, params);
   params.append('signature', signature);
   return signature;
