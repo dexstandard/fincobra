@@ -6,6 +6,8 @@ export type User = {
   openaiKey?: string;
   binanceKey?: string;
   binanceSecret?: string;
+  bybitKey?: string;
+  bybitSecret?: string;
   role?: 'user' | 'admin';
 } | null;
 

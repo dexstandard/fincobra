@@ -19,6 +19,7 @@ interface AdminUserResponse {
   createdAt: string;
   hasAiKey: boolean;
   hasBinanceKey: boolean;
+  hasBybitKey: boolean;
 }
 
 interface ToggleUserResponse {
@@ -34,6 +35,7 @@ function mapUserListEntry(entry: UserListEntry): AdminUserResponse {
     createdAt: entry.createdAt,
     hasAiKey: entry.hasAiKey,
     hasBinanceKey: entry.hasBinanceKey,
+    hasBybitKey: entry.hasBybitKey,
   };
 }
 

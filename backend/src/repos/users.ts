@@ -79,12 +79,14 @@ export async function listUsers(): Promise<UserListEntry[]> {
   const { rows } = await db.query(
     'SELECT u.id, u.role, u.is_enabled, u.email_enc, u.created_at, ' +
       '(ak.id IS NOT NULL OR oak.id IS NOT NULL) AS has_ai_key, ' +
-      '(ek.id IS NOT NULL) AS has_binance_key ' +
+      '(ek.id IS NOT NULL) AS has_binance_key, ' +
+      '(bek.id IS NOT NULL) AS has_bybit_key ' +
       'FROM users u ' +
       "LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' " +
       'LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id ' +
       "LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' " +
-      "LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance'",
+      "LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance' " +
+      "LEFT JOIN exchange_keys bek ON bek.user_id = u.id AND bek.provider = 'bybit'",
   );
   return rows.map((row) => convertKeysToCamelCase(row) as UserListEntry);
 }

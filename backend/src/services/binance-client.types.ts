@@ -1,7 +1,10 @@
-export interface BinanceKeyVerificationResult {
+export interface ExchangeKeyVerificationResult {
   ok: boolean;
   reason?: string;
 }
+
+export interface BinanceKeyVerificationResult
+  extends ExchangeKeyVerificationResult {}
 
 export interface BinanceBalance {
   asset: string;

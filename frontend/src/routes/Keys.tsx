@@ -19,6 +19,10 @@ export default function Keys() {
         exchange="binance"
         label={t('binance_api_credentials')}
       />
+      <ExchangeApiKeySection
+        exchange="bybit"
+        label={t('bybit_api_credentials')}
+      />
     </div>
   );
 }

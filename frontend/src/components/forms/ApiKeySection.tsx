@@ -141,7 +141,7 @@ export default function ApiKeySection({
   });
 
   const balanceQuery = useQuery<{ totalUsd: number }>({
-    queryKey: [balanceQueryKey!, id],
+    queryKey: [balanceQueryKey ?? 'balance-disabled', id],
     enabled: !!query.data && !editing && !!balanceQueryKey && !!getBalancePath,
     queryFn: async () => {
       const res = await api.get(getBalancePath!(id));
