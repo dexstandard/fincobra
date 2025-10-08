@@ -144,7 +144,7 @@ export async function fetchPairInfo(
       lastErr = new Error(
         `failed to fetch exchange info: ${res.status} ${body}`,
       );
-      if (/Invalid symbol/i.test(body)) continue;
+      if (isInvalidSymbolError(lastErr)) continue;
       throw lastErr;
     }
     const json = (await res.json()) as ExchangeInfoResponse;
@@ -236,6 +236,17 @@ export function parseBinanceError(err: unknown): {
     }
   }
   return {};
+}
+
+export function isInvalidSymbolError(err: unknown): boolean {
+  if (err instanceof Error && /Invalid symbol/i.test(err.message)) {
+    return true;
+  }
+  const parsed = parseBinanceError(err);
+  if (typeof parsed.msg === 'string' && /Invalid symbol/i.test(parsed.msg)) {
+    return true;
+  }
+  return false;
 }
 
 export async function fetchAccount(id: string): Promise<BinanceAccount | null> {
@@ -543,7 +554,7 @@ export async function fetchPairPrice(token1: string, token2: string) {
       return await fetchSymbolPrice(symbol);
     } catch (err) {
       lastErr = err;
-      if (err instanceof Error && /Invalid symbol/i.test(err.message)) {
+      if (isInvalidSymbolError(err)) {
         continue;
       }
       throw err;

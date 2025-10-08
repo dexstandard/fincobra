@@ -12,6 +12,7 @@ import {
   fetchAccount,
   fetchPairInfo,
   fetchPairPrice,
+  isInvalidSymbolError,
 } from '../services/binance-client.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
@@ -385,7 +386,21 @@ export async function collectPromptData(
       log.error('failed to fetch token balances');
       return undefined;
     }
-    const { currentPrice } = await fetchPairPrice(t.token, cash);
+    let priceData;
+    try {
+      priceData = await fetchPairPrice(t.token, cash);
+    } catch (err) {
+      if (isInvalidSymbolError(err)) {
+        const error =
+          err instanceof Error ? err : new Error(String(err ?? 'unknown error'));
+        log.error({ token: t.token, cash, err: error }, 'unsupported trading pair');
+        throw new Error(`unsupported trading pair: ${t.token}/${cash}`, {
+          cause: error,
+        });
+      }
+      throw err;
+    }
+    const { currentPrice } = priceData;
     positions.push({
       sym: t.token,
       qty,
@@ -399,10 +414,40 @@ export async function collectPromptData(
     for (let j = i + 1; j < allTokens.length; j++) {
       try {
         attemptedRoutes += 1;
-        const [info, data] = await Promise.all([
+        const [infoResult, priceResult] = await Promise.allSettled([
           fetchPairInfo(allTokens[i], allTokens[j]),
           fetchPairPrice(allTokens[i], allTokens[j]),
         ]);
+        if (infoResult.status === 'rejected') {
+          const infoErr =
+            infoResult.reason instanceof Error
+              ? infoResult.reason
+              : new Error(String(infoResult.reason));
+          if (isInvalidSymbolError(infoErr)) {
+            log.warn(
+              { pair: `${allTokens[i]}/${allTokens[j]}`, err: infoErr },
+              'skipping trading route: unsupported pair on Binance',
+            );
+            continue;
+          }
+          throw infoErr;
+        }
+        if (priceResult.status === 'rejected') {
+          const priceErr =
+            priceResult.reason instanceof Error
+              ? priceResult.reason
+              : new Error(String(priceResult.reason));
+          if (isInvalidSymbolError(priceErr)) {
+            log.warn(
+              { pair: `${allTokens[i]}/${allTokens[j]}`, err: priceErr },
+              'skipping trading route: unsupported pair on Binance',
+            );
+            continue;
+          }
+          throw priceErr;
+        }
+        const info = infoResult.value;
+        const data = priceResult.value;
         if (!Number.isFinite(data.currentPrice) || data.currentPrice <= 0) {
           malformedRoutes += 1;
           log.warn(

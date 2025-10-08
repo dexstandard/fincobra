@@ -33,8 +33,24 @@ vi.mock('../src/services/binance-client.js', async () => {
   const actual = await vi.importActual<
     typeof import('../src/services/binance-client.js')
   >('../src/services/binance-client.js');
-  return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
+  return {
+    ...actual,
+    cancelOrder: vi.fn().mockResolvedValue(undefined),
+    fetchPairInfo: vi
+      .fn(async (token1: string, token2: string) => ({
+        symbol: `${token1}${token2}`.toUpperCase(),
+        baseAsset: token1.toUpperCase(),
+        quoteAsset: token2.toUpperCase(),
+        quantityPrecision: 8,
+        pricePrecision: 2,
+        minNotional: 10,
+      })),
+  };
 });
+
+vi.mock('../src/util/output-ip.js', () => ({
+  fetchOutputIp: vi.fn().mockResolvedValue('127.0.0.1'),
+}));
 
 const cancelOrdersSpy = vi.spyOn(orderOrchestrator, 'cancelOrdersForWorkflow');
 

@@ -66,6 +66,11 @@ vi.mock('../src/services/binance-client.js', () => ({
   fetchPairPrice: vi.fn().mockImplementation(defaultFetchPairPrice),
   fetchPairInfo: vi.fn().mockImplementation(defaultFetchPairInfo),
   fetchOrder: vi.fn().mockResolvedValue(undefined),
+  isInvalidSymbolError: vi
+    .fn((err: unknown) =>
+      err instanceof Error && /Invalid symbol/i.test(err.message),
+    )
+    .mockName('isInvalidSymbolError'),
 }));
 
 vi.mock('../src/repos/review-result.js', () => ({
@@ -160,6 +165,36 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.pnlPct).toBeCloseTo(0.05);
     expect(prompt?.reviewInterval).toBe('PT1H');
     expect(prompt).not.toHaveProperty('instructions');
+  });
+
+  it('throws descriptive error when a token pair is unsupported', async () => {
+    const row: ActivePortfolioWorkflow = {
+      id: '1',
+      userId: 'u1',
+      model: 'm',
+      cashToken: 'USDC',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyId: null,
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: 20000,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: '1',
+    };
+
+    vi.mocked(fetchPairPrice).mockImplementationOnce(() => {
+      throw new Error(
+        'failed to fetch symbol price: 400 {"code":-1121,"msg":"Invalid symbol."}',
+      );
+    });
+
+    await expect(collectPromptData(row, mockLogger())).rejects.toThrow(
+      'unsupported trading pair: BTC/USDC',
+    );
   });
 
   it('includes recent limit orders in prompt', async () => {
