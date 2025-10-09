@@ -298,6 +298,69 @@ function MarketOverviewSection({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {assets.map(([asset, info]) => {
           const riskFlags = getRiskFlags(info.riskFlags);
+          const htf = info.htf;
+          const trendFrames = ['4h', '1d', '1w'] as const;
+          const htfTrendBadges = trendFrames
+            .map((frame) => {
+              const frameData = htf?.trend?.[frame];
+              if (!frameData) return null;
+              const slope = frameData.slope?.trim();
+              const gap =
+                typeof frameData.gapPct === 'number' ? formatPercent(frameData.gapPct) : null;
+              if (!slope && !gap) return null;
+              return {
+                frame,
+                slope: slope ?? '—',
+                gap,
+              };
+            })
+            .filter(
+              (value): value is { frame: (typeof trendFrames)[number]; slope: string; gap: string | null } =>
+                value !== null,
+            );
+          const htfMetrics: { label: string; value: string }[] = [];
+          if (htf?.regime?.volState) {
+            htfMetrics.push({ label: 'Vol State', value: htf.regime.volState });
+          }
+          if (typeof htf?.regime?.volRank1y === 'number') {
+            htfMetrics.push({
+              label: 'Vol Rank (1y)',
+              value: `${percentFormatter.format(htf.regime.volRank1y * 100)}%`,
+            });
+          }
+          if (typeof htf?.regime?.corrBtc90d === 'number') {
+            htfMetrics.push({
+              label: 'BTC Corr (90d)',
+              value: formatNumber(htf.regime.corrBtc90d),
+            });
+          }
+          if (typeof htf?.regime?.marketBeta90d === 'number') {
+            htfMetrics.push({
+              label: 'Market Beta (90d)',
+              value: formatNumber(htf.regime.marketBeta90d),
+            });
+          }
+          const htfReturnMetrics = (
+            [
+              { key: '30d', label: 'Return (30d)' },
+              { key: '90d', label: 'Return (90d)' },
+              { key: '180d', label: 'Return (180d)' },
+              { key: '365d', label: 'Return (365d)' },
+            ] as const
+          )
+            .map(({ key, label }) => {
+              const value = htf?.returns?.[key];
+              if (typeof value !== 'number') return null;
+              return {
+                label,
+                value: formatDecimalPercent(value),
+              };
+            })
+            .filter(
+              (metric): metric is { label: string; value: string } => metric !== null,
+            );
+          const combinedHtfMetrics = [...htfMetrics, ...htfReturnMetrics];
+          const hasHtfContent = htfTrendBadges.length > 0 || combinedHtfMetrics.length > 0;
           const ltf = info.ltf;
           const ltfMetrics: { label: string; value: string }[] = [];
           if (typeof ltf?.alignmentScore === 'number') {
@@ -368,47 +431,47 @@ function MarketOverviewSection({
                   <p className="font-semibold">{info.htf?.regime?.volState ?? '—'}</p>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                <div className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">
-                  4h: {info.htf?.trend?.['4h']?.slope ?? '—'} ({formatPercent(
-                    info.htf?.trend?.['4h']?.gapPct,
-                  )})
+              {riskFlags.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  {riskFlags.map((flag) => (
+                    <div
+                      key={flag}
+                      className="flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-red-700"
+                    >
+                      <AlertTriangle className="h-3 w-3" />
+                      {flag}
+                    </div>
+                  ))}
                 </div>
-                <div className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">
-                  1d: {info.htf?.trend?.['1d']?.slope ?? '—'} ({formatPercent(
-                    info.htf?.trend?.['1d']?.gapPct,
-                  )})
+              )}
+              {hasHtfContent && (
+                <div className="mt-3 rounded border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    HTF snapshot
+                  </div>
+                  {htfTrendBadges.length > 0 && (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {htfTrendBadges.map(({ frame, slope, gap }) => (
+                        <div key={`${asset}-htf-${frame}`} className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">
+                          {frame}: {slope}
+                          {gap ? ` (${gap})` : ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {combinedHtfMetrics.length > 0 && (
+                    <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                      {combinedHtfMetrics.map((metric) => (
+                        <div key={`${asset}-htf-${metric.label}`}>
+                          <p className="text-slate-500">{metric.label}</p>
+                          <p className="font-semibold text-slate-700">{metric.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">
-                  1w: {info.htf?.trend?.['1w']?.slope ?? '—'} ({formatPercent(
-                    info.htf?.trend?.['1w']?.gapPct,
-                  )})
-                </div>
-                {typeof info.htf?.regime?.volRank1y === 'number' && (
-                  <div className="rounded bg-sky-100 px-2 py-0.5 text-sky-700">
-                    Vol Rank 1y: {percentFormatter.format(info.htf.regime.volRank1y * 100)}%
-                  </div>
-                )}
-                {typeof info.htf?.regime?.corrBtc90d === 'number' && (
-                  <div className="rounded bg-sky-100 px-2 py-0.5 text-sky-700">
-                    Corr BTC 90d: {formatNumber(info.htf.regime.corrBtc90d)}
-                  </div>
-                )}
-                {typeof info.htf?.regime?.marketBeta90d === 'number' && (
-                  <div className="rounded bg-sky-100 px-2 py-0.5 text-sky-700">
-                    Beta 90d: {formatNumber(info.htf.regime.marketBeta90d)}
-                  </div>
-                )}
-                {riskFlags.map((flag) => (
-                  <div
-                    key={flag}
-                    className="flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-red-700"
-                  >
-                    <AlertTriangle className="h-3 w-3" />
-                    {flag}
-                  </div>
-                ))}
-              </div>
+              )}
               {hasLtfContent && (
                 <div className="mt-3 rounded border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                   <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
