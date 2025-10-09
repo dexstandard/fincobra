@@ -3,6 +3,8 @@ export interface PortfolioWorkflowTokenInput {
   minAllocation: number;
 }
 
+import type { TradeMode } from '../repos/portfolio-workflows.types.js';
+
 export interface PortfolioWorkflowInput {
   model: string;
   cash: string;
@@ -13,4 +15,5 @@ export interface PortfolioWorkflowInput {
   manualRebalance: boolean;
   useEarn: boolean;
   status: 'active' | 'inactive' | 'retired';
+  tradeMode: TradeMode;
 }

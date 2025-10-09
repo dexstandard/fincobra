@@ -23,6 +23,8 @@ import { createDecisionLimitOrders } from '../services/rebalance.js';
 import { type RebalancePrompt } from '../agents/main-trader.types.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
+import { insertFuturesPositionPlan } from '../repos/futures-position-plan.js';
+import { FuturesPositionPlanStatus } from '../repos/futures-position-plan.types.js';
 
 /** Workflows currently running. Used to avoid concurrent runs. */
 const runningWorkflows = new Set<string>();
@@ -88,6 +90,7 @@ async function cleanupOpenOrders(
   wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ) {
+  if (wf.tradeMode !== 'spot') return;
   const orders = await getOpenLimitOrdersForWorkflow(wf.id);
   const limit = pLimit(5);
   await Promise.all(
@@ -126,13 +129,17 @@ function buildReviewResultEntry({
   validationError?: string;
 }): ReviewResultInsert {
   const ok = !!decision && !validationError;
-  const orders = decision?.orders ?? [];
+  const actionsCount = (() => {
+    if (!decision) return 0;
+    if (decision.tradeMode === 'futures') return decision.futures.length;
+    return decision.orders.length;
+  })();
 
   return {
     portfolioWorkflowId: workflowId,
     log: decision ? JSON.stringify(decision) : '',
     rawLogId: logId,
-    rebalance: ok ? orders.length > 0 : false,
+    rebalance: ok ? actionsCount > 0 : false,
     ...(ok && decision
       ? { shortReport: decision.shortReport }
       : { error: { message: validationError ?? 'decision unavailable' } }),
@@ -231,22 +238,56 @@ async function runWorkflowAttempt(
       model: wf.model,
       apiKey: key,
       portfolioId: wf.id,
+      tradeMode: wf.tradeMode,
     };
     const decision = await runStep('runMainTrader', () =>
       runMainTrader(params, prompt!, wf.agentInstructions),
     );
-    const normalizedDecision =
-      decision && !Array.isArray(decision.orders)
-        ? {
-            ...decision,
+    let normalizedDecision: MainTraderDecision | null = null;
+    if (decision) {
+      if (wf.tradeMode === 'spot') {
+        const tradeMode = decision.tradeMode ?? 'spot';
+        if (tradeMode !== 'spot') {
+          runLog.info(
+            { response: decision },
+            'ai decision returned futures payload for spot workflow; treating as hold',
+          );
+          normalizedDecision = {
+            tradeMode: 'spot',
             orders: [],
-          }
-        : decision;
-    if (decision && !Array.isArray(decision.orders)) {
-      runLog.info(
-        { response: decision },
-        'ai decision missing orders; treating as hold',
-      );
+            shortReport: decision.shortReport,
+            strategyName: decision.strategyName,
+            strategyRationale: decision.strategyRationale,
+          };
+        } else {
+          normalizedDecision = {
+            ...decision,
+            tradeMode: 'spot',
+            orders: decision.orders ?? [],
+          };
+        }
+      } else {
+        const tradeMode = decision.tradeMode ?? 'futures';
+        if (tradeMode !== 'futures') {
+          runLog.info(
+            { response: decision },
+            'ai decision missing futures block; treating as hold',
+          );
+          normalizedDecision = {
+            tradeMode: 'futures',
+            futures: [],
+            shortReport: decision.shortReport,
+            strategyName: decision.strategyName,
+            strategyRationale: decision.strategyRationale,
+          };
+        } else {
+          normalizedDecision = {
+            ...decision,
+            tradeMode: 'futures',
+            futures: decision.futures ?? [],
+          };
+        }
+      }
     }
     const logId = await runStep('insertReviewRawLog', () =>
       insertReviewRawLog({
@@ -258,6 +299,7 @@ async function runWorkflowAttempt(
     const validationError = validateExecResponse(
       normalizedDecision ?? undefined,
       prompt!.portfolio.positions.map((p) => p.sym),
+      wf.tradeMode,
     );
     if (validationError)
       runLog.error({ err: validationError }, 'validation failed');
@@ -270,16 +312,16 @@ async function runWorkflowAttempt(
     const resultId = await runStep('insertReviewResult', () =>
       insertReviewResult(resultEntry),
     );
-    const normalizedOrders = normalizedDecision?.orders ?? [];
     if (
       normalizedDecision &&
       !validationError &&
+      normalizedDecision.tradeMode === 'spot' &&
       !wf.manualRebalance &&
-      normalizedOrders.length
+      normalizedDecision.orders.length
     ) {
       const orderResult = await createDecisionLimitOrders({
         userId: wf.userId,
-        orders: normalizedOrders,
+        orders: normalizedDecision.orders,
         reviewResultId: resultId,
         log: runLog,
       });
@@ -295,6 +337,24 @@ async function runWorkflowAttempt(
           canceledOrders: orderResult.priceDivergenceCancellations,
         };
       }
+    }
+    if (
+      normalizedDecision &&
+      !validationError &&
+      normalizedDecision.tradeMode === 'futures' &&
+      normalizedDecision.futures.length
+    ) {
+      await Promise.all(
+        normalizedDecision.futures.map((plan, index) =>
+          insertFuturesPositionPlan({
+            userId: wf.userId,
+            planned: { ...plan },
+            status: FuturesPositionPlanStatus.Planned,
+            reviewResultId: resultId,
+            positionId: `${randomUUID()}-${index}`,
+          }),
+        ),
+      );
     }
     runLog.info('workflow run complete');
     return { kind: 'success' };
@@ -321,8 +381,10 @@ async function saveFailure(
   const parsed = parseExecLog({ error: message });
 
   const rebalance =
-    Array.isArray(parsed.response?.orders) &&
-    parsed.response!.orders.length > 0;
+    (Array.isArray(parsed.response?.orders) &&
+      parsed.response!.orders.length > 0) ||
+    (Array.isArray(parsed.response?.futures) &&
+      parsed.response!.futures.length > 0);
 
   const entry: ReviewResultInsert = {
     portfolioWorkflowId: row.id,

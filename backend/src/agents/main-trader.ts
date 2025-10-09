@@ -16,18 +16,25 @@ import {
 } from '../services/binance-client.js';
 import { getRecentReviewResults } from '../repos/review-result.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
+import { getFuturesPositionsByReviewResult } from '../repos/futures-position-plan.js';
 import { getNewsByToken } from '../repos/news.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
-import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
+import type {
+  ActivePortfolioWorkflow,
+  TradeMode,
+} from '../repos/portfolio-workflows.types.js';
 import type {
   RunParams,
   RebalancePosition,
   PreviousReport,
   PreviousReportOrder,
+  PreviousReportFuturesPosition,
   RebalancePrompt,
   MainTraderDecision,
   MainTraderOrder,
+  MainTraderFuturesPosition,
   NewsContext,
+  FuturesPromptPosition,
 } from './main-trader.types.js';
 import {
   computeDerivedItem,
@@ -35,15 +42,18 @@ import {
   computeWeight,
 } from './news-analyst.js';
 
-export const developerInstructions = [
+const sharedStrategyInstructions = [
   'Primary Goal: Grow total portfolio USD value and monitor PnL every decision cycle.',
   'Strategy & Decision Rules',
-  '- You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place orders consistent with those targets.',
+  '- You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place trades consistent with those targets.',
   '- Use the market overview dataset for price action, higher-timeframe trend, returns, and risk flags.',
   '- Use the structured news feed for event risks.',
   '- If a bearish Hack | StablecoinDepeg | Outage with severity ≥ 0.75 appears, allow protective action even if technicals are neutral.',
   '- If your chosen strategy overlaps with any recent strategies, do not follow it blindly; provide evidence of expected alpha inside the rationale.',
   'Execution Rules',
+];
+
+const spotExecutionRules = [
   '- Always check portfolio balances and policy floors before placing orders.',
   '- Supported order books are listed in the prompt (may include asset-to-asset combos like BTCSOL, not just cash pairs).',
   '- Place limit orders sized precisely to available balances. Avoid oversizing and rounding errors.',
@@ -51,61 +61,135 @@ export const developerInstructions = [
   '- Keep limit targets realistic for the review interval so orders can fill; avoid extreme/unlikely prices.',
   '- Unfilled orders are canceled before the next review (interval is provided in the prompt).',
   '- Use maxPriceDriftPct to allow a small % drift from basePrice (≥0.0001 = 0.01%) to prevent premature cancellations.',
+];
+
+const futuresExecutionRules = [
+  '- Always check portfolio balances and policy floors before opening or adjusting positions.',
+  '- Size leverage so margin requirements remain comfortably satisfied; avoid over-levered exposure.',
+  '- Specify entryType (MARKET or LIMIT) and entryPrice for limit entries.',
+  '- Provide stopLoss and takeProfit levels to bound risk for every position.',
+  '- Use reduceOnly=true when closing or trimming positions so you do not accidentally flip direction.',
+];
+
+const sharedResponseInstructions = [
   'Response Specification',
-  '- Return the chosen strategy name, a short report (≤255 chars), a rationale explaining expected alpha, and an array of orders.',
-  '- If no trade is taken, return an empty orders array.',
+  '- Return the chosen strategy name, a short report (≤255 chars), and a rationale explaining expected alpha.',
   '- On error, return error message.',
+];
+
+const spotResponseInstructions = [
+  '- Return an array `orders` describing each desired limit order.',
+  '- If no trade is taken, return an empty orders array.',
+];
+
+const futuresResponseInstructions = [
+  '- Return an array `futures` describing each desired perpetual futures position adjustment (symbol, positionSide, qty, leverage, entryType, entryPrice for limits, stopLoss, takeProfit, reduceOnly).',
+  '- If no trade is taken, return an empty futures array.',
+];
+
+export const developerInstructionsSpot = [
+  ...sharedStrategyInstructions,
+  ...spotExecutionRules,
+  ...sharedResponseInstructions,
+  ...spotResponseInstructions,
 ].join('\n');
+
+export const developerInstructionsFutures = [
+  ...sharedStrategyInstructions,
+  ...futuresExecutionRules,
+  ...sharedResponseInstructions,
+  ...futuresResponseInstructions,
+].join('\n');
+
+export const developerInstructions = developerInstructionsSpot;
+
+export function getDeveloperInstructionsForMode(mode: TradeMode): string {
+  return mode === 'futures' ? developerInstructionsFutures : developerInstructionsSpot;
+}
+
+const baseDecisionProperties = {
+  shortReport: { type: 'string' },
+  strategyName: { type: 'string' },
+  strategyRationale: { type: 'string' },
+  tradeMode: { type: 'string', enum: ['spot', 'futures'] },
+};
+
+const spotDecisionSchema = {
+  type: 'object',
+  properties: {
+    ...baseDecisionProperties,
+    orders: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          pair: { type: 'string' },
+          token: { type: 'string' },
+          side: { type: 'string', enum: ['BUY', 'SELL'] },
+          qty: { type: 'number' },
+          limitPrice: { type: 'number' },
+          basePrice: { type: 'number' },
+          maxPriceDriftPct: { type: 'number' },
+        },
+        required: [
+          'pair',
+          'token',
+          'side',
+          'qty',
+          'limitPrice',
+          'basePrice',
+          'maxPriceDriftPct',
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['orders', 'shortReport', 'strategyName', 'strategyRationale'],
+  additionalProperties: false,
+};
+
+const futuresDecisionSchema = {
+  type: 'object',
+  properties: {
+    ...baseDecisionProperties,
+    futures: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          symbol: { type: 'string' },
+          positionSide: { type: 'string', enum: ['LONG', 'SHORT'] },
+          qty: { type: 'number' },
+          leverage: { type: 'number' },
+          entryType: { type: 'string', enum: ['MARKET', 'LIMIT'] },
+          entryPrice: { type: 'number' },
+          reduceOnly: { type: 'boolean' },
+          stopLoss: { type: 'number' },
+          takeProfit: { type: 'number' },
+        },
+        required: ['symbol', 'positionSide', 'qty', 'leverage', 'entryType'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['futures', 'shortReport', 'strategyName', 'strategyRationale'],
+  additionalProperties: false,
+};
+
+const errorDecisionSchema = {
+  type: 'object',
+  properties: {
+    error: { type: 'string' },
+  },
+  required: ['error'],
+  additionalProperties: false,
+};
 
 export const rebalanceResponseSchema = {
   type: 'object',
   properties: {
     result: {
-      anyOf: [
-        {
-          type: 'object',
-          properties: {
-            orders: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  pair: { type: 'string' },
-                  token: { type: 'string' },
-                  side: { type: 'string', enum: ['BUY', 'SELL'] },
-                  qty: { type: 'number' },
-                  limitPrice: { type: 'number' },
-                  basePrice: { type: 'number' },
-                  maxPriceDriftPct: { type: 'number' },
-                },
-                required: [
-                  'pair',
-                  'token',
-                  'side',
-                  'qty',
-                  'limitPrice',
-                  'basePrice',
-                  'maxPriceDriftPct',
-                ],
-                additionalProperties: false,
-              },
-            },
-            shortReport: { type: 'string' },
-            strategyName: { type: 'string' },
-            strategyRationale: { type: 'string' },
-          },
-          required: ['orders', 'shortReport', 'strategyName', 'strategyRationale'],
-          additionalProperties: false,
-        },
-        {
-          type: 'object',
-          properties: {
-            error: { type: 'string' },
-          },
-          required: ['error'],
-          additionalProperties: false,
-        },
-      ],
+      anyOf: [spotDecisionSchema, futuresDecisionSchema, errorDecisionSchema],
     },
   },
   required: ['result'],
@@ -360,6 +444,7 @@ export async function collectPromptData(
   row: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ): Promise<RebalancePrompt | undefined> {
+  const isFutures = row.tradeMode === 'futures';
   const cash = row.cashToken;
   const tokens = row.tokens.map((t) => t.token);
   const allTokens = [cash, ...tokens];
@@ -520,6 +605,7 @@ export async function collectPromptData(
     const r = prevRows[index];
     const ordersRows = await getLimitOrdersByReviewResult(row.id, r.id);
     const orders: PreviousReportOrder[] = [];
+    const futures: PreviousReportFuturesPosition[] = [];
     for (const o of ordersRows) {
       const planned = JSON.parse(o.plannedJson);
       // TODO: drop quantity fallback once legacy orders are migrated.
@@ -578,11 +664,64 @@ export async function collectPromptData(
       }
     }
 
+    if (isFutures) {
+      const futuresRows = await getFuturesPositionsByReviewResult(row.id, r.id);
+      for (const fRow of futuresRows) {
+        try {
+          const parsedPlanned = JSON.parse(
+            fRow.plannedJson,
+          ) as Record<string, unknown>;
+          const symbol = parsedPlanned.symbol;
+          const positionSide = parsedPlanned.positionSide;
+          const qty = parsedPlanned.qty;
+          if (
+            typeof symbol === 'string' &&
+            (positionSide === 'LONG' || positionSide === 'SHORT') &&
+            typeof qty === 'number'
+          ) {
+            futures.push({
+              symbol,
+              positionSide,
+              qty,
+              leverage:
+                typeof parsedPlanned.leverage === 'number'
+                  ? parsedPlanned.leverage
+                  : undefined,
+              entryType:
+                typeof parsedPlanned.entryType === 'string'
+                  ? parsedPlanned.entryType
+                  : undefined,
+              entryPrice:
+                typeof parsedPlanned.entryPrice === 'number'
+                  ? parsedPlanned.entryPrice
+                  : undefined,
+              stopLoss:
+                typeof parsedPlanned.stopLoss === 'number'
+                  ? parsedPlanned.stopLoss
+                  : undefined,
+              takeProfit:
+                typeof parsedPlanned.takeProfit === 'number'
+                  ? parsedPlanned.takeProfit
+                  : undefined,
+              status: fRow.status,
+              positionId: fRow.positionId,
+            });
+          }
+        } catch (err) {
+          log.warn(
+            { err, reviewResultId: r.id },
+            'failed to parse previous futures position',
+          );
+        }
+      }
+    }
+
     const report: PreviousReport = {
       ts: r.createdAt.toISOString(),
       ...(r.shortReport !== undefined ? { shortReport: r.shortReport } : {}),
       ...(r.error !== undefined ? { error: r.error } : {}),
       ...(orders.length ? { orders } : {}),
+      ...(futures.length ? { futures } : {}),
       ...(strategyName ? { strategyName } : {}),
     };
     const currentSnapshot = promptSnapshots[index];
@@ -609,6 +748,7 @@ export async function collectPromptData(
   );
 
   const prompt: RebalancePrompt = {
+    tradeMode: row.tradeMode,
     reviewInterval: decisionInterval,
     policy: { floor },
     cash,
@@ -619,6 +759,10 @@ export async function collectPromptData(
   };
   if (previousReports.length) {
     prompt.previousReports = previousReports;
+  }
+  if (isFutures) {
+    const futuresPositions: FuturesPromptPosition[] = [];
+    prompt.futures = { positions: futuresPositions };
   }
 
   let marketOverview = createEmptyMarketOverview(new Date(), decisionInterval);
@@ -650,6 +794,34 @@ export async function collectPromptData(
   return prompt;
 }
 
+function isMainTraderOrderValue(value: unknown): value is MainTraderOrder {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.pair === 'string' &&
+    typeof record.token === 'string' &&
+    typeof record.side === 'string' &&
+    typeof record.qty === 'number' &&
+    typeof record.limitPrice === 'number' &&
+    typeof record.basePrice === 'number' &&
+    typeof record.maxPriceDriftPct === 'number'
+  );
+}
+
+function isMainTraderFuturesPositionValue(
+  value: unknown,
+): value is MainTraderFuturesPosition {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.symbol === 'string' &&
+    (record.positionSide === 'LONG' || record.positionSide === 'SHORT') &&
+    typeof record.qty === 'number' &&
+    typeof record.leverage === 'number' &&
+    (record.entryType === 'MARKET' || record.entryType === 'LIMIT')
+  );
+}
+
 function extractResult(res: string): MainTraderDecision | null {
   try {
     const json = JSON.parse(res);
@@ -662,20 +834,82 @@ function extractResult(res: string): MainTraderDecision | null {
     const text = msg?.content?.[0]?.text;
     if (typeof text !== 'string') return null;
     const parsed = JSON.parse(text);
-    return parsed.result ?? null;
+    const result = (parsed as Record<string, unknown>).result as
+      | Record<string, unknown>
+      | undefined;
+    if (!result) return null;
+
+    if (typeof result.error === 'string') {
+      return null;
+    }
+
+    const shortReport = result.shortReport;
+    const strategyName = result.strategyName;
+    const strategyRationale = result.strategyRationale;
+    if (
+      typeof shortReport !== 'string' ||
+      typeof strategyName !== 'string' ||
+      typeof strategyRationale !== 'string'
+    ) {
+      return null;
+    }
+
+    const requestedMode =
+      result.tradeMode === 'futures' ? 'futures' : 'spot';
+
+    if (Array.isArray(result.orders)) {
+      const orders = result.orders.filter(isMainTraderOrderValue);
+      return {
+        tradeMode: 'spot',
+        orders,
+        shortReport,
+        strategyName,
+        strategyRationale,
+      };
+    }
+
+    if (Array.isArray(result.futures)) {
+      const futures = result.futures.filter(isMainTraderFuturesPositionValue);
+      return {
+        tradeMode: 'futures',
+        futures,
+        shortReport,
+        strategyName,
+        strategyRationale,
+      };
+    }
+
+    if (requestedMode === 'futures') {
+      return {
+        tradeMode: 'futures',
+        futures: [],
+        shortReport,
+        strategyName,
+        strategyRationale,
+      };
+    }
+
+    return {
+      tradeMode: 'spot',
+      orders: [],
+      shortReport,
+      strategyName,
+      strategyRationale,
+    };
   } catch {
     return null;
   }
 }
 
 export async function run(
-  { log, model, apiKey }: RunParams,
+  { log, model, apiKey, tradeMode }: RunParams,
   prompt: RebalancePrompt,
   instructionsOverride?: string,
 ): Promise<MainTraderDecision | null> {
+  const mode = prompt.tradeMode ?? tradeMode;
   const instructions = instructionsOverride?.trim()
     ? instructionsOverride
-    : developerInstructions;
+    : getDeveloperInstructionsForMode(mode ?? 'spot');
   const res = await callAi(
     model,
     instructions,

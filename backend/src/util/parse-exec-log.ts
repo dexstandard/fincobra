@@ -1,4 +1,9 @@
-import type { ExecOrder, ParsedExecLog } from './parse-exec-log.types.js';
+import type {
+  ExecOrder,
+  ExecFuturesPosition,
+  ParsedExecLog,
+} from './parse-exec-log.types.js';
+import type { TradeMode } from '../repos/portfolio-workflows.types.js';
 import { TOKEN_SYMBOLS } from './tokens.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -21,6 +26,25 @@ function isExecOrder(value: unknown): value is ExecOrder {
     'maxPriceDriftPct' in value &&
     typeof value.maxPriceDriftPct !== 'number'
   )
+    return false;
+  return true;
+}
+
+function isExecFuturesPosition(value: unknown): value is ExecFuturesPosition {
+  if (!isRecord(value)) return false;
+  if (
+    typeof value.symbol !== 'string' ||
+    typeof value.positionSide !== 'string' ||
+    typeof value.qty !== 'number'
+  )
+    return false;
+  if ('leverage' in value && typeof value.leverage !== 'number') return false;
+  if ('entryType' in value && typeof value.entryType !== 'string') return false;
+  if ('entryPrice' in value && typeof value.entryPrice !== 'number') return false;
+  if ('reduceOnly' in value && typeof value.reduceOnly !== 'boolean')
+    return false;
+  if ('stopLoss' in value && typeof value.stopLoss !== 'number') return false;
+  if ('takeProfit' in value && typeof value.takeProfit !== 'number')
     return false;
   return true;
 }
@@ -105,11 +129,15 @@ export function parseExecLog(log: unknown): ParsedExecLog {
                     ? resultError
                     : JSON.stringify(resultError);
                 error = { message };
-              } else if ('orders' in result) {
+              } else if ('orders' in result || 'futures' in result) {
                 const ordersValue = result.orders;
+                const futuresValue = (result as { futures?: unknown }).futures;
                 const orders = Array.isArray(ordersValue)
                   ? ordersValue.filter(isExecOrder)
-                  : [];
+                  : undefined;
+                const futures = Array.isArray(futuresValue)
+                  ? futuresValue.filter(isExecFuturesPosition)
+                  : undefined;
                 const shortReportValue =
                   typeof result.shortReport === 'string'
                     ? result.shortReport
@@ -119,7 +147,8 @@ export function parseExecLog(log: unknown): ParsedExecLog {
                       : undefined;
                 if (typeof shortReportValue === 'string') {
                   response = {
-                    orders,
+                    ...(orders ? { orders } : {}),
+                    ...(futures ? { futures } : {}),
                     shortReport: shortReportValue,
                   };
                 } else {
@@ -146,33 +175,65 @@ export function parseExecLog(log: unknown): ParsedExecLog {
 export function validateExecResponse(
   response: ParsedExecLog['response'] | undefined,
   allowedTokens: string[],
+  tradeMode: TradeMode,
 ): string | undefined {
   if (!response) return undefined;
-  for (const o of response.orders || []) {
-    if (
-      typeof o.pair !== 'string' ||
-      typeof o.token !== 'string' ||
-      typeof o.side !== 'string'
-    )
-      return 'invalid order';
-    let base = '';
-    let quote = '';
-    for (const sym of TOKEN_SYMBOLS) {
-      if (o.pair.startsWith(sym)) {
-        const rest = o.pair.slice(sym.length);
-        if (TOKEN_SYMBOLS.includes(rest)) {
-          base = sym;
-          quote = rest;
-          break;
+  if (tradeMode === 'spot') {
+    const orders = response.orders ?? [];
+    for (const o of orders) {
+      if (
+        typeof o.pair !== 'string' ||
+        typeof o.token !== 'string' ||
+        typeof o.side !== 'string'
+      )
+        return 'invalid order';
+      let base = '';
+      let quote = '';
+      for (const sym of TOKEN_SYMBOLS) {
+        if (o.pair.startsWith(sym)) {
+          const rest = o.pair.slice(sym.length);
+          if (TOKEN_SYMBOLS.includes(rest)) {
+            base = sym;
+            quote = rest;
+            break;
+          }
         }
       }
+      if (!base || !quote) return 'invalid pair';
+      if (!allowedTokens.includes(base) || !allowedTokens.includes(quote))
+        return 'invalid pair';
+      if (o.token !== base && o.token !== quote) return 'invalid token';
+      if (typeof o.qty !== 'number' || o.qty <= 0)
+        return 'invalid qty';
     }
-    if (!base || !quote) return 'invalid pair';
-    if (!allowedTokens.includes(base) || !allowedTokens.includes(quote))
-      return 'invalid pair';
-    if (o.token !== base && o.token !== quote) return 'invalid token';
-    if (typeof o.qty !== 'number' || o.qty <= 0)
-      return 'invalid qty';
+    return undefined;
+  }
+
+  const futures = response.futures ?? [];
+  if (!Array.isArray(response.futures)) {
+    return 'invalid futures block';
+  }
+  for (const f of futures) {
+    if (typeof f.symbol !== 'string' || !f.symbol) return 'invalid symbol';
+    if (f.positionSide !== 'LONG' && f.positionSide !== 'SHORT')
+      return 'invalid positionSide';
+    if (typeof f.qty !== 'number' || f.qty <= 0) return 'invalid qty';
+    if (typeof f.leverage !== 'number' || f.leverage <= 0)
+      return 'invalid leverage';
+    if (f.entryType !== 'MARKET' && f.entryType !== 'LIMIT')
+      return 'invalid entryType';
+    if (f.entryType === 'LIMIT' && typeof f.entryPrice !== 'number')
+      return 'missing entryPrice';
+    if (
+      f.entryType === 'LIMIT' &&
+      typeof f.entryPrice === 'number' &&
+      f.entryPrice <= 0
+    )
+      return 'invalid entryPrice';
+    if (f.stopLoss !== undefined && typeof f.stopLoss !== 'number')
+      return 'invalid stopLoss';
+    if (f.takeProfit !== undefined && typeof f.takeProfit !== 'number')
+      return 'invalid takeProfit';
   }
   return undefined;
 }

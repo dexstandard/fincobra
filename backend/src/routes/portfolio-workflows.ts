@@ -79,6 +79,7 @@ const workflowUpsertSchema = z
     manualRebalance: z.boolean().optional().default(false),
     useEarn: z.boolean().optional().default(false),
     status: z.nativeEnum(PortfolioWorkflowStatus),
+    tradeMode: z.enum(['spot', 'futures']).optional().default('spot'),
   })
   .strip();
 
@@ -412,6 +413,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         agentInstructions: validated.agentInstructions,
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
+        tradeMode: validated.tradeMode,
       });
       if (status === PortfolioWorkflowStatus.Active)
         reviewWorkflowPortfolio(req.log, row.id).catch((err) =>
@@ -446,10 +448,14 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       return {
         items: rows.map((r) => {
           let orders: unknown[] | undefined;
+          let futures: unknown[] | undefined;
           try {
             const parsed = JSON.parse(r.log);
             if (parsed && Array.isArray(parsed.orders)) {
               orders = parsed.orders;
+            }
+            if (parsed && Array.isArray(parsed.futures)) {
+              futures = parsed.futures;
             }
           } catch {
             // ignore JSON parse errors and leave orders undefined
@@ -461,6 +467,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
                   rebalance: !!r.rebalance,
                   shortReport: r.shortReport ?? '',
                   ...(orders ? { orders } : {}),
+                  ...(futures ? { futures } : {}),
                 };
           return {
             id: r.id,
@@ -558,6 +565,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         log.error('workflow not in manual mode');
         return reply.code(400).send(errorResponse('manual rebalance disabled'));
       }
+      if (workflow.tradeMode !== 'spot') {
+        log.error('workflow trade mode does not support manual limit orders');
+        return reply
+          .code(400)
+          .send(errorResponse('manual limit orders unavailable for futures workflows'));
+      }
       const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
       const { logId } = lp;
@@ -637,7 +650,13 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { id, userId, log } = ctx;
+      const { id, userId, log, workflow } = ctx;
+      if (workflow.tradeMode !== 'spot') {
+        log.error('workflow trade mode does not support manual limit orders');
+        return reply
+          .code(400)
+          .send(errorResponse('manual limit orders unavailable for futures workflows'));
+      }
       const lp = parseRequestParams(orderIdParams, req, reply);
       if (!lp) return;
       const { logId, orderId } = lp;
@@ -683,6 +702,12 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if (!workflow.manualRebalance) {
         log.error('workflow not in manual mode');
         return reply.code(400).send(errorResponse('manual rebalance disabled'));
+      }
+      if (workflow.tradeMode !== 'spot') {
+        log.error('workflow trade mode does not support manual limit orders');
+        return reply
+          .code(400)
+          .send(errorResponse('manual limit orders unavailable for futures workflows'));
       }
       const lp = parseRequestParams(logIdParams, req, reply);
       if (!lp) return;
@@ -762,6 +787,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         startBalance,
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
+        tradeMode: validated.tradeMode,
       });
       const row = (await getPortfolioWorkflow(id))!;
       if (status === PortfolioWorkflowStatus.Active)
@@ -808,14 +834,16 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('model required'));
       }
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
-      const pairErr = await validateTradingPairs(
-        log,
-        existing.cashToken,
-        tokens,
-      );
-      if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
-      const conflict = await validateTokenConflicts(log, userId, tokens, id);
-      if (conflict) return reply.code(conflict.code).send(conflict.body);
+      if (existing.tradeMode === 'spot') {
+        const pairErr = await validateTradingPairs(
+          log,
+          existing.cashToken,
+          tokens,
+        );
+        if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
+        const conflict = await validateTokenConflicts(log, userId, tokens, id);
+        if (conflict) return reply.code(conflict.code).send(conflict.body);
+      }
       const keyErr = await ensureApiKeys(log, userId);
       if (keyErr) return reply.code(keyErr.code).send(keyErr.body);
       const bal = await getStartBalance(log, userId, tokens);

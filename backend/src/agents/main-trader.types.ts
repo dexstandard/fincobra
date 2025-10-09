@@ -1,10 +1,12 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { MarketOverviewPayload } from '../services/indicators.types.js';
+import type { TradeMode } from '../repos/portfolio-workflows.types.js';
 export interface RunParams {
   log: FastifyBaseLogger;
   model: string;
   apiKey: string;
   portfolioId: string;
+  tradeMode: TradeMode;
 }
 
 export interface RebalancePosition {
@@ -26,10 +28,24 @@ export interface PreviousReportOrder {
 export interface PreviousReport {
   ts: string;
   orders?: PreviousReportOrder[];
+  futures?: PreviousReportFuturesPosition[];
   shortReport?: string;
   error?: unknown;
   strategyName?: string;
   pnlShiftUsd?: number;
+}
+
+export interface PreviousReportFuturesPosition {
+  symbol: string;
+  positionSide: string;
+  qty: number;
+  leverage?: number;
+  entryType?: string;
+  entryPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  status?: string;
+  positionId?: string;
 }
 
 export interface RoutePrice {
@@ -73,6 +89,7 @@ export interface PromptReport {
 }
 
 export interface RebalancePrompt {
+  tradeMode: TradeMode;
   reviewInterval: string;
   policy: { floor: Record<string, number> };
   cash: string;
@@ -94,6 +111,21 @@ export interface RebalancePrompt {
   };
   previousReports?: PreviousReport[];
   reports?: PromptReport[];
+  futures?: RebalancePromptFuturesContext;
+}
+
+export interface RebalancePromptFuturesContext {
+  positions: FuturesPromptPosition[];
+  walletBalanceUsd?: number;
+}
+
+export interface FuturesPromptPosition {
+  symbol: string;
+  positionSide: 'LONG' | 'SHORT';
+  qty: number;
+  entryPrice?: number;
+  leverage?: number;
+  unrealizedPnlUsd?: number;
 }
 
 export interface MainTraderOrder {
@@ -106,9 +138,34 @@ export interface MainTraderOrder {
   maxPriceDriftPct: number;
 }
 
-export interface MainTraderDecision {
-  orders: MainTraderOrder[];
+export interface MainTraderFuturesPosition {
+  symbol: string;
+  positionSide: 'LONG' | 'SHORT';
+  qty: number;
+  leverage: number;
+  entryType: 'MARKET' | 'LIMIT';
+  entryPrice?: number;
+  reduceOnly?: boolean;
+  stopLoss?: number;
+  takeProfit?: number;
+}
+
+interface MainTraderBaseDecision {
   shortReport: string;
   strategyName?: string;
   strategyRationale?: string;
 }
+
+export interface MainTraderSpotDecision extends MainTraderBaseDecision {
+  tradeMode: 'spot';
+  orders: MainTraderOrder[];
+}
+
+export interface MainTraderFuturesDecision extends MainTraderBaseDecision {
+  tradeMode: 'futures';
+  futures: MainTraderFuturesPosition[];
+}
+
+export type MainTraderDecision =
+  | MainTraderSpotDecision
+  | MainTraderFuturesDecision;

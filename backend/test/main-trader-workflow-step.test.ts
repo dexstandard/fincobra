@@ -24,6 +24,8 @@ const callAiMock = vi.hoisted(() =>
                       },
                     ],
                     shortReport: 'ok',
+                    strategyName: 'trend',
+                    strategyRationale: 'alpha',
                   },
                 }),
               },
@@ -48,6 +50,7 @@ describe('main trader step', () => {
 
   it('returns decision from AI response', async () => {
     const prompt = {
+      tradeMode: 'spot',
       reviewInterval: '1h',
       policy: { floor: {} },
       cash: 'USDT',
@@ -62,6 +65,7 @@ describe('main trader step', () => {
         model: 'gpt',
         apiKey: 'key',
         portfolioId: 'agent1',
+        tradeMode: 'spot',
       },
       prompt,
     );
@@ -83,6 +87,7 @@ describe('main trader step', () => {
 
   it('prefers prompt instructions when provided', async () => {
     const prompt = {
+      tradeMode: 'spot',
       reviewInterval: '1h',
       policy: { floor: {} },
       cash: 'USDT',
@@ -96,6 +101,7 @@ describe('main trader step', () => {
         model: 'gpt',
         apiKey: 'key',
         portfolioId: 'agent1',
+        tradeMode: 'spot',
       },
       prompt,
       'custom developer instructions',

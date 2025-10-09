@@ -15,6 +15,7 @@ describe('callAi structured output', () => {
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
     const prompt: RebalancePrompt = {
+      tradeMode: 'spot',
       policy: { floor: { USDT: 20 } },
       cash: 'USDT',
       portfolio: {
@@ -53,7 +54,7 @@ describe('callAi structured output', () => {
     const body = JSON.parse(opts.body);
     expect(opts.body).toBe(JSON.stringify(body));
     expect(body.instructions).toMatch(
-      /You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place orders consistent with those targets/i,
+      /You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place trades consistent with those targets/i,
     );
     expect(body.instructions).toMatch(/On error, return error message/i);
     expect(typeof body.input).toBe('string');
@@ -78,7 +79,7 @@ describe('callAi structured output', () => {
     expect(body.text.format.type).toBe('json_schema');
     const anyOf = body.text.format.schema.properties.result.anyOf;
     expect(Array.isArray(anyOf)).toBe(true);
-    expect(anyOf).toHaveLength(2);
+    expect(anyOf).toHaveLength(3);
     (globalThis as any).fetch = originalFetch;
   });
 
@@ -89,6 +90,7 @@ describe('callAi structured output', () => {
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
     const prompt: RebalancePrompt = {
+      tradeMode: 'spot',
       reviewInterval: '1h',
       policy: { floor: {} },
       cash: 'USDT',

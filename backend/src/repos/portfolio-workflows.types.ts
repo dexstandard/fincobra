@@ -1,3 +1,5 @@
+export type TradeMode = 'spot' | 'futures';
+
 export interface PortfolioWorkflowToken {
   token: string;
   minAllocation: number;
@@ -17,6 +19,7 @@ export interface PortfolioWorkflow {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  tradeMode: TradeMode;
   aiApiKeyId: string | null;
   exchangeApiKeyId: string | null;
   ownerEmailEnc: string | null;
@@ -34,6 +37,7 @@ export interface PortfolioWorkflowInsert {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  tradeMode: TradeMode;
 }
 
 export interface PortfolioWorkflowUpdate {
@@ -48,6 +52,7 @@ export interface PortfolioWorkflowUpdate {
   startBalance: number | null;
   manualRebalance: boolean;
   useEarn: boolean;
+  tradeMode: TradeMode;
 }
 
 export interface PortfolioWorkflowInactiveSearch {
@@ -60,6 +65,7 @@ export interface PortfolioWorkflowInactiveSearch {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  tradeMode: TradeMode;
 }
 
 export interface PortfolioWorkflowUserApiKeys {
@@ -85,4 +91,5 @@ export interface ActivePortfolioWorkflow {
   startBalance: number | null;
   createdAt: string;
   portfolioId: string;
+  tradeMode: TradeMode;
 }

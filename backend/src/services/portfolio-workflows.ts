@@ -3,6 +3,7 @@ import type {
   PortfolioWorkflowInput,
   PortfolioWorkflowTokenInput,
 } from '../routes/portfolio-workflows.types.js';
+import type { TradeMode } from '../repos/portfolio-workflows.types.js';
 import {
   getUserApiKeys,
   findIdenticalInactiveWorkflow,
@@ -90,6 +91,11 @@ async function validateWorkflowInput(
   body: PortfolioWorkflowInput,
   id?: string,
 ): Promise<ValidationErr | null> {
+  body.tradeMode = (body.tradeMode ?? 'spot') as TradeMode;
+  if (body.tradeMode !== 'spot' && body.tradeMode !== 'futures') {
+    log.error('invalid trade mode');
+    return { code: 400, body: errorResponse('invalid trade mode') };
+  }
   body.cash = (body.cash ?? '').toUpperCase();
   if (!['USDT', 'USDC'].includes(body.cash)) {
     log.error('invalid cash token');
@@ -137,6 +143,7 @@ async function validateWorkflowInput(
         agentInstructions: body.agentInstructions,
         manualRebalance: body.manualRebalance,
         useEarn: body.useEarn,
+        tradeMode: body.tradeMode,
       },
       id,
     );
@@ -149,7 +156,7 @@ async function validateWorkflowInput(
         ),
       };
     }
-  } else {
+  } else if (body.tradeMode === 'spot') {
     const conflict = await validateTokenConflicts(
       log,
       userId,
@@ -206,6 +213,7 @@ export async function preparePortfolioWorkflowForUpsert(
   try {
     body.manualRebalance = !!body.manualRebalance;
     body.useEarn = body.useEarn === true;
+    body.tradeMode = (body.tradeMode ?? 'spot') as TradeMode;
     body.tokens = validateAllocations(
       body.tokens.map((t) => ({
         token: normalizeTokenSymbol(t.token),
@@ -220,20 +228,24 @@ export async function preparePortfolioWorkflowForUpsert(
   if (err) return err;
   let startBalance: number | null = null;
   if (body.status === PortfolioWorkflowStatus.Active) {
-    const pairErr = await validateTradingPairs(
-      log,
-      body.cash,
-      body.tokens.map((t) => t.token),
-    );
-    if (pairErr) return pairErr;
+    if (body.tradeMode === 'spot') {
+      const pairErr = await validateTradingPairs(
+        log,
+        body.cash,
+        body.tokens.map((t) => t.token),
+      );
+      if (pairErr) return pairErr;
+    }
     const keyErr = await ensureApiKeys(log, userId);
     if (keyErr) return keyErr;
-    const bal = await getStartBalance(log, userId, [
-      body.cash,
-      ...body.tokens.map((t) => t.token),
-    ]);
-    if (typeof bal === 'number') startBalance = bal;
-    else return bal;
+    if (body.tradeMode === 'spot') {
+      const bal = await getStartBalance(log, userId, [
+        body.cash,
+        ...body.tokens.map((t) => t.token),
+      ]);
+      if (typeof bal === 'number') startBalance = bal;
+      else return bal;
+    }
   }
   return { body, startBalance };
 }

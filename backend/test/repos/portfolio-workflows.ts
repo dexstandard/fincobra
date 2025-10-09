@@ -8,7 +8,7 @@ import {
 
 export const insertPortfolioWorkflow = (
   data: Parameters<typeof insertWorkflowProd>[0],
-) => insertWorkflowProd({ cashToken: 'USDT', ...data });
+) => insertWorkflowProd({ cashToken: 'USDT', tradeMode: 'spot', ...data });
 export {
   startPortfolioWorkflow,
   stopPortfolioWorkflow,

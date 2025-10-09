@@ -121,6 +121,7 @@ describe('portfolio workflow routes', () => {
       agentInstructions: 'prompt',
       cash: 'USDT',
       status: 'active',
+      tradeMode: 'spot',
     };
 
     let res = await app.inject({

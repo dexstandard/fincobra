@@ -8,8 +8,21 @@ export interface ExecOrder {
   maxPriceDriftPct?: number;
 }
 
+export interface ExecFuturesPosition {
+  symbol: string;
+  positionSide: string;
+  qty: number;
+  leverage?: number;
+  entryType?: string;
+  entryPrice?: number;
+  reduceOnly?: boolean;
+  stopLoss?: number;
+  takeProfit?: number;
+}
+
 export interface ParsedExecLogResponse {
-  orders: ExecOrder[];
+  orders?: ExecOrder[];
+  futures?: ExecFuturesPosition[];
   shortReport: string;
 }
 
