@@ -197,6 +197,10 @@ export default function ExecSuccessItem({ response, rawLog, promptIcon }: Props)
   const [responseRaw, setResponseRaw] = useState<string | null>(null);
   const [parseFailed, setParseFailed] = useState(false);
   const { rebalance, shortReport } = response;
+  if (typeof shortReport !== 'string') {
+    console.error('Missing shortReport in execution log response', response);
+  }
+  const shortReportText = typeof shortReport === 'string' ? shortReport : '';
   const color = rebalance
     ? 'border-green-300 bg-green-50 text-green-800'
     : 'border-blue-300 bg-blue-50 text-blue-800';
@@ -218,7 +222,7 @@ export default function ExecSuccessItem({ response, rawLog, promptIcon }: Props)
         <span className="font-bold mr-1">
           {rebalance ? t('rebalance') : t('hold')}
         </span>
-        <span>{truncate(shortReport)}</span>
+        <span>{shortReportText && truncate(shortReportText)}</span>
       </div>
       {promptIcon}
       <Eye className="h-4 w-4 cursor-pointer" onClick={handleShowResponse} />

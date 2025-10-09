@@ -409,6 +409,33 @@ describe('portfolio workflow exec log routes', () => {
     await app.close();
   });
 
+  it('marks AI responses without shortReport as errors', () => {
+    const aiLog = JSON.stringify({
+      object: 'response',
+      output: [
+        {
+          id: 'msg_1',
+          type: 'message',
+          status: 'completed',
+          role: 'assistant',
+          content: [
+            {
+              type: 'output_text',
+              text: '{"result":{"orders":[]}}',
+            },
+          ],
+        },
+      ],
+    });
+
+    const parsed = parseExecLog(aiLog);
+
+    expect(parsed.response).toBeUndefined();
+    expect(parsed.error).toMatchObject({
+      message: 'AI response missing shortReport',
+    });
+  });
+
   it('creates manual rebalance order once', async () => {
     const app = await buildServer();
     const userId = await insertUser('20');
