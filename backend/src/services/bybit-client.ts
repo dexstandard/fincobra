@@ -293,6 +293,25 @@ function mapPositionIndex(positionSide: 'LONG' | 'SHORT'): 1 | 2 {
   return positionSide === 'LONG' ? 1 : 2;
 }
 
+function resolvePositionIndex(
+  positionSide: 'LONG' | 'SHORT',
+  options: { hedgeMode?: boolean; positionIdx?: 0 | 1 | 2 },
+): 0 | 1 | 2 | undefined {
+  if (options.positionIdx !== undefined) {
+    return options.positionIdx;
+  }
+
+  if (options.hedgeMode === true) {
+    return mapPositionIndex(positionSide);
+  }
+
+  if (options.hedgeMode === false) {
+    return undefined;
+  }
+
+  return undefined;
+}
+
 export async function fetchFuturesWalletBalance(
   userId: string,
 ): Promise<BybitWalletBalance | null> {
@@ -357,13 +376,10 @@ export async function openBybitFuturesPosition(
       qty: String(params.quantity),
     };
 
-    const shouldOmitPositionIdx =
-      params.hedgeMode === false && params.positionIdx === undefined;
-    const positionIdx = shouldOmitPositionIdx
-      ? undefined
-      : params.positionIdx !== undefined
-        ? params.positionIdx
-        : mapPositionIndex(params.positionSide);
+    const positionIdx = resolvePositionIndex(params.positionSide, {
+      hedgeMode: params.hedgeMode,
+      positionIdx: params.positionIdx,
+    });
 
     if (positionIdx !== undefined) {
       body.positionIdx = positionIdx;
@@ -400,6 +416,11 @@ async function updateTradingStop(
   triggerField: 'slTriggerBy' | 'tpTriggerBy',
   errorMessage: string,
 ) {
+  const positionIdx = resolvePositionIndex(params.positionSide, {
+    hedgeMode: params.hedgeMode,
+    positionIdx: params.positionIdx,
+  });
+
   return withBybitUserCreds(userId, async (creds) =>
     requestOrThrow<Record<string, unknown>>(
       creds,
@@ -411,14 +432,7 @@ async function updateTradingStop(
           symbol: params.symbol.toUpperCase(),
           [field]: String(params.stopPrice),
           [triggerField]: 'LastPrice',
-          ...(params.hedgeMode === false && params.positionIdx === undefined
-            ? {}
-            : {
-                positionIdx:
-                  params.positionIdx !== undefined
-                    ? params.positionIdx
-                    : mapPositionIndex(params.positionSide),
-              }),
+          ...(positionIdx === undefined ? {} : { positionIdx }),
         },
       },
       errorMessage,
