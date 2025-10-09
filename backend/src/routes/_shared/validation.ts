@@ -2,6 +2,17 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { errorResponse } from '../../util/error-messages.js';
 
+interface ValidationIssueSummary {
+  path: string;
+  code: string;
+  message: string;
+}
+
+interface ParseBodyOptions {
+  errorMessage?: string;
+  logIssues?: boolean;
+}
+
 export const userIdParams = z.object({ id: z.string().regex(/^\d+$/) });
 
 export const userTokenParamsSchema = z
@@ -19,10 +30,21 @@ export function parseBody<S extends z.ZodTypeAny>(
   schema: S,
   req: FastifyRequest,
   reply: FastifyReply,
+  options?: ParseBodyOptions,
 ): z.infer<S> | undefined {
   const result = schema.safeParse(req.body);
   if (!result.success) {
-    reply.code(400).send(errorResponse('invalid request body'));
+    if (options?.logIssues !== false) {
+      const issues: ValidationIssueSummary[] = result.error.issues.map((issue) => ({
+        path: issue.path.join('.') || '<root>',
+        code: issue.code,
+        message: issue.message,
+      }));
+      req.log.warn({ issues }, 'request body validation failed');
+    }
+    reply
+      .code(400)
+      .send(errorResponse(options?.errorMessage ?? 'invalid request body'));
     return undefined;
   }
   return result.data;
