@@ -339,7 +339,7 @@ export default function ApiKeySection({
               className="p-1 border rounded"
               onClick={() => {
                 navigator.clipboard.writeText(whitelistHost);
-                toast.show(t('copied'));
+                toast.show(t('copied'), 'success');
               }}
               aria-label={t('copy_ip')}
             >

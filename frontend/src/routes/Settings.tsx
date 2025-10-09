@@ -134,7 +134,7 @@ export default function Settings() {
               className="p-1 border rounded"
               onClick={() => {
                 navigator.clipboard.writeText(setup.secret);
-                toast.show(t('copied'));
+                toast.show(t('copied'), 'success');
               }}
               aria-label={t('copy_secret')}
             >
