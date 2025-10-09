@@ -14,13 +14,21 @@ const translations: Record<Lang, Record<string, string>> = {
     terms: 'Terms',
     privacy: 'Privacy',
     terms_title: 'Terms of Use',
-    terms_p1:
-      'FinCobra is open source software provided "as is" without warranties or guarantees of any kind. Use it at your own risk.',
-    terms_p2:
-      'You are free to review the source code and run your own instance on your infrastructure. The code is available at ',
-    terms_link: 'this GitHub repository',
-    terms_p3:
-      'By using the service you agree that the authors are not liable for any damages.',
+    terms_intro:
+      'Welcome to FinCobra, an experimental trading assistant currently in alpha.',
+    terms_disclaimer:
+      'FinCobra is provided “as is” without any warranties or guarantees. Use it at your own risk.',
+    terms_access:
+      'Access is for private use only. Features may change over time, and access may be revoked if misuse is detected.',
+    terms_safety_heading: 'For your safety:',
+    terms_safety_item_enable_2fa: 'Enable 2FA on your exchange accounts.',
+    terms_safety_item_no_withdrawals: 'Never allow withdrawals in your API keys.',
+    terms_safety_item_openai_billing:
+      'If you add your own OpenAI API key, note that OpenAI will bill you for the models you use.',
+    terms_free_stage:
+      'The service is free to use in this alpha stage, and the authors assume no liability for any outcomes.',
+    terms_responsible_use:
+      'By using FinCobra, you agree to these terms and use the service responsibly.',
     privacy_title: 'Privacy Policy',
     privacy_p1:
       'We collect only the information required to run the service. When you sign in with Google we record your Google account ID. Your email is stored encrypted and used only for platform-related notifications. Workflow configuration data and optional two-factor authentication secrets are also saved.',
@@ -207,13 +215,21 @@ const translations: Record<Lang, Record<string, string>> = {
     terms: 'Условия',
     privacy: 'Конфиденциальность',
     terms_title: 'Условия использования',
-    terms_p1:
-      'FinCobra — программное обеспечение с открытым исходным кодом, предоставляется «как есть» без каких-либо гарантий. Используйте на свой страх и риск.',
-    terms_p2:
-      'Вы можете изучать исходный код и запускать собственный экземпляр на своей инфраструктуре. Код доступен в ',
-    terms_link: 'этом репозитории GitHub',
-    terms_p3:
-      'Используя сервис, вы соглашаетесь, что авторы не несут ответственности за любые убытки.',
+    terms_intro:
+      'Добро пожаловать в FinCobra — экспериментальный торговый ассистент в статусе альфа.',
+    terms_disclaimer:
+      'FinCobra предоставляется «как есть» без каких-либо гарантий. Используйте сервис на свой страх и риск.',
+    terms_access:
+      'Доступ предназначен только для частного использования. Функциональность может меняться, а доступ может быть отозван при обнаружении злоупотреблений.',
+    terms_safety_heading: 'Для вашей безопасности:',
+    terms_safety_item_enable_2fa: 'Включайте 2FA на своих счетах бирж.',
+    terms_safety_item_no_withdrawals: 'Никогда не разрешайте вывод средств в API-ключах.',
+    terms_safety_item_openai_billing:
+      'Если вы добавляете собственный API-ключ OpenAI, помните, что OpenAI выставит вам счёт за используемые модели.',
+    terms_free_stage:
+      'Сервис бесплатен на этапе альфа-тестирования, авторы не несут ответственности за результаты.',
+    terms_responsible_use:
+      'Используя FinCobra, вы соглашаетесь с этими условиями и обязуетесь пользоваться сервисом ответственно.',
     privacy_title: 'Политика конфиденциальности',
     privacy_p1:
       'Мы собираем только информацию, необходимую для работы сервиса. При входе через Google мы сохраняем идентификатор вашей учетной записи Google. Ваш email хранится в зашифрованном виде и используется только для уведомлений, связанных с платформой. Также сохраняются данные конфигурации workflow и, при необходимости, секреты двухфакторной аутентификации.',
