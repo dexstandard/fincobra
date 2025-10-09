@@ -258,6 +258,19 @@ describe('reviewPortfolio', () => {
     expect(args.orders).toHaveLength(2);
   });
 
+  it('treats missing orders as a hold decision', async () => {
+    const { workflowId } = await setupWorkflow(['BTC']);
+    const decision = { shortReport: 'holding pattern' } as any;
+    runMainTrader.mockResolvedValue(decision);
+    const log = mockLogger();
+    await reviewWorkflowPortfolio(log, workflowId);
+    expect(createDecisionLimitOrders).not.toHaveBeenCalled();
+    const [result] = await getRecentReviewResults(workflowId, 1);
+    expect(result.rebalance).toBe(false);
+    expect(result.shortReport).toBe('holding pattern');
+    expect(result.error).toBeUndefined();
+  });
+
   it('retries workflow when every order is canceled for price divergence', async () => {
     const { workflowId } = await setupWorkflow(['BTC']);
     const decision = {
