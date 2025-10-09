@@ -36,6 +36,7 @@ import {
 } from './news-analyst.js';
 
 export const developerInstructions = [
+  'Primary Goal: Grow total portfolio USD value and monitor PnL every decision cycle.',
   'Strategy & Decision Rules',
   '- You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place orders consistent with those targets.',
   '- Use the market overview dataset for price action, higher-timeframe trend, returns, and risk flags.',
