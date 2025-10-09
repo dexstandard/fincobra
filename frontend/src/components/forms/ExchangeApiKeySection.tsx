@@ -18,8 +18,16 @@ export default function ExchangeApiKeySection({ exchange, label }: Props) {
   const supportsBalances = exchange === 'binance';
   const supportsWhitelist = exchange === 'binance' || exchange === 'bybit';
   const exchangeFields = [
-    { name: 'key', placeholder: t('api_key') },
-    { name: 'secret', placeholder: t('api_secret') },
+    {
+      name: 'key',
+      placeholder: t('api_key'),
+      minLength: exchange === 'binance' ? 64 : 18,
+    },
+    {
+      name: 'secret',
+      placeholder: t('api_secret'),
+      minLength: exchange === 'binance' ? 64 : 32,
+    },
   ];
   const commonProps = {
     label,
