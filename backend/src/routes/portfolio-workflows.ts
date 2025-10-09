@@ -78,6 +78,7 @@ const workflowUpsertSchema = z
     agentInstructions: z.string(),
     manualRebalance: z.boolean().optional().default(false),
     useEarn: z.boolean().optional().default(false),
+    useFutures: z.boolean().optional().default(false),
     status: z.nativeEnum(PortfolioWorkflowStatus),
   })
   .strip();
@@ -412,6 +413,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         agentInstructions: validated.agentInstructions,
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
+        useFutures: validated.useFutures,
       });
       if (status === PortfolioWorkflowStatus.Active)
         reviewWorkflowPortfolio(req.log, row.id).catch((err) =>
@@ -604,6 +606,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         orders: [updatedOrder],
         reviewResultId: logId,
         log: log.child({ execLogId: logId }),
+        useFutures: workflow.useFutures,
       });
       const orders = await getLimitOrdersByReviewResult(id, logId);
       if (!orders.length) {
@@ -652,6 +655,15 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('order not open'));
       }
       const planned = JSON.parse(row.plannedJson);
+      if (planned.execution === 'futures') {
+        log.error(
+          { execLogId: logId, orderId },
+          'futures order cancellation not supported',
+        );
+        return reply
+          .code(400)
+          .send(errorResponse('futures order cancellation not supported'));
+      }
       try {
         await cancelLimitOrder(userId, {
           symbol: planned.symbol,
@@ -762,6 +774,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         startBalance,
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
+        useFutures: validated.useFutures,
       });
       const row = (await getPortfolioWorkflow(id))!;
       if (status === PortfolioWorkflowStatus.Active)

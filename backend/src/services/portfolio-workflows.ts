@@ -137,6 +137,7 @@ async function validateWorkflowInput(
         agentInstructions: body.agentInstructions,
         manualRebalance: body.manualRebalance,
         useEarn: body.useEarn,
+        useFutures: body.useFutures,
       },
       id,
     );
@@ -206,6 +207,7 @@ export async function preparePortfolioWorkflowForUpsert(
   try {
     body.manualRebalance = !!body.manualRebalance;
     body.useEarn = body.useEarn === true;
+    body.useFutures = body.useFutures === true;
     body.tokens = validateAllocations(
       body.tokens.map((t) => ({
         token: normalizeTokenSymbol(t.token),

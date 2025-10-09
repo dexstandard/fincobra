@@ -94,6 +94,16 @@ export interface RebalancePrompt {
   };
   previousReports?: PreviousReport[];
   reports?: PromptReport[];
+  tradingMode: 'spot' | 'futures';
+}
+
+export interface MainTraderFuturesConfig {
+  leverage?: number;
+  positionSide: 'LONG' | 'SHORT';
+  type?: 'MARKET' | 'LIMIT';
+  stopLoss?: number;
+  takeProfit?: number;
+  reduceOnly?: boolean;
 }
 
 export interface MainTraderOrder {
@@ -104,6 +114,7 @@ export interface MainTraderOrder {
   limitPrice: number;
   basePrice: number;
   maxPriceDriftPct: number;
+  futures?: MainTraderFuturesConfig;
 }
 
 export interface MainTraderDecision {

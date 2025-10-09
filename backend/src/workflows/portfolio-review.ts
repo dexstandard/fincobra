@@ -94,6 +94,13 @@ async function cleanupOpenOrders(
     orders.map((o) =>
       limit(async () => {
         const planned = JSON.parse(o.plannedJson);
+        if (planned.execution === 'futures') {
+          log.info(
+            { orderId: o.orderId },
+            'skipping cancel for futures order',
+          );
+          return;
+        }
         try {
           const res = await cancelLimitOrder(o.userId, {
             symbol: planned.symbol,
@@ -267,6 +274,7 @@ async function runWorkflowAttempt(
         orders: decision.orders,
         reviewResultId: resultId,
         log: runLog,
+        useFutures: wf.useFutures,
       });
       if (orderResult.needsPriceDivergenceRetry) {
         runLog.warn(

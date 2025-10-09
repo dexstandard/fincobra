@@ -12,5 +12,6 @@ export interface PortfolioWorkflowInput {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  useFutures: boolean;
   status: 'active' | 'inactive' | 'retired';
 }

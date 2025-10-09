@@ -17,6 +17,7 @@ export interface PortfolioWorkflow {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  useFutures: boolean;
   aiApiKeyId: string | null;
   exchangeApiKeyId: string | null;
   ownerEmailEnc: string | null;
@@ -34,6 +35,7 @@ export interface PortfolioWorkflowInsert {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  useFutures: boolean;
 }
 
 export interface PortfolioWorkflowUpdate {
@@ -48,6 +50,7 @@ export interface PortfolioWorkflowUpdate {
   startBalance: number | null;
   manualRebalance: boolean;
   useEarn: boolean;
+  useFutures: boolean;
 }
 
 export interface PortfolioWorkflowInactiveSearch {
@@ -60,6 +63,7 @@ export interface PortfolioWorkflowInactiveSearch {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  useFutures: boolean;
 }
 
 export interface PortfolioWorkflowUserApiKeys {
@@ -82,6 +86,7 @@ export interface ActivePortfolioWorkflow {
   exchangeApiKeyId: string | null;
   manualRebalance: boolean;
   useEarn: boolean;
+  useFutures: boolean;
   startBalance: number | null;
   createdAt: string;
   portfolioId: string;

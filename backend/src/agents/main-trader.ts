@@ -50,6 +50,7 @@ export const developerInstructions = [
   '- Keep limit targets realistic for the review interval so orders can fill; avoid extreme/unlikely prices.',
   '- Unfilled orders are canceled before the next review (interval is provided in the prompt).',
   '- Use maxPriceDriftPct to allow a small % drift from basePrice (≥0.0001 = 0.01%) to prevent premature cancellations.',
+  '- When prompt.tradingMode is "futures", include a `futures` object on each order with positionSide, stopLoss, takeProfit, and optional leverage/type metadata so downstream services can place futures trades with protective orders.',
   'Response Specification',
   '- Return the chosen strategy name, a short report (≤255 chars), a rationale explaining expected alpha, and an array of orders.',
   '- If no trade is taken, return an empty orders array.',
@@ -76,6 +77,19 @@ export const rebalanceResponseSchema = {
                   limitPrice: { type: 'number' },
                   basePrice: { type: 'number' },
                   maxPriceDriftPct: { type: 'number' },
+                  futures: {
+                    type: 'object',
+                    properties: {
+                      leverage: { type: 'number' },
+                      positionSide: { type: 'string', enum: ['LONG', 'SHORT'] },
+                      type: { type: 'string', enum: ['MARKET', 'LIMIT'] },
+                      stopLoss: { type: 'number' },
+                      takeProfit: { type: 'number' },
+                      reduceOnly: { type: 'boolean' },
+                    },
+                    required: ['positionSide', 'stopLoss', 'takeProfit'],
+                    additionalProperties: false,
+                  },
                 },
                 required: [
                   'pair',
@@ -615,6 +629,7 @@ export async function collectPromptData(
     routes,
     marketData: {},
     reports,
+    tradingMode: row.useFutures ? 'futures' : 'spot',
   };
   if (previousReports.length) {
     prompt.previousReports = previousReports;

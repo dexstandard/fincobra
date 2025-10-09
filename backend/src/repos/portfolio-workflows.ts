@@ -30,6 +30,7 @@ export function toApi(row: PortfolioWorkflow) {
     agentInstructions: row.agentInstructions,
     manualRebalance: row.manualRebalance,
     useEarn: row.useEarn,
+    useFutures: row.useFutures,
     aiApiKeyId: row.aiApiKeyId ?? null,
     exchangeApiKeyId: row.exchangeApiKeyId ?? null,
     ownerEmail:
@@ -43,7 +44,7 @@ const baseSelect = `
   SELECT pw.id, pw.user_id, pw.model, pw.status, pw.created_at, pw.start_balance, pw.cash_token,
          COALESCE(json_agg(json_build_object('token', t.token, 'min_allocation', t.min_allocation) ORDER BY t.position)
                   FILTER (WHERE t.token IS NOT NULL), '[]') AS tokens,
-         pw.risk, pw.review_interval, pw.agent_instructions, pw.manual_rebalance, pw.use_earn,
+         pw.risk, pw.review_interval, pw.agent_instructions, pw.manual_rebalance, pw.use_earn, pw.use_futures,
          COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id, COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
          u.email_enc AS owner_email_enc
     FROM portfolio_workflow pw
@@ -158,7 +159,7 @@ export async function findIdenticalInactiveWorkflow(
     WHERE pw.user_id = $1 AND pw.status = 'inactive' AND ($2::bigint IS NULL OR pw.id != $2)
       AND pw.model = $3 AND pw.cash_token = $4
       AND pw.risk = $5 AND pw.review_interval = $6 AND pw.agent_instructions = $7 AND pw.manual_rebalance = $8 AND pw.use_earn = $9
-      AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $10::jsonb`;
+      AND pw.use_futures = $10 AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $11::jsonb`;
   const params: unknown[] = [
     data.userId,
     excludeId ?? null,
@@ -169,6 +170,7 @@ export async function findIdenticalInactiveWorkflow(
     data.agentInstructions,
     data.manualRebalance,
     data.useEarn,
+    data.useFutures,
     JSON.stringify(
       data.tokens.map((t) => ({
         token: t.token,
@@ -222,8 +224,8 @@ export async function insertPortfolioWorkflow(
   let id = '';
   await withTransaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO portfolio_workflow (user_id, model, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO portfolio_workflow (user_id, model, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn, use_futures)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id`,
       [
         data.userId,
@@ -236,6 +238,7 @@ export async function insertPortfolioWorkflow(
         data.agentInstructions,
         data.manualRebalance,
         data.useEarn,
+        data.useFutures,
       ],
     );
     id = rows[0].id as string;
@@ -259,7 +262,7 @@ export async function updatePortfolioWorkflow(
 ): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `UPDATE portfolio_workflow SET model = $1, status = $2, cash_token = $3, risk = $4, review_interval = $5, agent_instructions = $6, start_balance = $7, manual_rebalance = $8, use_earn = $9 WHERE id = $10`,
+      `UPDATE portfolio_workflow SET model = $1, status = $2, cash_token = $3, risk = $4, review_interval = $5, agent_instructions = $6, start_balance = $7, manual_rebalance = $8, use_earn = $9, use_futures = $10 WHERE id = $11`,
       [
         data.model,
         data.status,
@@ -270,6 +273,7 @@ export async function updatePortfolioWorkflow(
         data.startBalance,
         data.manualRebalance,
         data.useEarn,
+        data.useFutures,
         data.id,
       ],
     );
@@ -330,6 +334,7 @@ export async function getActivePortfolioWorkflowById(
                       COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
                       pw.manual_rebalance,
                       pw.use_earn,
+                      pw.use_futures,
                       pw.start_balance,
                       pw.created_at,
                       pw.id AS portfolio_id
@@ -365,6 +370,7 @@ export async function getActivePortfolioWorkflowsByInterval(
                       COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
                       pw.manual_rebalance,
                       pw.use_earn,
+                      pw.use_futures,
                       pw.start_balance,
                       pw.created_at,
                       pw.id AS portfolio_id
@@ -396,6 +402,7 @@ const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model,
                       COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
                       pw.manual_rebalance,
                       pw.use_earn,
+                      pw.use_futures,
                       pw.start_balance,
                       pw.created_at,
                       pw.id AS portfolio_id

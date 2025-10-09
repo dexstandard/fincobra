@@ -1,0 +1,2 @@
+ALTER TABLE portfolio_workflow
+  ADD COLUMN use_futures BOOLEAN NOT NULL DEFAULT FALSE;
