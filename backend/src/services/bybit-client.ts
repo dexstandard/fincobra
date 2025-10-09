@@ -68,12 +68,16 @@ interface FuturesPositionParams {
   type?: 'MARKET' | 'LIMIT';
   price?: number;
   reduceOnly?: boolean;
+  hedgeMode?: boolean;
+  positionIdx?: 0 | 1 | 2;
 }
 
 interface FuturesStopParams {
   symbol: string;
   positionSide: 'LONG' | 'SHORT';
   stopPrice: number;
+  hedgeMode?: boolean;
+  positionIdx?: 0 | 1 | 2;
 }
 
 const FUTURES_CATEGORY = 'linear';
@@ -349,10 +353,21 @@ export async function openBybitFuturesPosition(
       side: isReduceOnly
         ? mapCloseSide(params.positionSide)
         : mapOpenSide(params.positionSide),
-      positionIdx: mapPositionIndex(params.positionSide),
       orderType: orderType === 'LIMIT' ? 'Limit' : 'Market',
       qty: String(params.quantity),
     };
+
+    const shouldOmitPositionIdx =
+      params.hedgeMode === false && params.positionIdx === undefined;
+    const positionIdx = shouldOmitPositionIdx
+      ? undefined
+      : params.positionIdx !== undefined
+        ? params.positionIdx
+        : mapPositionIndex(params.positionSide);
+
+    if (positionIdx !== undefined) {
+      body.positionIdx = positionIdx;
+    }
 
     if (orderType === 'LIMIT') {
       if (params.price === undefined) {
@@ -394,9 +409,16 @@ async function updateTradingStop(
         body: {
           category: FUTURES_CATEGORY,
           symbol: params.symbol.toUpperCase(),
-          positionIdx: mapPositionIndex(params.positionSide),
           [field]: String(params.stopPrice),
           [triggerField]: 'LastPrice',
+          ...(params.hedgeMode === false && params.positionIdx === undefined
+            ? {}
+            : {
+                positionIdx:
+                  params.positionIdx !== undefined
+                    ? params.positionIdx
+                    : mapPositionIndex(params.positionSide),
+              }),
         },
       },
       errorMessage,
