@@ -64,10 +64,26 @@ export function usePrerequisites(
     },
   });
 
+  const bybitKeyQuery = useQuery<string | null>({
+    queryKey: ['bybit-key', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      try {
+        const res = await api.get(`/users/${user!.id}/bybit-key`);
+        return res.data.key as string;
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
+        throw err;
+      }
+    },
+  });
+
   const hasOpenAIKey = includeAiKey
     ? !!aiKeyQuery.data || !!sharedAiKeyQuery.data
     : false;
   const hasBinanceKey = !!binanceKeyQuery.data;
+  const hasBybitKey = !!bybitKeyQuery.data;
 
   const modelsQuery = useQuery<string[]>({
     queryKey: ['openai-models', user?.id],
@@ -138,6 +154,7 @@ export function usePrerequisites(
   return {
     hasOpenAIKey,
     hasBinanceKey,
+    hasBybitKey,
     models: includeAiKey ? (modelsQuery.data ?? []) : [],
     balances,
     accountBalances,

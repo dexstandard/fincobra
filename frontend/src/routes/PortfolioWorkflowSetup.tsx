@@ -64,11 +64,13 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const {
     hasOpenAIKey,
     hasBinanceKey,
+    hasBybitKey,
     models,
     balances,
     accountBalances,
     isAccountLoading,
   } = usePrerequisites(tokenSymbols);
+  const hasExchangeKey = hasBinanceKey || hasBybitKey;
 
   const [instructions, setInstructions] = useState(
     workflow?.agentInstructions || '',
@@ -256,7 +258,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               useEarn,
             }}
             model={model}
-            disabled={!user || !hasOpenAIKey || !hasBinanceKey || !model}
+            disabled={!user || !hasOpenAIKey || !hasExchangeKey || !model}
           />
         </div>
       </div>
