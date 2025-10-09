@@ -16,7 +16,7 @@ interface Props {
 export default function ExchangeApiKeySection({ exchange, label }: Props) {
   const t = useTranslation();
   const supportsBalances = exchange === 'binance';
-  const supportsWhitelist = exchange === 'binance';
+  const supportsWhitelist = exchange === 'binance' || exchange === 'bybit';
   const exchangeFields = [
     { name: 'key', placeholder: t('api_key') },
     { name: 'secret', placeholder: t('api_secret') },
