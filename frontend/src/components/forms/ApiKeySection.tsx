@@ -112,12 +112,26 @@ export default function ApiKeySection({
       setEditing(false);
     },
     onError: (err) => {
-      if (
-        axios.isAxiosError(err) &&
-        err.response?.data?.error === 'verification failed'
-      ) {
-        toast.show(t('key_verification_failed'));
+      if (axios.isAxiosError(err)) {
+        const errorMessage = err.response?.data?.error;
+        if (errorMessage) {
+          if (errorMessage === 'verification failed') {
+            toast.show(t('key_verification_failed'), 'error');
+          } else if (errorMessage.startsWith('verification failed:')) {
+            const reason = errorMessage.slice('verification failed:'.length).trim();
+            toast.show(
+              reason
+                ? `${t('key_verification_failed')}: ${reason}`
+                : t('key_verification_failed'),
+              'error',
+            );
+          } else {
+            toast.show(errorMessage, 'error');
+          }
+          return;
+        }
       }
+      toast.show(t('failed_save_exchange_key'), 'error');
     },
   });
 

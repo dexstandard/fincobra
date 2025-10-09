@@ -35,7 +35,7 @@ const binanceKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
 
 const bybitKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
   .object({
-    key: z.string().trim().min(32).max(64),
+    key: z.string().trim().min(18).max(64),
     secret: z.string().trim().min(32).max(128),
   })
   .strict();
@@ -111,7 +111,7 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       clear: clearBybitKey,
       bodySchema: bybitKeyBodySchema,
       validationErrorMessage:
-        'invalid request body: key must be between 32 and 64 characters long and secret must be between 32 and 128 characters long',
+        'invalid request body: key must be between 18 and 64 characters long and secret must be between 32 and 128 characters long',
     },
   ];
 
