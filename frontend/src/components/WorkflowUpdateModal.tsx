@@ -60,17 +60,21 @@ export default function WorkflowUpdateModal({
     ...workflow.tokens.map((t) => t.token),
   ]);
 
+  const [model, setModel] = useState(workflow.model || '');
+  const [aiProvider, setAiProvider] = useState('openai');
+  const [exchangeProvider, setExchangeProvider] = useState<'binance' | 'bybit'>(
+    'binance',
+  );
   const {
     hasOpenAIKey,
     hasBinanceKey,
+    hasBybitKey,
     models,
     balances,
     accountBalances,
     isAccountLoading,
-  } = usePrerequisites(tokenSymbols);
-  const [model, setModel] = useState(workflow.model || '');
-  const [aiProvider, setAiProvider] = useState('openai');
-  const [exchangeProvider, setExchangeProvider] = useState('binance');
+    activeExchange,
+  } = usePrerequisites(tokenSymbols, { exchange: exchangeProvider });
 
   useEffect(() => {
     if (open) {
@@ -102,6 +106,18 @@ export default function WorkflowUpdateModal({
       setModel(workflow.model || models[0] || '');
     }
   }, [hasOpenAIKey, models, workflow.model, model]);
+
+  useEffect(() => {
+    if (exchangeProvider === 'binance' && !hasBinanceKey && hasBybitKey) {
+      setExchangeProvider('bybit');
+    } else if (
+      exchangeProvider === 'bybit' &&
+      !hasBybitKey &&
+      hasBinanceKey
+    ) {
+      setExchangeProvider('binance');
+    }
+  }, [exchangeProvider, hasBinanceKey, hasBybitKey]);
 
   const updateMut = useMutation<void, unknown, PortfolioReviewFormValues>({
     mutationFn: async (values: PortfolioReviewFormValues) => {
@@ -190,7 +206,7 @@ export default function WorkflowUpdateModal({
             <div className="mt-2">
               <WalletBalances
                 balances={balances}
-                hasBinanceKey={hasBinanceKey}
+                exchange={activeExchange}
               />
             </div>
           </div>

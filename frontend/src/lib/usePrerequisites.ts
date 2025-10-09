@@ -3,6 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import api from './axios';
 import { useUser } from './useUser';
 import { useBinanceAccount } from './useBinanceAccount';
+import { useBybitFuturesBalance } from './useBybitFuturesBalance';
 
 export interface BalanceInfo {
   token: string;
@@ -12,11 +13,16 @@ export interface BalanceInfo {
   usdValue: number;
 }
 
+interface UsePrerequisitesOptions {
+  includeAiKey?: boolean;
+  exchange?: 'binance' | 'bybit';
+}
+
 export function usePrerequisites(
   tokens: string[],
-  options?: { includeAiKey?: boolean },
+  options?: UsePrerequisitesOptions,
 ) {
-  const { includeAiKey = true } = options ?? {};
+  const { includeAiKey = true, exchange } = options ?? {};
   const { user } = useUser();
 
   const aiKeyQuery = useQuery<string | null>({
@@ -94,8 +100,31 @@ export function usePrerequisites(
     },
   });
 
-  const accountQuery = useBinanceAccount();
-  const accountBalances = accountQuery.data?.balances ?? [];
+  const preferBinance = exchange === 'binance';
+  const preferBybit = exchange === 'bybit';
+
+  const accountQuery = useBinanceAccount({
+    enabled: hasBinanceKey && (!preferBybit || !hasBybitKey),
+  });
+
+  const bybitAccountQuery = useBybitFuturesBalance({
+    enabled:
+      hasBybitKey && (preferBybit || (!preferBinance && !hasBinanceKey)),
+  });
+
+  const activeExchange =
+    hasBinanceKey && (!preferBybit || !hasBybitKey)
+      ? 'binance'
+      : hasBybitKey && (preferBybit || (!preferBinance && !hasBinanceKey))
+        ? 'bybit'
+        : null;
+
+  const accountBalances =
+    activeExchange === 'binance'
+      ? accountQuery.data?.balances ?? []
+      : activeExchange === 'bybit'
+        ? bybitAccountQuery.data?.balances ?? []
+        : [];
 
   const earnBalanceQueries = useQueries({
     queries: tokens.map((token) => ({
@@ -118,8 +147,8 @@ export function usePrerequisites(
 
   const priceQueries = useQueries({
     queries: tokens.map((token) => ({
-      queryKey: ['binance-price', token.toUpperCase()],
-      enabled: !!user && hasBinanceKey,
+      queryKey: ['token-price-usd', token.toUpperCase()],
+      enabled: !!user && (hasBinanceKey || hasBybitKey),
       queryFn: async () => {
         if (['USDT', 'USDC'].includes(token.toUpperCase())) return 1;
         const res = await fetch(
@@ -142,7 +171,8 @@ export function usePrerequisites(
     return {
       token,
       isLoading:
-        accountQuery.isLoading ||
+        (activeExchange === 'binance' ? accountQuery.isLoading : false) ||
+        (activeExchange === 'bybit' ? bybitAccountQuery.isLoading : false) ||
         (earnBalanceQueries[idx]?.isLoading ?? false) ||
         (priceQueries[idx]?.isLoading ?? false),
       walletBalance: wallet,
@@ -158,6 +188,12 @@ export function usePrerequisites(
     models: includeAiKey ? (modelsQuery.data ?? []) : [],
     balances,
     accountBalances,
-    isAccountLoading: accountQuery.isLoading,
+    isAccountLoading:
+      activeExchange === 'binance'
+        ? accountQuery.isLoading
+        : activeExchange === 'bybit'
+          ? bybitAccountQuery.isLoading
+          : false,
+    activeExchange,
   } as const;
 }
