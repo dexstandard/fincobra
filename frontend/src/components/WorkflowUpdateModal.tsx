@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { FormProvider, useForm } from 'react-hook-form';
@@ -60,17 +60,28 @@ export default function WorkflowUpdateModal({
     ...workflow.tokens.map((t) => t.token),
   ]);
 
+  const [model, setModel] = useState(workflow.model || '');
+  const [aiProvider, setAiProvider] = useState('openai');
+  const [exchangeProvider, setExchangeProvider] = useState<'binance' | 'bybit'>(
+    'binance',
+  );
   const {
     hasOpenAIKey,
     hasBinanceKey,
+    hasBybitKey,
+    binanceKeyId,
+    bybitKeyId,
     models,
     balances,
     accountBalances,
     isAccountLoading,
-  } = usePrerequisites(tokenSymbols);
-  const [model, setModel] = useState(workflow.model || '');
-  const [aiProvider, setAiProvider] = useState('openai');
-  const [exchangeProvider, setExchangeProvider] = useState('binance');
+    activeExchange,
+  } = usePrerequisites(tokenSymbols, { exchange: exchangeProvider });
+  const selectedExchangeKeyId = useMemo(() => {
+    if (exchangeProvider === 'binance') return binanceKeyId;
+    if (exchangeProvider === 'bybit') return bybitKeyId;
+    return null;
+  }, [exchangeProvider, binanceKeyId, bybitKeyId]);
 
   useEffect(() => {
     if (open) {
@@ -103,6 +114,37 @@ export default function WorkflowUpdateModal({
     }
   }, [hasOpenAIKey, models, workflow.model, model]);
 
+  useEffect(() => {
+    if (!open) return;
+    const desired = (() => {
+      if (!workflow.exchangeApiKeyId) return null;
+      if (workflow.exchangeApiKeyId === bybitKeyId) return 'bybit';
+      if (workflow.exchangeApiKeyId === binanceKeyId) return 'binance';
+      return null;
+    })();
+    if (desired && exchangeProvider !== desired) {
+      setExchangeProvider(desired);
+    }
+  }, [
+    open,
+    workflow.exchangeApiKeyId,
+    binanceKeyId,
+    bybitKeyId,
+    exchangeProvider,
+  ]);
+
+  useEffect(() => {
+    if (exchangeProvider === 'binance' && !hasBinanceKey && hasBybitKey) {
+      setExchangeProvider('bybit');
+    } else if (
+      exchangeProvider === 'bybit' &&
+      !hasBybitKey &&
+      hasBinanceKey
+    ) {
+      setExchangeProvider('binance');
+    }
+  }, [exchangeProvider, hasBinanceKey, hasBybitKey]);
+
   const updateMut = useMutation<void, unknown, PortfolioReviewFormValues>({
     mutationFn: async (values: PortfolioReviewFormValues) => {
       const [cashToken, ...positions] = values.tokens;
@@ -119,6 +161,7 @@ export default function WorkflowUpdateModal({
         agentInstructions: instructions,
         manualRebalance: workflow.manualRebalance,
         useEarn,
+        exchangeKeyId: selectedExchangeKeyId,
       });
     },
     onSuccess: () => {
@@ -190,7 +233,7 @@ export default function WorkflowUpdateModal({
             <div className="mt-2">
               <WalletBalances
                 balances={balances}
-                hasBinanceKey={hasBinanceKey}
+                exchange={activeExchange}
               />
             </div>
           </div>

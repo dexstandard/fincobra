@@ -79,6 +79,10 @@ const workflowUpsertSchema = z
     manualRebalance: z.boolean().optional().default(false),
     useEarn: z.boolean().optional().default(false),
     status: z.nativeEnum(PortfolioWorkflowStatus),
+    exchangeKeyId: z
+      .union([z.string().regex(/^\d+$/), z.null()])
+      .optional()
+      .transform((value) => (value === undefined ? null : value)),
   })
   .strip();
 
@@ -412,6 +416,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         agentInstructions: validated.agentInstructions,
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
+        exchangeKeyId: validated.exchangeKeyId,
       });
       if (status === PortfolioWorkflowStatus.Active)
         reviewWorkflowPortfolio(req.log, row.id).catch((err) =>
@@ -762,6 +767,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         startBalance,
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
+        exchangeKeyId: validated.exchangeKeyId,
       });
       const row = (await getPortfolioWorkflow(id))!;
       if (status === PortfolioWorkflowStatus.Active)
@@ -816,11 +822,19 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
       const conflict = await validateTokenConflicts(log, userId, tokens, id);
       if (conflict) return reply.code(conflict.code).send(conflict.body);
-      const keyErr = await ensureApiKeys(log, userId);
-      if (keyErr) return reply.code(keyErr.code).send(keyErr.body);
-      const bal = await getStartBalance(log, userId, tokens);
-      if (typeof bal !== 'number') return reply.code(bal.code).send(bal.body);
-      await repoStartWorkflow(id, bal);
+      const ensuredKeys = await ensureApiKeys(log, userId, {
+        exchangeKeyId: existing.exchangeApiKeyId,
+      });
+      if ('code' in ensuredKeys)
+        return reply.code(ensuredKeys.code).send(ensuredKeys.body);
+      let startBalance: number | null = null;
+      if (ensuredKeys.exchangeProvider === 'binance') {
+        const bal = await getStartBalance(log, userId, tokens);
+        if (typeof bal !== 'number')
+          return reply.code(bal.code).send(bal.body);
+        startBalance = bal;
+      }
+      await repoStartWorkflow(id, startBalance);
       reviewWorkflowPortfolio(req.log, id).catch((err) =>
         log.error({ err }, 'initial review failed'),
       );

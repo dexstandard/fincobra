@@ -16,6 +16,7 @@ interface WorkflowPreviewDetails {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  exchangeKeyId: string | null;
 }
 
 interface ExistingWorkflow extends WorkflowPreviewDetails {
@@ -74,6 +75,7 @@ export default function WorkflowStartButton({
           manualRebalance: workflowData.manualRebalance,
           useEarn: workflowData.useEarn,
           status: 'active',
+          exchangeKeyId: workflowData.exchangeKeyId,
         });
         navigate(`/portfolio-workflows/${res.data.id}`);
       }

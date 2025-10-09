@@ -149,7 +149,11 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
         const exchangeKey = await config.get(userId);
         if (!exchangeKey)
           return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
-        return { key: REDACTED_KEY, secret: REDACTED_KEY };
+        return {
+          id: exchangeKey.id,
+          key: REDACTED_KEY,
+          secret: REDACTED_KEY,
+        };
       },
     );
 

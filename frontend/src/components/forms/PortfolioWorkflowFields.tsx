@@ -7,7 +7,7 @@ import {
 } from 'react-hook-form';
 import { Plus, Trash } from 'lucide-react';
 import type { BalanceInfo } from '../../lib/usePrerequisites';
-import type { BinanceAccount } from '../../lib/useBinanceAccount';
+import type { ExchangeAccountBalance } from '../../lib/exchange-accounts.types';
 import { useTranslation } from '../../lib/i18n';
 import {
   tokens,
@@ -27,7 +27,7 @@ const SHOW_EARN_FEATURE = false;
 interface Props {
   onTokensChange?: (tokens: string[]) => void;
   balances: BalanceInfo[];
-  accountBalances: BinanceAccount['balances'];
+  accountBalances: ExchangeAccountBalance[];
   accountLoading: boolean;
   autoPopulateTopTokens?: boolean;
   useEarn: boolean;

@@ -11,6 +11,7 @@ import Button from '../components/ui/Button';
 import { usePrerequisites } from '../lib/usePrerequisites';
 import WorkflowStartButton from '../components/WorkflowStartButton';
 import SelectInput from '../components/forms/SelectInput';
+import WalletBalances from '../components/WalletBalances';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -51,6 +52,9 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
 
   const [model, setModel] = useState(workflow?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
+  const [exchangeProvider, setExchangeProvider] = useState<
+    'binance' | 'bybit' | null
+  >(null);
   const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? false);
   const [tokenSymbols, setTokenSymbols] = useState(
     defaultValues.tokens.map((t) => t.token),
@@ -65,12 +69,22 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     hasOpenAIKey,
     hasBinanceKey,
     hasBybitKey,
+    binanceKeyId,
+    bybitKeyId,
     models,
     balances,
     accountBalances,
     isAccountLoading,
-  } = usePrerequisites(tokenSymbols);
+    activeExchange,
+  } = usePrerequisites(tokenSymbols, {
+    exchange: exchangeProvider ?? undefined,
+  });
   const hasExchangeKey = hasBinanceKey || hasBybitKey;
+  const selectedExchangeKeyId = useMemo(() => {
+    if (exchangeProvider === 'binance') return binanceKeyId;
+    if (exchangeProvider === 'bybit') return bybitKeyId;
+    return null;
+  }, [exchangeProvider, binanceKeyId, bybitKeyId]);
 
   const [instructions, setInstructions] = useState(
     workflow?.agentInstructions || '',
@@ -81,6 +95,17 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const values = methods.watch();
   const { data: defaultDeveloperInstructions } = useDeveloperInstructions();
+
+  const exchangeOptions = useMemo(() => {
+    const options: { value: 'binance' | 'bybit'; label: string }[] = [];
+    if (hasBinanceKey) {
+      options.push({ value: 'binance', label: 'Binance' });
+    }
+    if (hasBybitKey) {
+      options.push({ value: 'bybit', label: 'Bybit' });
+    }
+    return options;
+  }, [hasBinanceKey, hasBybitKey]);
 
   useEffect(() => {
     setModel(workflow?.model || '');
@@ -122,6 +147,42 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
       setInstructions(defaultDeveloperInstructions);
     }
   }, [workflow, defaultDeveloperInstructions, instructions]);
+
+  useEffect(() => {
+    if (!exchangeOptions.length) {
+      if (exchangeProvider !== null) {
+        setExchangeProvider(null);
+      }
+      return;
+    }
+    const desiredExchange = (() => {
+      if (!workflow?.exchangeApiKeyId) return null;
+      if (workflow.exchangeApiKeyId === bybitKeyId) return 'bybit';
+      if (workflow.exchangeApiKeyId === binanceKeyId) return 'binance';
+      return null;
+    })();
+    if (
+      desiredExchange &&
+      exchangeProvider !== desiredExchange &&
+      exchangeOptions.some((opt) => opt.value === desiredExchange)
+    ) {
+      setExchangeProvider(desiredExchange);
+      return;
+    }
+    if (!exchangeProvider) {
+      setExchangeProvider(exchangeOptions[0].value);
+      return;
+    }
+    if (!exchangeOptions.some((opt) => opt.value === exchangeProvider)) {
+      setExchangeProvider(exchangeOptions[0].value);
+    }
+  }, [
+    exchangeOptions,
+    exchangeProvider,
+    workflow?.exchangeApiKeyId,
+    binanceKeyId,
+    bybitKeyId,
+  ]);
 
   function WarningSign({ children }: { children: ReactNode }) {
     return (
@@ -175,6 +236,34 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               </div>
             )}
           </div>
+          {exchangeOptions.length > 0 && (
+            <div className="mt-4">
+              <label
+                htmlFor="exchange-provider"
+                className="block text-md font-bold"
+              >
+                {t('exchange')}
+              </label>
+              <SelectInput
+                id="exchange-provider"
+                value={
+                  exchangeProvider ?? exchangeOptions[0]?.value ?? 'binance'
+                }
+                onChange={(value) =>
+                  setExchangeProvider(value as 'binance' | 'bybit')
+                }
+                options={exchangeOptions}
+              />
+            </div>
+          )}
+          {activeExchange && (
+            <div className="mt-2">
+              <WalletBalances
+                balances={balances}
+                exchange={activeExchange}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -223,6 +312,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
                   manualRebalance,
                   useEarn,
                   status: 'inactive',
+                  exchangeKeyId: selectedExchangeKeyId,
                 };
                 if (workflow) {
                   await api.put(`/portfolio-workflows/${workflow.id}`, payload);
@@ -256,9 +346,16 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               agentInstructions: instructions,
               manualRebalance,
               useEarn,
+              exchangeKeyId: selectedExchangeKeyId,
             }}
             model={model}
-            disabled={!user || !hasOpenAIKey || !hasExchangeKey || !model}
+            disabled={
+              !user ||
+              !hasOpenAIKey ||
+              !hasExchangeKey ||
+              !model ||
+              !selectedExchangeKeyId
+            }
           />
         </div>
       </div>

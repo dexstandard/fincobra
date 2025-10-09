@@ -209,7 +209,7 @@ export async function findActiveTokenConflicts(
 
 export async function getUserApiKeys(userId: string) {
   const { rows } = await db.query(
-    "SELECT COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc, ek.api_key_enc AS binance_api_key_enc, ek.api_secret_enc AS binance_api_secret_enc FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance' WHERE u.id = $1",
+    "SELECT COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc, ek.api_key_enc AS binance_api_key_enc, ek.api_secret_enc AS binance_api_secret_enc, ek.id AS binance_key_id, bek.api_key_enc AS bybit_api_key_enc, bek.api_secret_enc AS bybit_api_secret_enc, bek.id AS bybit_key_id FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance' LEFT JOIN exchange_keys bek ON bek.user_id = u.id AND bek.provider = 'bybit' WHERE u.id = $1",
     [userId],
   );
   if (!rows[0]) return undefined;
@@ -222,8 +222,8 @@ export async function insertPortfolioWorkflow(
   let id = '';
   await withTransaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO portfolio_workflow (user_id, model, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO portfolio_workflow (user_id, model, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn, exchange_key_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id`,
       [
         data.userId,
@@ -236,6 +236,7 @@ export async function insertPortfolioWorkflow(
         data.agentInstructions,
         data.manualRebalance,
         data.useEarn,
+        data.exchangeKeyId,
       ],
     );
     id = rows[0].id as string;
@@ -259,7 +260,7 @@ export async function updatePortfolioWorkflow(
 ): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `UPDATE portfolio_workflow SET model = $1, status = $2, cash_token = $3, risk = $4, review_interval = $5, agent_instructions = $6, start_balance = $7, manual_rebalance = $8, use_earn = $9 WHERE id = $10`,
+      `UPDATE portfolio_workflow SET model = $1, status = $2, cash_token = $3, risk = $4, review_interval = $5, agent_instructions = $6, start_balance = $7, manual_rebalance = $8, use_earn = $9, exchange_key_id = $10 WHERE id = $11`,
       [
         data.model,
         data.status,
@@ -270,6 +271,7 @@ export async function updatePortfolioWorkflow(
         data.startBalance,
         data.manualRebalance,
         data.useEarn,
+        data.exchangeKeyId,
         data.id,
       ],
     );
@@ -300,7 +302,7 @@ export async function deletePortfolioWorkflow(id: string): Promise<void> {
 
 export async function startPortfolioWorkflow(
   id: string,
-  startBalance: number,
+  startBalance: number | null,
 ): Promise<void> {
   await db.query(
     'UPDATE portfolio_workflow SET status = $1, start_balance = $2 WHERE id = $3',

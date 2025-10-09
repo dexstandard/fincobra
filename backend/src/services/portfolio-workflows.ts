@@ -161,20 +161,68 @@ async function validateWorkflowInput(
   return null;
 }
 
+export interface EnsuredExchangeKey {
+  exchangeKeyId: string | null;
+  exchangeProvider: 'binance' | 'bybit' | null;
+}
+
+interface EnsureApiKeysOptions {
+  exchangeKeyId?: string | null;
+  requireAi?: boolean;
+  requireExchange?: boolean;
+}
+
 export async function ensureApiKeys(
   log: FastifyBaseLogger,
   userId: string,
-): Promise<ValidationErr | null> {
+  options: EnsureApiKeysOptions = {},
+): Promise<ValidationErr | EnsuredExchangeKey> {
+  const { exchangeKeyId, requireAi = true, requireExchange = true } = options;
   const userRow = await getUserApiKeys(userId);
-  if (
-    !userRow?.aiApiKeyEnc ||
-    !userRow.binanceApiKeyEnc ||
-    !userRow.binanceApiSecretEnc
-  ) {
+  if (!userRow) {
     log.error('missing api keys');
     return { code: 400, body: errorResponse('missing api keys') };
   }
-  return null;
+
+  const hasAiKey = !!userRow.aiApiKeyEnc;
+  const hasBinanceKey =
+    !!userRow.binanceApiKeyEnc && !!userRow.binanceApiSecretEnc;
+  const hasBybitKey =
+    !!userRow.bybitApiKeyEnc && !!userRow.bybitApiSecretEnc;
+
+  let resolvedKeyId: string | null = null;
+  let exchangeProvider: 'binance' | 'bybit' | null = null;
+
+  if (exchangeKeyId) {
+    if (hasBinanceKey && exchangeKeyId === userRow.binanceKeyId) {
+      resolvedKeyId = userRow.binanceKeyId ?? null;
+      exchangeProvider = 'binance';
+    } else if (hasBybitKey && exchangeKeyId === userRow.bybitKeyId) {
+      resolvedKeyId = userRow.bybitKeyId ?? null;
+      exchangeProvider = 'bybit';
+    } else {
+      log.error({ exchangeKeyId }, 'missing api keys');
+      return { code: 400, body: errorResponse('missing api keys') };
+    }
+  } else if (hasBinanceKey) {
+    resolvedKeyId = userRow.binanceKeyId ?? null;
+    exchangeProvider = 'binance';
+  } else if (hasBybitKey) {
+    resolvedKeyId = userRow.bybitKeyId ?? null;
+    exchangeProvider = 'bybit';
+  }
+
+  if (requireAi && !hasAiKey) {
+    log.error('missing api keys');
+    return { code: 400, body: errorResponse('missing api keys') };
+  }
+
+  if (requireExchange && !exchangeProvider) {
+    log.error('missing api keys');
+    return { code: 400, body: errorResponse('missing api keys') };
+  }
+
+  return { exchangeKeyId: resolvedKeyId, exchangeProvider };
 }
 
 export async function getStartBalance(
@@ -218,6 +266,15 @@ export async function preparePortfolioWorkflowForUpsert(
   }
   const err = await validateWorkflowInput(log, userId, body, id);
   if (err) return err;
+
+  const ensuredKeys = await ensureApiKeys(log, userId, {
+    exchangeKeyId: body.exchangeKeyId,
+    requireAi: body.status === PortfolioWorkflowStatus.Active,
+    requireExchange: body.status === PortfolioWorkflowStatus.Active,
+  });
+  if ('code' in ensuredKeys) return ensuredKeys;
+  body.exchangeKeyId = ensuredKeys.exchangeKeyId;
+
   let startBalance: number | null = null;
   if (body.status === PortfolioWorkflowStatus.Active) {
     const pairErr = await validateTradingPairs(
@@ -226,14 +283,14 @@ export async function preparePortfolioWorkflowForUpsert(
       body.tokens.map((t) => t.token),
     );
     if (pairErr) return pairErr;
-    const keyErr = await ensureApiKeys(log, userId);
-    if (keyErr) return keyErr;
-    const bal = await getStartBalance(log, userId, [
-      body.cash,
-      ...body.tokens.map((t) => t.token),
-    ]);
-    if (typeof bal === 'number') startBalance = bal;
-    else return bal;
+    if (ensuredKeys.exchangeProvider === 'binance') {
+      const bal = await getStartBalance(log, userId, [
+        body.cash,
+        ...body.tokens.map((t) => t.token),
+      ]);
+      if (typeof bal === 'number') startBalance = bal;
+      else return bal;
+    }
   }
   return { body, startBalance };
 }

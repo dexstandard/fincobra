@@ -56,7 +56,7 @@ async function loadTotalBalanceUsd(
 
 export default async function binanceBalanceRoutes(app: FastifyInstance) {
   app.get(
-    '/users/:id/binance-account',
+    '/users/:id/binance/account',
     {
       config: { rateLimit: RATE_LIMITS.RELAXED },
       preHandler: userOrAdminPreHandlers,
@@ -70,7 +70,7 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
   );
 
   app.get(
-    '/users/:id/binance-balance',
+    '/users/:id/binance/balance',
     {
       config: { rateLimit: RATE_LIMITS.MODERATE },
       preHandler: userOrAdminPreHandlers,
@@ -84,7 +84,7 @@ export default async function binanceBalanceRoutes(app: FastifyInstance) {
   );
 
   app.get(
-    '/users/:id/binance-balance/:token',
+    '/users/:id/binance/balance/:token',
     {
       config: { rateLimit: RATE_LIMITS.LAX },
       preHandler: userOrAdminPreHandlers,

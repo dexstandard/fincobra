@@ -66,3 +66,4 @@ Environment variables: `DATABASE_URL`, `KEY_PASSWORD`, `GOOGLE_CLIENT_ID`.
 - Reuse existing components (forms, tables, etc.) for consistent UI and validation.
 - Break down complex components into smaller pieces and extract helper functions when needed.
 - Surface backend errors by reading the `error` field from responses; avoid relying on alternative shapes.
+- Favor RESTful path structures for API routes (e.g., `/users/:id/binance/balance`) when adding or updating endpoints.

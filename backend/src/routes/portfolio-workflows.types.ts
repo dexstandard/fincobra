@@ -13,4 +13,5 @@ export interface PortfolioWorkflowInput {
   manualRebalance: boolean;
   useEarn: boolean;
   status: 'active' | 'inactive' | 'retired';
+  exchangeKeyId: string | null;
 }

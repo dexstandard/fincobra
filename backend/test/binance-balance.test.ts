@@ -39,7 +39,7 @@ describe('binance balance route', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/users/${userId}/binance-balance`,
+      url: `/api/users/${userId}/binance/balance`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -77,7 +77,7 @@ describe('binance balance route', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/users/${userId}/binance-account`,
+      url: `/api/users/${userId}/binance/account`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -117,7 +117,7 @@ describe('binance balance route', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/users/${userId}/binance-balance/BTC`,
+      url: `/api/users/${userId}/binance/balance/BTC`,
       cookies: authCookies(userId),
     });
     expect(res.statusCode).toBe(200);
@@ -131,7 +131,7 @@ describe('binance balance route', () => {
     const app = await buildServer();
     const res = await app.inject({
       method: 'GET',
-      url: '/api/users/999/binance-balance',
+      url: '/api/users/999/binance/balance',
       cookies: authCookies('1'),
     });
     expect(res.statusCode).toBe(403);
