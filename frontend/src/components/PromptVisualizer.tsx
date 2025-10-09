@@ -340,25 +340,22 @@ function MarketOverviewSection({
               value: formatNumber(htf.regime.marketBeta90d),
             });
           }
-          const htfReturnMetrics = (
-            [
-              { key: '30d', label: 'Return (30d)' },
-              { key: '90d', label: 'Return (90d)' },
-              { key: '180d', label: 'Return (180d)' },
-              { key: '365d', label: 'Return (365d)' },
-            ] as const
-          )
-            .map(({ key, label }) => {
-              const value = htf?.returns?.[key];
-              if (typeof value !== 'number') return null;
-              return {
-                label,
-                value: formatDecimalPercent(value),
-              };
-            })
-            .filter(
-              (metric): metric is { label: string; value: string } => metric !== null,
-            );
+          const htfReturnMetrics = ([
+            { key: '30d', label: 'Return (30d)' },
+            { key: '90d', label: 'Return (90d)' },
+            { key: '180d', label: 'Return (180d)' },
+            { key: '365d', label: 'Return (365d)' },
+          ] as const).reduce<{ label: string; value: string }[]>((acc, { key, label }) => {
+            const value = htf?.returns?.[key];
+            if (typeof value !== 'number') {
+              return acc;
+            }
+            acc.push({
+              label,
+              value: formatDecimalPercent(value),
+            });
+            return acc;
+          }, []);
           const combinedHtfMetrics = [...htfMetrics, ...htfReturnMetrics];
           const hasHtfContent = htfTrendBadges.length > 0 || combinedHtfMetrics.length > 0;
           const ltf = info.ltf;
