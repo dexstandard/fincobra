@@ -50,7 +50,7 @@ describe('Exchange API key routes', () => {
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
 
-    const k = (c: string) => c.repeat(64);
+    const k = (c: string, len = 64) => c.repeat(len);
     const validBadKey = k('A');
     const validBadSecret = k('b');
     const key1 = k('C');
@@ -181,13 +181,13 @@ describe('Exchange API key routes', () => {
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
 
-    const k = (c: string) => c.repeat(64);
-    const badKey = k('I');
-    const badSecret = k('j');
-    const key1 = k('K');
-    const secret1 = k('l');
-    const key2 = k('M');
-    const secret2 = k('n');
+    const k = (c: string, len = 64) => c.repeat(len);
+    const badKey = k('I', 36);
+    const badSecret = k('j', 64);
+    const key1 = k('K', 36);
+    const secret1 = k('l', 64);
+    const key2 = k('M', 36);
+    const secret2 = k('n', 64);
 
     fetchMock.mockResolvedValueOnce({
       ok: false,

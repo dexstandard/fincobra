@@ -26,10 +26,17 @@ interface ExchangeKeyBody {
   secret: string;
 }
 
-const exchangeKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
+const binanceKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
   .object({
     key: z.string().trim().length(64),
     secret: z.string().trim().min(64).max(128),
+  })
+  .strict();
+
+const bybitKeyBodySchema: z.ZodType<ExchangeKeyBody> = z
+  .object({
+    key: z.string().trim().min(32).max(64),
+    secret: z.string().trim().min(32).max(128),
   })
   .strict();
 
@@ -59,6 +66,8 @@ interface ExchangeRouteConfig {
   get: (userId: string) => Promise<ExchangeApiKeyDetails | null>;
   set: (entry: ExchangeApiKeyUpsert) => Promise<void>;
   clear: (userId: string) => Promise<void>;
+  bodySchema: z.ZodType<ExchangeKeyBody>;
+  validationErrorMessage: string;
 }
 
 async function verifyAndSave(
@@ -90,6 +99,9 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       get: getBinanceKey,
       set: setBinanceKey,
       clear: clearBinanceKey,
+      bodySchema: binanceKeyBodySchema,
+      validationErrorMessage:
+        'invalid request body: key must be 64 characters long and secret must be 64 characters long',
     },
     {
       exchange: 'bybit',
@@ -97,6 +109,9 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       get: getBybitKey,
       set: setBybitKey,
       clear: clearBybitKey,
+      bodySchema: bybitKeyBodySchema,
+      validationErrorMessage:
+        'invalid request body: key must be between 32 and 64 characters long and secret must be between 32 and 128 characters long',
     },
   ];
 
@@ -111,7 +126,9 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       },
       async (req, reply) => {
         const userId = getValidatedUserId(req);
-        const body = parseBody(exchangeKeyBodySchema, req, reply);
+        const body = parseBody(config.bodySchema, req, reply, {
+          errorMessage: config.validationErrorMessage,
+        });
         if (!body) return;
         const { key, secret } = body;
         const existingKey = await config.get(userId);
@@ -144,7 +161,9 @@ export default async function exchangeApiKeyRoutes(app: FastifyInstance) {
       },
       async (req, reply) => {
         const userId = getValidatedUserId(req);
-        const body = parseBody(exchangeKeyBodySchema, req, reply);
+        const body = parseBody(config.bodySchema, req, reply, {
+          errorMessage: config.validationErrorMessage,
+        });
         if (!body) return;
         const { key, secret } = body;
         const existingKey = await config.get(userId);
