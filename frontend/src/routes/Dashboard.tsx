@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Eye, Trash, Clock, Plus } from 'lucide-react';
@@ -311,9 +311,20 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const t = useTranslation();
-  const { hasBinanceKey } = usePrerequisites([], {
+  const { hasBinanceKey, hasBybitKey } = usePrerequisites([], {
     includeAiKey: false,
   });
+  const hasExchangeKey = hasBinanceKey || hasBybitKey;
+  const exchangeOptions = useMemo(
+    () => [
+      { id: 'binance' as const, label: 'Binance' },
+      { id: 'bybit' as const, label: 'Bybit' },
+    ],
+    [],
+  );
+  const [selectedExchange, setSelectedExchange] = useState<
+    (typeof exchangeOptions)[number]['id']
+  >(exchangeOptions[0].id);
   const isAdmin = user?.role === 'admin';
   const showOwnerColumn = isAdmin && !onlyMy;
 
@@ -387,7 +398,7 @@ export default function Dashboard() {
               <h2 className="text-xl font-bold">{t('my_workflows')}</h2>
             </div>
             <p>
-              {hasBinanceKey
+              {hasExchangeKey
                 ? t('no_workflows_yet_connected')
                 : t('no_workflows_yet')}
             </p>
@@ -400,13 +411,44 @@ export default function Dashboard() {
   return (
     <>
       <div className="flex flex-col gap-3 w-full">
-        {!hasBinanceKey && (
+        {!hasExchangeKey && (
           <div className="flex flex-col md:flex-row gap-3 items-stretch">
             <div className="flex-1 flex flex-col gap-4">
-              <ExchangeApiKeySection
-                exchange="binance"
-                label={t('connect_binance_api')}
-              />
+              <div className="bg-white shadow-md border border-gray-200 rounded p-6">
+                <h2 className="text-xl font-bold mb-4">
+                  {t('connect_exchange_api')}
+                </h2>
+                <div className="flex gap-2 text-sm">
+                  {exchangeOptions.map((option) => {
+                    const isActive = selectedExchange === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setSelectedExchange(option.id)}
+                        className={`px-3 py-1.5 rounded border transition-colors ${
+                          isActive
+                            ? 'bg-blue-600 text-white border-transparent'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}
+                        aria-pressed={isActive}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-4">
+                  <ExchangeApiKeySection
+                    exchange={selectedExchange}
+                    label={
+                      selectedExchange === 'binance'
+                        ? t('binance_api_credentials')
+                        : t('bybit_api_credentials')
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -415,7 +457,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-bold">{t('my_workflows')}</h2>
-                {hasBinanceKey && (
+                {hasExchangeKey && (
                   <Link
                     to="/portfolio-workflow"
                     className="text-blue-600 inline-flex"
@@ -448,7 +490,7 @@ export default function Dashboard() {
             </div>
             {items.length === 0 ? (
               <p>
-                {hasBinanceKey
+                {hasExchangeKey
                   ? t('no_workflows_yet_connected')
                   : t('no_workflows_yet')}
               </p>

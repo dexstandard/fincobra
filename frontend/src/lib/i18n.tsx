@@ -52,12 +52,13 @@ const translations: Record<Lang, Record<string, string>> = {
     bybit_api_credentials: 'Bybit API Credentials',
     binance_balances: 'Binance Balances',
     connect_binance_api: 'Connect your Binance API',
+    connect_exchange_api: 'Connect your exchange API',
     my_workflows: 'Portfolios',
     only_active: 'Only Active',
     only_my: 'Only My',
     please_log_in_workflows: 'Please log in to view your portfolios.',
     no_workflows_yet:
-      'Connect your Binance account to create your first Portfolio Workflow.',
+      'Connect your exchange account to create your first Portfolio Workflow.',
     no_workflows_yet_connected:
       'Click the + above to create your first Portfolio Workflow.',
     tokens: 'Tokens',
@@ -243,13 +244,14 @@ const translations: Record<Lang, Record<string, string>> = {
     bybit_api_credentials: 'Учётные данные Bybit API',
     binance_balances: 'Балансы Binance',
     connect_binance_api: 'Подключите ваш Binance API',
+    connect_exchange_api: 'Подключите API биржи',
     my_workflows: 'Портфели',
     only_active: 'Только активные',
     only_my: 'Только мои',
     please_log_in_workflows:
       'Пожалуйста, войдите, чтобы увидеть ваши портфолио.',
     no_workflows_yet:
-      'Подключите ваш аккаунт Binance, чтобы создать первый Workflow портфолио.',
+      'Подключите API биржи, чтобы создать первый Workflow портфолио.',
     no_workflows_yet_connected:
       'Нажмите на + выше, чтобы создать первый Workflow портфолио.',
     tokens: 'Токены',
