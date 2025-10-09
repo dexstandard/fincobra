@@ -5,20 +5,17 @@ export default function Terms() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <h2 className="text-xl font-bold">{t('terms_title')}</h2>
-      <p>{t('terms_p1')}</p>
-      <p>
-        {t('terms_p2')}
-        <a
-          href="https://github.com/dexstandard/fincobra"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline"
-        >
-          {t('terms_link')}
-        </a>
-        .
-      </p>
-      <p>{t('terms_p3')}</p>
+      <p>{t('terms_intro')}</p>
+      <p>{t('terms_disclaimer')}</p>
+      <p>{t('terms_access')}</p>
+      <p>{t('terms_safety_heading')}</p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li>{t('terms_safety_item_enable_2fa')}</li>
+        <li>{t('terms_safety_item_no_withdrawals')}</li>
+        <li>{t('terms_safety_item_openai_billing')}</li>
+      </ul>
+      <p>{t('terms_free_stage')}</p>
+      <p>{t('terms_responsible_use')}</p>
     </div>
   );
 }
