@@ -73,7 +73,7 @@ const translations: Record<Lang, Record<string, string>> = {
     trading_mode_spot_description:
       'Spot bots trade from your Binance spot wallet and can include Earn balances when enabled.',
     trading_mode_futures_description:
-      'Futures bots trade from your Bybit USDT perpetual account with leverage-aware execution.',
+      'Futures bots trade from your Bybit or Binance futures account with leverage-aware execution.',
     trading_mode_connect_exchange:
       'Connect your {{exchange}} API key to enable this mode.',
     connect_binance_api: 'Connect your Binance API',
@@ -289,7 +289,7 @@ const translations: Record<Lang, Record<string, string>> = {
     trading_mode_spot_description:
       'Спотовые боты работают с вашим спотовым кошельком Binance и при необходимости учитывают балансы Earn.',
     trading_mode_futures_description:
-      'Фьючерсные боты работают с вашим счётом Bybit USDT perpetual и учитывают настройки плеча.',
+      'Фьючерсные боты работают с вашим фьючерсным счётом Bybit или Binance и учитывают настройки плеча.',
     trading_mode_connect_exchange:
       'Подключите API ключ {{exchange}}, чтобы включить этот режим.',
     connect_binance_api: 'Подключите ваш Binance API',

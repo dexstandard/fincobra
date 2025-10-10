@@ -64,8 +64,10 @@ export default function WorkflowUpdateModal({
   const [model, setModel] = useState(workflow.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
-  const desiredExchange: 'binance' | 'bybit' =
-    tradingMode === 'futures' ? 'bybit' : 'binance';
+  const [selectedExchange, setSelectedExchange] = useState<'binance' | 'bybit'>(
+    'binance',
+  );
+  const desiredExchange = selectedExchange;
   const {
     hasOpenAIKey,
     hasBinanceKey,
@@ -77,7 +79,10 @@ export default function WorkflowUpdateModal({
     accountBalances,
     isAccountLoading,
     activeExchange,
-  } = usePrerequisites(tokenSymbols, { exchange: desiredExchange });
+  } = usePrerequisites(tokenSymbols, {
+    exchange: desiredExchange,
+    mode: tradingMode,
+  });
   const selectedExchangeKeyId = useMemo(() => {
     if (desiredExchange === 'binance') return binanceKeyId;
     if (desiredExchange === 'bybit') return bybitKeyId;
@@ -117,28 +122,33 @@ export default function WorkflowUpdateModal({
 
   useEffect(() => {
     if (!open) return;
-    if (workflow.exchangeApiKeyId === bybitKeyId && tradingMode !== 'futures') {
+    if (workflow.exchangeApiKeyId === bybitKeyId) {
       setTradingMode('futures');
-    } else if (
-      workflow.exchangeApiKeyId === binanceKeyId &&
-      tradingMode !== 'spot'
-    ) {
-      setTradingMode('spot');
+      setSelectedExchange('bybit');
+    } else if (workflow.exchangeApiKeyId === binanceKeyId) {
+      setSelectedExchange('binance');
     }
-  }, [
-    open,
-    workflow.exchangeApiKeyId,
-    binanceKeyId,
-    bybitKeyId,
-    tradingMode,
-  ]);
+  }, [open, workflow.exchangeApiKeyId, binanceKeyId, bybitKeyId]);
 
   useEffect(() => {
     if (tradingMode === 'spot' && !hasBinanceKey && hasBybitKey) {
       setTradingMode('futures');
-    } else if (tradingMode === 'futures' && !hasBybitKey && hasBinanceKey) {
-      setTradingMode('spot');
+      setSelectedExchange('bybit');
     }
+  }, [tradingMode, hasBinanceKey, hasBybitKey]);
+
+  useEffect(() => {
+    if (tradingMode === 'spot') {
+      setSelectedExchange('binance');
+      return;
+    }
+    setSelectedExchange((prev) => {
+      if (prev === 'bybit' && hasBybitKey) return 'bybit';
+      if (prev === 'binance' && hasBinanceKey) return 'binance';
+      if (hasBybitKey) return 'bybit';
+      if (hasBinanceKey) return 'binance';
+      return prev;
+    });
   }, [tradingMode, hasBinanceKey, hasBybitKey]);
 
   const tradingModeConfigs = useMemo(
@@ -154,11 +164,27 @@ export default function WorkflowUpdateModal({
         id: 'futures' as const,
         label: t('futures_trading'),
         description: t('trading_mode_futures_description'),
-        exchangeLabel: 'Bybit',
-        enabled: hasBybitKey,
+        exchangeLabel: 'Binance or Bybit',
+        enabled: hasBybitKey || hasBinanceKey,
       },
     ],
     [t, hasBinanceKey, hasBybitKey],
+  );
+
+  const futuresExchangeOptions = useMemo(
+    () => [
+      {
+        id: 'bybit' as const,
+        label: 'Bybit',
+        enabled: hasBybitKey,
+      },
+      {
+        id: 'binance' as const,
+        label: 'Binance',
+        enabled: hasBinanceKey,
+      },
+    ],
+    [hasBinanceKey, hasBybitKey],
   );
 
   const updateMut = useMutation<void, unknown, PortfolioReviewFormValues>({
@@ -272,6 +298,40 @@ export default function WorkflowUpdateModal({
                   );
                 })}
               </div>
+              {tradingMode === 'futures' && (
+                <div className="flex flex-wrap gap-2">
+                  {futuresExchangeOptions.map((exchange) => {
+                    const isActive = selectedExchange === exchange.id;
+                    const disabled = !exchange.enabled;
+                    const hint = disabled
+                      ? t('trading_mode_connect_exchange').replace(
+                          '{{exchange}}',
+                          exchange.label,
+                        )
+                      : undefined;
+                    return (
+                      <button
+                        key={exchange.id}
+                        type="button"
+                        onClick={() => {
+                          if (!disabled) {
+                            setSelectedExchange(exchange.id);
+                          }
+                        }}
+                        disabled={disabled}
+                        title={hint}
+                        className={`px-3 py-1.5 rounded border text-sm transition-colors ${
+                          isActive
+                            ? 'bg-blue-600 text-white border-transparent'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200'
+                        }`}
+                      >
+                        {exchange.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <p className="text-sm text-gray-600">
                 {
                   tradingModeConfigs.find((mode) => mode.id === tradingMode)
