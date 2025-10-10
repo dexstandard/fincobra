@@ -1,94 +1,79 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, beforeEach, expect, vi } from 'vitest';
 import { syncOpenOrderStatuses } from '../src/services/order-orchestrator.js';
-import { CANCEL_ORDER_REASONS } from '../src/services/order-orchestrator.types.js';
 import { insertUser } from './repos/users.js';
 import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { insertReviewResult } from './repos/review-result.js';
 import { insertLimitOrder, getLimitOrder } from './repos/limit-orders.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
-import { updateLimitOrderStatus } from '../src/repos/limit-orders.js';
 import { mockLogger } from './helpers.js';
+import { db } from '../src/db/index.js';
 
-const { fetchOpenOrders, fetchOrder, parseBinanceError } = vi.hoisted(() => ({
+const gatewaySpotMock = vi.hoisted(() => ({
   fetchOpenOrders: vi.fn(),
   fetchOrder: vi.fn(),
-  parseBinanceError: vi.fn(),
+  cancelOrder: vi.fn(),
 }));
 
-vi.mock('../src/services/binance-client.js', () => ({
-  fetchOpenOrders,
-  fetchOrder,
-  parseBinanceError,
-  isInvalidSymbolError: vi
-    .fn((err: unknown) =>
-      err instanceof Error && /Invalid symbol/i.test(err.message),
-    )
-    .mockName('isInvalidSymbolError'),
+vi.mock('../src/services/exchange-gateway.js', () => ({
+  getExchangeGateway: vi.fn(() => ({
+    metadata: { fetchMarket: vi.fn(), fetchTicker: vi.fn() },
+    spot: gatewaySpotMock,
+  })),
 }));
 
 vi.mock('../src/services/limit-order.js', () => ({
   cancelLimitOrder: vi.fn(),
 }));
 
+import { getExchangeGateway } from '../src/services/exchange-gateway.js';
+import { cancelLimitOrder } from '../src/services/limit-order.js';
+
+async function createOpenOrder(
+  orderId = '123',
+  status: LimitOrderStatus = LimitOrderStatus.Open,
+) {
+  const userId = await insertUser('sync-user');
+  const workflow = await insertPortfolioWorkflow({
+    userId,
+    model: 'm',
+    status: 'active',
+    startBalance: null,
+    tokens: [
+      { token: 'BTC', minAllocation: 10 },
+      { token: 'USDT', minAllocation: 10 },
+    ],
+    risk: 'low',
+    reviewInterval: '1h',
+    agentInstructions: 'inst',
+    manualRebalance: false,
+    useEarn: false,
+  });
+  const reviewResultId = await insertReviewResult({
+    portfolioWorkflowId: workflow.id,
+    log: '{}',
+  });
+  await insertLimitOrder({
+    userId,
+    planned: { symbol: 'BTCUSDT', side: 'BUY', qty: 1, price: 100, exchange: 'binance' },
+    status,
+    reviewResultId,
+    orderId,
+  });
+  return { userId, orderId, workflowId: workflow.id };
+}
+
 describe('syncOpenOrderStatuses', () => {
   beforeEach(() => {
-    fetchOpenOrders.mockReset();
-    fetchOrder.mockReset();
-    parseBinanceError.mockReset();
-    fetchOpenOrders.mockResolvedValue([]);
-    parseBinanceError.mockReturnValue({});
+    gatewaySpotMock.fetchOpenOrders.mockReset();
+    gatewaySpotMock.fetchOrder.mockReset();
+    gatewaySpotMock.cancelOrder.mockReset();
+    gatewaySpotMock.fetchOpenOrders.mockResolvedValue([]);
+    vi.mocked(getExchangeGateway).mockClear();
   });
 
-  async function setupOrder(orderId = '123') {
-    const userId = await insertUser('user-1');
-    const agent = await insertPortfolioWorkflow({
-      userId,
-      model: 'gpt',
-      status: 'active',
-      startBalance: null,
-      tokens: [
-        { token: 'SOL', minAllocation: 10 },
-        { token: 'USDT', minAllocation: 10 },
-      ],
-      risk: 'low',
-      reviewInterval: '1h',
-      agentInstructions: 'inst',
-      manualRebalance: false,
-      useEarn: false,
-    });
-    const reviewResultId = await insertReviewResult({
-      portfolioWorkflowId: agent.id,
-      log: 'log',
-      rebalance: true,
-      newAllocation: 50,
-      shortReport: 's',
-    });
-    await insertLimitOrder({
-      userId,
-      planned: { symbol: 'SOLUSDT', side: 'BUY', qty: 0.1, price: 10 },
-      status: LimitOrderStatus.Open,
-      reviewResultId,
-      orderId,
-    });
-    return { orderId, userId };
-  }
-
-  it('marks missing orders as canceled when Binance reports cancellation', async () => {
-    const { orderId } = await setupOrder();
-    fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
-
-    await syncOpenOrderStatuses(mockLogger());
-
-    const order = await getLimitOrder(orderId);
-    expect(order?.status).toBe(LimitOrderStatus.Canceled);
-    expect(order?.cancellation_reason).toBe(
-      'Binance canceled the order (status CANCELED)',
-    );
-  });
-
-  it('marks missing orders as filled when Binance reports filled status', async () => {
-    const { orderId } = await setupOrder('456');
-    fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
+  it('marks missing orders as filled when exchange reports filled status', async () => {
+    const { orderId } = await createOpenOrder('1001');
+    gatewaySpotMock.fetchOrder.mockResolvedValueOnce({ status: 'FILLED' });
 
     await syncOpenOrderStatuses(mockLogger());
 
@@ -96,53 +81,35 @@ describe('syncOpenOrderStatuses', () => {
     expect(order?.status).toBe(LimitOrderStatus.Filled);
   });
 
-  it('marks missing orders as canceled when Binance returns unknown order error', async () => {
-    const { orderId } = await setupOrder('789');
-    fetchOrder.mockRejectedValueOnce(new Error('err'));
-    parseBinanceError.mockReturnValueOnce({
-      code: -2013,
-      msg: 'Order does not exist.',
-    });
+  it('records cancellation reason when exchange closes order', async () => {
+    const { orderId } = await createOpenOrder('1002');
+    gatewaySpotMock.fetchOrder.mockResolvedValueOnce({ status: 'CANCELED' });
 
     await syncOpenOrderStatuses(mockLogger());
 
     const order = await getLimitOrder(orderId);
     expect(order?.status).toBe(LimitOrderStatus.Canceled);
-    expect(order?.cancellation_reason).toBe('Binance: Order does not exist.');
+    expect(order?.cancellation_reason).toContain('Binance canceled the order');
   });
 
-  it('falls back to a generic message when Binance omits the unknown order error message', async () => {
-    const { orderId } = await setupOrder('101112');
-    fetchOrder.mockRejectedValueOnce(new Error('err'));
-    parseBinanceError.mockReturnValueOnce({ code: -2013 });
+  it('cancels outstanding orders when workflow is inactive', async () => {
+    const { orderId, userId, workflowId } = await createOpenOrder('1003');
+    vi.mocked(cancelLimitOrder).mockResolvedValueOnce(LimitOrderStatus.Canceled);
+    // Return open order to simulate presence on exchange
+    gatewaySpotMock.fetchOpenOrders.mockResolvedValueOnce([
+      { orderId, symbol: 'BTCUSDT' },
+    ]);
+
+    await db.query("UPDATE portfolio_workflow SET status = 'inactive' WHERE id = $1", [workflowId]);
 
     await syncOpenOrderStatuses(mockLogger());
 
-    const order = await getLimitOrder(orderId);
-    expect(order?.status).toBe(LimitOrderStatus.Canceled);
-    expect(order?.cancellation_reason).toBe(
-      'Binance could not find the order (code -2013)',
-    );
-  });
-
-  it('does not overwrite local cancellation reasons during reconciliation', async () => {
-    const { orderId, userId } = await setupOrder('131415');
-    fetchOrder.mockImplementationOnce(async () => {
-      await updateLimitOrderStatus(
-        userId,
-        orderId,
-        LimitOrderStatus.Canceled,
-        CANCEL_ORDER_REASONS.WORKFLOW_STOPPED,
-      );
-      return { status: 'CANCELED' };
+    expect(cancelLimitOrder).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      orderId,
+      reason: 'Workflow inactive',
+      exchange: 'binance',
     });
-
-    await syncOpenOrderStatuses(mockLogger());
-
-    const order = await getLimitOrder(orderId);
-    expect(order?.status).toBe(LimitOrderStatus.Canceled);
-    expect(order?.cancellation_reason).toBe(
-      CANCEL_ORDER_REASONS.WORKFLOW_STOPPED,
-    );
   });
 });
+

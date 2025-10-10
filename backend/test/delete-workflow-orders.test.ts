@@ -15,15 +15,16 @@ vi.mock('../src/workflows/portfolio-review.js', () => ({
   removeWorkflowFromSchedule: vi.fn(),
 }));
 
-const { cancelOrder } = vi.hoisted(() => ({
+const { cancelOrder, fetchOrder } = vi.hoisted(() => ({
   cancelOrder: vi.fn().mockResolvedValue(undefined),
+  fetchOrder: vi.fn().mockResolvedValue({ status: 'CANCELED' }),
 }));
 
 vi.mock('../src/services/binance-client.js', async () => {
   const actual = await vi.importActual<
     typeof import('../src/services/binance-client.js')
   >('../src/services/binance-client.js');
-  return { ...actual, cancelOrder };
+  return { ...actual, cancelOrder, fetchOrder };
 });
 
 const cancelOrdersSpy = vi.spyOn(orderOrchestrator, 'cancelOrdersForWorkflow');

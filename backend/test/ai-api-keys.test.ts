@@ -1,10 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const { cancelOrder: cancelOrderMock, fetchOrder: fetchOrderMock } = vi.hoisted(
+  () => ({
+    cancelOrder: vi.fn().mockResolvedValue(undefined),
+    fetchOrder: vi.fn().mockResolvedValue({ status: 'CANCELED' }),
+  }),
+);
+
 vi.mock('../src/services/binance-client.js', async () => {
   const actual = await vi.importActual<
     typeof import('../src/services/binance-client.js')
   >('../src/services/binance-client.js');
-  return { ...actual, cancelOrder: vi.fn().mockResolvedValue(undefined) };
+  return {
+    ...actual,
+    cancelOrder: cancelOrderMock,
+    fetchOrder: fetchOrderMock,
+  };
 });
 
 import buildServer from '../src/server.js';
