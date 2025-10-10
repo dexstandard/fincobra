@@ -46,7 +46,7 @@ const endpoints: Endpoint[] = [
   {
     name: 'binance-balance',
     method: 'GET',
-    url: '/api/users/1/binance-balance',
+    url: '/api/users/1/binance/balance',
     limit: RATE_LIMITS.MODERATE.max,
   },
   {

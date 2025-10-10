@@ -43,7 +43,7 @@ export function useWorkflowBalanceUsd(tokens: string[], ownerId?: string) {
             const tokenUpper = token.toUpperCase();
             try {
               const res = await api.get(
-                `/users/${targetUserId}/binance-balance/${tokenUpper}`,
+                `/users/${targetUserId}/binance/balance/${tokenUpper}`,
               );
               const bal = res.data as BinanceBalanceResponse;
               const amount =

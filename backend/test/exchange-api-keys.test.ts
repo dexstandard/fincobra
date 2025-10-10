@@ -107,6 +107,7 @@ describe('Exchange API key routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
+      id: expect.any(String),
       key: '<REDACTED>',
       secret: '<REDACTED>',
     });
@@ -238,6 +239,7 @@ describe('Exchange API key routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
+      id: expect.any(String),
       key: '<REDACTED>',
       secret: '<REDACTED>',
     });

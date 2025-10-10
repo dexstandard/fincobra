@@ -7,6 +7,7 @@ import {
 } from '../src/repos/portfolio-workflows.js';
 import { insertAdminUser, insertUser, insertUserWithKeys } from './repos/users.js';
 import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
+import { setBybitKey, getBybitKey } from '../src/repos/exchange-api-keys.js';
 import {
   setWorkflowStatus,
   getPortfolioWorkflowStatus,
@@ -257,6 +258,58 @@ describe('portfolio workflow routes', () => {
 
     await app.close();
     (globalThis as any).fetch = originalFetch;
+  });
+
+  it('persists bybit exchange selection when starting a workflow', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('bybit-user');
+    const aiKey = encrypt('bybit-ai', process.env.KEY_PASSWORD!);
+    const bybitKey = encrypt('bybit-key', process.env.KEY_PASSWORD!);
+    const bybitSecret = encrypt('bybit-secret', process.env.KEY_PASSWORD!);
+    await setAiKey({ userId, apiKeyEnc: aiKey });
+    await setBybitKey({
+      userId,
+      apiKeyEnc: bybitKey,
+      apiSecretEnc: bybitSecret,
+    });
+    const storedBybitKey = await getBybitKey(userId);
+    expect(storedBybitKey).not.toBeNull();
+    if (!storedBybitKey) throw new Error('bybit key missing');
+
+    const payload = {
+      model: 'gpt-5',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'prompt',
+      cash: 'USDT',
+      status: 'inactive',
+      exchangeKeyId: storedBybitKey.id,
+    };
+
+    let res = await app.inject({
+      method: 'POST',
+      url: '/api/portfolio-workflows',
+      cookies: authCookies(userId),
+      payload,
+    });
+    expect(res.statusCode).toBe(200);
+    const workflowId = res.json().id as string;
+    expect(res.json().exchangeApiKeyId).toBe(storedBybitKey.id);
+
+    res = await app.inject({
+      method: 'POST',
+      url: `/api/portfolio-workflows/${workflowId}/start`,
+      cookies: authCookies(userId),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().exchangeApiKeyId).toBe(storedBybitKey.id);
+    expect(res.json().startBalanceUsd).toBeNull();
+
+    await app.close();
   });
 
   it('returns null api key ids when keys missing', async () => {

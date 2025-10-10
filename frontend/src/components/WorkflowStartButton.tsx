@@ -6,6 +6,7 @@ import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
 import { useToast } from '../lib/useToast';
 import { useTranslation } from '../lib/i18n';
+import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 import Button from './ui/Button';
 import ConfirmDialog from './ui/ConfirmDialog';
 
@@ -16,16 +17,11 @@ interface WorkflowPreviewDetails {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
-}
-
-interface ExistingWorkflow extends WorkflowPreviewDetails {
-  id: string;
-  userId: string;
-  model: string | null;
+  exchangeKeyId: string | null;
 }
 
 interface Props {
-  workflow?: ExistingWorkflow;
+  workflow?: PortfolioWorkflow;
   workflowData: WorkflowPreviewDetails;
   model: string;
   disabled: boolean;
@@ -74,6 +70,7 @@ export default function WorkflowStartButton({
           manualRebalance: workflowData.manualRebalance,
           useEarn: workflowData.useEarn,
           status: 'active',
+          exchangeKeyId: workflowData.exchangeKeyId,
         });
         navigate(`/portfolio-workflows/${res.data.id}`);
       }

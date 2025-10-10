@@ -3,23 +3,29 @@ import { useQuery } from '@tanstack/react-query';
 import api from './axios';
 import { parseBalanceAmount } from './parseBalanceAmount';
 import { useUser } from './useUser';
+import type { ExchangeAccountBalance } from './exchange-accounts.types';
 
 export interface BinanceAccount {
-  balances: { asset: string; free: number; locked: number }[];
+  balances: ExchangeAccountBalance[];
 }
 
 interface BinanceAccountResponse {
   balances?: { asset: string; free: unknown; locked: unknown }[];
 }
 
-export function useBinanceAccount() {
+interface UseBinanceAccountOptions {
+  enabled?: boolean;
+}
+
+export function useBinanceAccount(options?: UseBinanceAccountOptions) {
+  const { enabled = true } = options ?? {};
   const { user } = useUser();
   return useQuery<BinanceAccount>({
     queryKey: ['binance-account', user?.id],
-    enabled: !!user,
+    enabled: !!user && enabled,
     queryFn: async () => {
       try {
-        const res = await api.get(`/users/${user!.id}/binance-account`);
+        const res = await api.get(`/users/${user!.id}/binance/account`);
         const data = res.data as BinanceAccountResponse;
         const balances = (data.balances ?? []).map((balance) => ({
           asset: balance.asset,

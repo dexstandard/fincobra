@@ -7,20 +7,25 @@ const SHOW_EARN_FEATURE = false;
 
 interface Props {
   balances: BalanceInfo[];
-  hasBinanceKey: boolean;
+  exchange: 'binance' | 'bybit' | null;
 }
 
-export default function WalletBalances({ balances, hasBinanceKey }: Props) {
+export default function WalletBalances({ balances, exchange }: Props) {
   const { user } = useUser();
   const t = useTranslation();
 
-  if (!user || !hasBinanceKey) {
+  if (!user || !exchange) {
     return null;
   }
 
+  const title =
+    exchange === 'binance'
+      ? t('binance_balances')
+      : t('bybit_futures_balances');
+
   return (
     <div>
-      <h3 className="text-md font-bold mb-2">{t('binance_balances')}</h3>
+      <h3 className="text-md font-bold mb-2">{title}</h3>
       {balances.map((b) => (
         <p key={b.token} className="flex flex-wrap items-center gap-1">
           <TokenDisplay token={b.token} className="font-bold shrink-0" />
