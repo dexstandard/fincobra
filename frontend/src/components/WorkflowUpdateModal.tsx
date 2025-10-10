@@ -63,9 +63,6 @@ export default function WorkflowUpdateModal({
 
   const [model, setModel] = useState(workflow.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
-  const [exchangeKeyProvider, setExchangeKeyProvider] = useState<
-    'binance' | 'bybit'
-  >('binance');
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
   const desiredExchange: 'binance' | 'bybit' =
     tradingMode === 'futures' ? 'bybit' : 'binance';
@@ -107,11 +104,6 @@ export default function WorkflowUpdateModal({
         workflow.cashToken,
         ...workflow.tokens.map((t) => t.token),
       ]);
-      if (workflow.exchangeApiKeyId === bybitKeyId) {
-        setExchangeKeyProvider('bybit');
-      } else if (workflow.exchangeApiKeyId === binanceKeyId) {
-        setExchangeKeyProvider('binance');
-      }
     }
   }, [open, workflow, reset, bybitKeyId, binanceKeyId]);
 
@@ -248,57 +240,46 @@ export default function WorkflowUpdateModal({
             )}
           </div>
           <div>
-            <ApiKeyProviderSelector
-              type="exchange"
-              label={t('exchange')}
-              value={exchangeKeyProvider}
-              onChange={(value) =>
-                setExchangeKeyProvider(value as 'binance' | 'bybit')
-              }
-            />
-            <div className="mt-4">
-              <span className="block text-md font-bold">
-                {t('trading_mode')}
-              </span>
-              <div className="mt-2 flex flex-col gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {tradingModeConfigs.map((mode) => {
-                    const isActive = tradingMode === mode.id;
-                    const disabled = !mode.enabled;
-                    const hint = disabled
-                      ? t('trading_mode_connect_exchange', {
-                          exchange: mode.exchangeLabel,
-                        })
-                      : undefined;
-                    return (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        onClick={() => {
-                          if (!disabled) setTradingMode(mode.id);
-                        }}
-                        disabled={disabled}
-                        title={hint}
-                        className={`px-3 py-1.5 rounded border text-sm transition-colors ${
-                          isActive
-                            ? 'bg-blue-600 text-white border-transparent'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200'
-                        }`}
-                      >
-                        {mode.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-sm text-gray-600">
-                  {
-                    tradingModeConfigs.find((mode) => mode.id === tradingMode)
-                      ?.description ?? ''
-                  }
-                </p>
+            <span className="block text-md font-bold">{t('trading_mode')}</span>
+            <div className="mt-2 flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                {tradingModeConfigs.map((mode) => {
+                  const isActive = tradingMode === mode.id;
+                  const disabled = !mode.enabled;
+                  const hint = disabled
+                    ? t('trading_mode_connect_exchange').replace(
+                        '{{exchange}}',
+                        mode.exchangeLabel,
+                      )
+                    : undefined;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => {
+                        if (!disabled) setTradingMode(mode.id);
+                      }}
+                      disabled={disabled}
+                      title={hint}
+                      className={`px-3 py-1.5 rounded border text-sm transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white border-transparent'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
               </div>
+              <p className="text-sm text-gray-600">
+                {
+                  tradingModeConfigs.find((mode) => mode.id === tradingMode)
+                    ?.description ?? ''
+                }
+              </p>
             </div>
-            <div className="mt-2">
+            <div className="mt-4">
               <WalletBalances
                 balances={balances}
                 exchange={activeExchange}

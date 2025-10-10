@@ -243,9 +243,10 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
                   const isActive = tradingMode === mode.id;
                   const disabled = !mode.enabled;
                   const hint = disabled
-                    ? t('trading_mode_connect_exchange', {
-                        exchange: mode.exchangeLabel,
-                      })
+                    ? t('trading_mode_connect_exchange').replace(
+                        '{{exchange}}',
+                        mode.exchangeLabel,
+                      )
                     : undefined;
                   return (
                     <button
