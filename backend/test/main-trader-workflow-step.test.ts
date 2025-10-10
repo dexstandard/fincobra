@@ -35,7 +35,7 @@ const callAiMock = vi.hoisted(() =>
   ),
 );
 
-vi.mock('../src/services/openai-client.js', () => ({
+vi.mock('../src/services/ai-provider.js', () => ({
   callAi: callAiMock,
 }));
 
@@ -62,6 +62,7 @@ describe('main trader step', () => {
         model: 'gpt',
         apiKey: 'key',
         portfolioId: 'agent1',
+        aiProvider: 'openai',
       },
       prompt,
     );
@@ -77,7 +78,7 @@ describe('main trader step', () => {
       },
     ]);
     expect(callAiMock).toHaveBeenCalled();
-    const [, instructionsArg] = callAiMock.mock.calls[0];
+    const [, , instructionsArg] = callAiMock.mock.calls[0];
     expect(instructionsArg).toBe(developerInstructions);
   });
 
@@ -96,11 +97,12 @@ describe('main trader step', () => {
         model: 'gpt',
         apiKey: 'key',
         portfolioId: 'agent1',
+        aiProvider: 'openai',
       },
       prompt,
       'custom developer instructions',
     );
-    const [, instructionsArg] = callAiMock.mock.calls[0];
+    const [, , instructionsArg] = callAiMock.mock.calls[0];
     expect(instructionsArg).toBe('custom developer instructions');
   });
 });

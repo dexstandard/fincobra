@@ -96,6 +96,7 @@ async function validateWorkflowInput(
   body: PortfolioWorkflowInput,
   id?: string,
 ): Promise<ValidationErr | null> {
+  body.aiProvider = body.aiProvider ?? 'openai';
   body.cash = (body.cash ?? '').toUpperCase();
   if (!['USDT', 'USDC'].includes(body.cash)) {
     log.error('invalid cash token');
@@ -123,8 +124,8 @@ async function validateWorkflowInput(
     return { code: 400, body: errorResponse(lengthMessage('model', 50)) };
   } else {
     const [ownKey, sharedKey] = await Promise.all([
-      getAiKey(userId),
-      getSharedAiKey(userId),
+      getAiKey(userId, body.aiProvider),
+      getSharedAiKey(userId, body.aiProvider),
     ]);
     if (!ownKey && sharedKey?.model && body.model !== sharedKey.model) {
       log.error('model not allowed');
@@ -136,6 +137,7 @@ async function validateWorkflowInput(
       {
         userId,
         model: body.model,
+        aiProvider: body.aiProvider,
         cashToken: body.cash,
         tokens: body.tokens,
         risk: body.risk,
@@ -177,6 +179,7 @@ interface EnsureApiKeysOptions {
   requireAi?: boolean;
   requireExchange?: boolean;
   preferredExchange?: 'binance' | 'bybit';
+  aiProvider?: 'openai' | 'groq';
 }
 
 export async function ensureApiKeys(
@@ -189,8 +192,9 @@ export async function ensureApiKeys(
     requireAi = true,
     requireExchange = true,
     preferredExchange,
+    aiProvider = 'openai',
   } = options;
-  const userRow = await getUserApiKeys(userId);
+  const userRow = await getUserApiKeys(userId, aiProvider);
   if (!userRow) {
     log.error('missing api keys');
     return { code: 400, body: errorResponse('missing api keys') };
@@ -294,6 +298,7 @@ export async function preparePortfolioWorkflowForUpsert(
     exchangeKeyId: body.exchangeKeyId,
     requireAi: body.status === PortfolioWorkflowStatus.Active,
     requireExchange: body.status === PortfolioWorkflowStatus.Active,
+    aiProvider: body.aiProvider,
   });
   if ('code' in ensuredKeys) return ensuredKeys;
   body.exchangeKeyId = ensuredKeys.exchangeKeyId;

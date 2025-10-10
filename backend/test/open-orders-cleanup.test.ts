@@ -71,7 +71,7 @@ const sampleMarketOverview = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../src/services/openai-client.js', () => ({
+vi.mock('../src/services/ai-provider.js', () => ({
   callAi: vi.fn().mockResolvedValue('ok'),
 }));
 

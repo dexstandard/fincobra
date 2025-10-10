@@ -68,6 +68,7 @@ const workflowUpsertSchema = z
       .string()
       .optional()
       .transform((value) => value ?? ''),
+    aiProvider: z.enum(['openai', 'groq']).default('openai'),
     cash: z
       .string()
       .optional()
@@ -407,6 +408,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const row = await insertPortfolioWorkflow({
         userId,
         model: validated.model,
+        aiProvider: validated.aiProvider,
         status,
         startBalance,
         cashToken: validated.cash,
@@ -608,6 +610,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         exchangeKeyId: workflow.exchangeApiKeyId,
         requireAi: false,
         requireExchange: false,
+        aiProvider: workflow.aiProvider,
       });
       if ('code' in ensuredKeys)
         return reply.code(ensuredKeys.code).send(ensuredKeys.body);
@@ -773,6 +776,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       await updatePortfolioWorkflow({
         id,
         model: validated.model,
+        aiProvider: validated.aiProvider,
         status,
         cashToken: validated.cash,
         tokens: validated.tokens,
@@ -831,6 +835,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
       const ensuredKeys = await ensureApiKeys(log, userId, {
         exchangeKeyId: existing.exchangeApiKeyId,
+        aiProvider: existing.aiProvider,
       });
       if ('code' in ensuredKeys)
         return reply.code(ensuredKeys.code).send(ensuredKeys.body);

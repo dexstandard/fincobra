@@ -7,6 +7,7 @@ import api from '../../lib/axios';
 import SelectInput from './SelectInput';
 import AiApiKeySection from './AiApiKeySection';
 import ExchangeApiKeySection from './ExchangeApiKeySection';
+import GroqApiKeySection from './GroqApiKeySection';
 
 interface ProviderConfig {
   value: string;
@@ -23,6 +24,13 @@ const aiBaseConfigs: ProviderConfig[] = [
     queryKey: 'ai-key',
     getKeyPath: (id) => `/users/${id}/ai-key`,
     renderForm: () => <AiApiKeySection label="OpenAI API Key" />,
+  },
+  {
+    value: 'groq',
+    label: 'Groq',
+    queryKey: 'groq-key',
+    getKeyPath: (id) => `/users/${id}/groq-key`,
+    renderForm: () => <GroqApiKeySection label="Groq API Key" />,
   },
   {
     value: 'openai-shared',

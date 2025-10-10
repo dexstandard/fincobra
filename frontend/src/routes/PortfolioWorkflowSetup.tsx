@@ -52,7 +52,9 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const defaultValues = workflowFormValues ?? portfolioReviewDefaults;
 
   const [model, setModel] = useState(workflow?.model || '');
-  const [aiProvider, setAiProvider] = useState('openai');
+  const [aiProvider, setAiProvider] = useState<
+    'openai' | 'groq'
+  >(workflow?.aiProvider ?? 'openai');
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
   const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? false);
   const [tokenSymbols, setTokenSymbols] = useState(
@@ -67,7 +69,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const desiredExchange: 'binance' | 'bybit' =
     tradingMode === 'futures' ? 'bybit' : 'binance';
   const {
-    hasOpenAIKey,
+    hasAiKey,
     hasBinanceKey,
     hasBybitKey,
     binanceKeyId,
@@ -79,6 +81,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     activeExchange,
   } = usePrerequisites(tokenSymbols, {
     exchange: desiredExchange,
+    aiProvider,
   });
   const hasExchangeKey = hasBinanceKey || hasBybitKey;
   const selectedExchangeKeyId = useMemo(() => {
@@ -102,12 +105,18 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   }, [workflow?.model]);
 
   useEffect(() => {
-    if (!hasOpenAIKey) {
+    if (!hasAiKey) {
       setModel('');
     } else if (!model) {
       setModel(workflow?.model || models[0] || '');
     }
-  }, [hasOpenAIKey, models, workflow?.model, model]);
+  }, [hasAiKey, models, workflow?.model, model, aiProvider]);
+
+  useEffect(() => {
+    if (workflow?.aiProvider) {
+      setAiProvider(workflow.aiProvider);
+    }
+  }, [workflow?.aiProvider]);
 
   useEffect(() => {
     if (!workflowFormValues) return;
@@ -217,7 +226,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               value={aiProvider}
               onChange={setAiProvider}
             />
-            {hasOpenAIKey && (models.length || workflow?.model) && (
+            {hasAiKey && (models.length || workflow?.model) && (
               <div>
                 <label htmlFor="model" className="block text-md font-bold">
                   {t('model')}
@@ -310,17 +319,18 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
           </p>
         )}
         <div className="mt-4 flex gap-2">
-          <Button
-            disabled={isSaving || !user}
-            loading={isSaving}
-            onClick={async () => {
-              if (!user) return;
+              <Button
+                disabled={isSaving || !user}
+                loading={isSaving}
+                onClick={async () => {
+                  if (!user) return;
               setIsSaving(true);
               try {
                 const values = methods.getValues();
                 const [cashToken, ...positions] = values.tokens;
                 const payload = {
                   model,
+                  aiProvider,
                   cash: cashToken.token.toUpperCase(),
                   tokens: positions.map((t) => ({
                     token: t.token.toUpperCase(),
@@ -369,9 +379,10 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               exchangeKeyId: selectedExchangeKeyId,
             }}
             model={model}
+            aiProvider={aiProvider}
             disabled={
               !user ||
-              !hasOpenAIKey ||
+              !hasAiKey ||
               !hasExchangeKey ||
               !model ||
               !selectedExchangeKeyId

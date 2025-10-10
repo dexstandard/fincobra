@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { createHash } from 'crypto';
 import NodeCache from 'node-cache';
+import { z } from 'zod';
 import { RATE_LIMITS } from '../rate-limit.js';
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
 import type {
   AiApiKeyDetails,
   SharedAiApiKeyDetails,
 } from '../repos/ai-api-key.types.js';
-import { fetchSupportedModels } from '../services/openai-client.js';
+import { fetchSupportedModels } from '../services/ai-provider.js';
 import { decryptKey } from '../util/crypto.js';
 import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { getValidatedUserId, userPreHandlers } from './_shared/guards.js';
@@ -48,9 +49,17 @@ export default async function modelsRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const userId = getValidatedUserId(req);
+      const providerResult = z
+        .object({ provider: z.enum(['openai', 'groq']).default('openai') })
+        .safeParse(req.query);
+      if (!providerResult.success)
+        return reply
+          .code(400)
+          .send(errorResponse('invalid provider parameter'));
+      const { provider } = providerResult.data;
       const [ownKey, sharedKey] = await Promise.all([
-        getAiKey(userId),
-        getSharedAiKey(userId),
+        getAiKey(userId, provider),
+        getSharedAiKey(userId, provider),
       ]);
 
       const restricted = getRestrictedSharedModels(ownKey, sharedKey);
@@ -61,12 +70,12 @@ export default async function modelsRoutes(app: FastifyInstance) {
         return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
 
       const apiKey = decryptKey(encryptedKey);
-      const cacheKey = sha256(apiKey);
+      const cacheKey = sha256(`${provider}:${apiKey}`);
 
       const cached = modelsCache.get<string[]>(cacheKey);
       if (cached) return { models: cached };
 
-      const models = await fetchSupportedModels(apiKey);
+      const models = await fetchSupportedModels(provider, apiKey);
       if (models === null)
         return reply.code(502).send(errorResponse(MODEL_FETCH_ERROR));
 

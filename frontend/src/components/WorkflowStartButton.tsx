@@ -25,6 +25,7 @@ interface Props {
   workflowData: WorkflowPreviewDetails;
   model: string;
   disabled: boolean;
+  aiProvider: 'openai' | 'groq';
 }
 
 export default function WorkflowStartButton({
@@ -32,6 +33,7 @@ export default function WorkflowStartButton({
   workflowData,
   model,
   disabled,
+  aiProvider,
 }: Props) {
   const { user } = useUser();
   const toast = useToast();
@@ -59,6 +61,7 @@ export default function WorkflowStartButton({
         const [cashToken, ...positions] = workflowData.tokens;
         const res = await api.post('/portfolio-workflows', {
           model,
+          aiProvider,
           cash: cashToken.token.toUpperCase(),
           tokens: positions.map((t) => ({
             token: t.token.toUpperCase(),

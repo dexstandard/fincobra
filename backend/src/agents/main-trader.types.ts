@@ -5,6 +5,7 @@ export interface RunParams {
   model: string;
   apiKey: string;
   portfolioId: string;
+  aiProvider: 'openai' | 'groq';
 }
 
 export interface RebalancePosition {

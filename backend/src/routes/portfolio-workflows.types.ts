@@ -5,6 +5,7 @@ export interface PortfolioWorkflowTokenInput {
 
 export interface PortfolioWorkflowInput {
   model: string;
+  aiProvider: 'openai' | 'groq';
   cash: string;
   tokens: PortfolioWorkflowTokenInput[];
   risk: string;

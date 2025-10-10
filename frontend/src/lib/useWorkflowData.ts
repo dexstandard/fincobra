@@ -7,6 +7,7 @@ export interface PortfolioWorkflow {
   id: string;
   userId: string;
   model: string | null;
+  aiProvider: 'openai' | 'groq';
   status: 'active' | 'inactive' | 'retired';
   createdAt: number;
   cashToken: string;

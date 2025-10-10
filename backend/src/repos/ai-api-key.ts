@@ -67,8 +67,9 @@ async function deleteAiKey(
 
 export async function getAiKey(
   userId: string,
+  provider: AiApiProvider = 'openai',
 ): Promise<AiApiKeyDetails | null | undefined> {
-  return getProviderAiKey(userId, 'openai');
+  return getProviderAiKey(userId, provider);
 }
 
 export async function getGroqKey(
@@ -79,6 +80,7 @@ export async function getGroqKey(
 
 export async function getSharedAiKey(
   id: string,
+  provider: AiApiProvider = 'openai',
 ): Promise<SharedAiApiKeyDetails | null | undefined> {
   const { rows } = await db.query(
     `SELECT oak.id AS shared_ai_api_key_id,
@@ -86,9 +88,9 @@ export async function getSharedAiKey(
             s.model AS shared_model
        FROM users u
        LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id
-       LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+       LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = $2
       WHERE u.id = $1`,
-    [id],
+    [id, provider],
   );
   const row = rows[0];
   if (!row) return undefined;
@@ -109,8 +111,11 @@ export async function setAiKey(entry: AiApiKeyUpsert): Promise<void> {
   await upsertAiKey(entry);
 }
 
-export async function clearAiKey(id: string): Promise<void> {
-  await deleteAiKey(id, 'openai');
+export async function clearAiKey(
+  id: string,
+  provider: AiApiProvider = 'openai',
+): Promise<void> {
+  await deleteAiKey(id, provider);
 }
 
 export async function setGroqKey(entry: AiApiKeyUpsert): Promise<void> {

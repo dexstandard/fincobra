@@ -8,7 +8,8 @@ import {
 
 export const insertPortfolioWorkflow = (
   data: Parameters<typeof insertWorkflowProd>[0],
-) => insertWorkflowProd({ cashToken: 'USDT', ...data });
+) =>
+  insertWorkflowProd({ aiProvider: 'openai', cashToken: 'USDT', ...data });
 export {
   startPortfolioWorkflow,
   stopPortfolioWorkflow,

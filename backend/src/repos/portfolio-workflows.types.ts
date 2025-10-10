@@ -7,6 +7,7 @@ export interface PortfolioWorkflow {
   id: string;
   userId: string;
   model: string | null;
+  aiProvider: 'openai' | 'groq';
   status: string;
   createdAt: string;
   startBalance: number | null;
@@ -25,6 +26,7 @@ export interface PortfolioWorkflow {
 export interface PortfolioWorkflowInsert {
   userId: string;
   model: string | null;
+  aiProvider: 'openai' | 'groq';
   status: string;
   startBalance: number | null;
   cashToken: string;
@@ -40,6 +42,7 @@ export interface PortfolioWorkflowInsert {
 export interface PortfolioWorkflowUpdate {
   id: string;
   model: string | null;
+  aiProvider: 'openai' | 'groq';
   status: string;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
@@ -55,6 +58,7 @@ export interface PortfolioWorkflowUpdate {
 export interface PortfolioWorkflowInactiveSearch {
   userId: string;
   model: string | null;
+  aiProvider: 'openai' | 'groq';
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;
@@ -78,6 +82,7 @@ export interface ActivePortfolioWorkflow {
   id: string;
   userId: string;
   model: string | null;
+  aiProvider: 'openai' | 'groq';
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;

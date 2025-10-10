@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import NodeCache from 'node-cache';
-import { callAi } from '../services/openai-client.js';
+import { callAi } from '../services/ai-provider.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
   fetchMarketOverview,
@@ -669,7 +669,7 @@ function extractResult(res: string): MainTraderDecision | null {
 }
 
 export async function run(
-  { log, model, apiKey }: RunParams,
+  { log, model, apiKey, aiProvider }: RunParams,
   prompt: RebalancePrompt,
   instructionsOverride?: string,
 ): Promise<MainTraderDecision | null> {
@@ -677,6 +677,7 @@ export async function run(
     ? instructionsOverride
     : developerInstructions;
   const res = await callAi(
+    aiProvider,
     model,
     instructions,
     rebalanceResponseSchema,

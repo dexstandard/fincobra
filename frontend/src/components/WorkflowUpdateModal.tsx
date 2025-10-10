@@ -62,12 +62,14 @@ export default function WorkflowUpdateModal({
   ]);
 
   const [model, setModel] = useState(workflow.model || '');
-  const [aiProvider, setAiProvider] = useState('openai');
+  const [aiProvider, setAiProvider] = useState<'openai' | 'groq'>(
+    workflow.aiProvider ?? 'openai',
+  );
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
   const desiredExchange: 'binance' | 'bybit' =
     tradingMode === 'futures' ? 'bybit' : 'binance';
   const {
-    hasOpenAIKey,
+    hasAiKey,
     hasBinanceKey,
     hasBybitKey,
     binanceKeyId,
@@ -77,7 +79,10 @@ export default function WorkflowUpdateModal({
     accountBalances,
     isAccountLoading,
     activeExchange,
-  } = usePrerequisites(tokenSymbols, { exchange: desiredExchange });
+  } = usePrerequisites(tokenSymbols, {
+    exchange: desiredExchange,
+    aiProvider,
+  });
   const selectedExchangeKeyId = useMemo(() => {
     if (desiredExchange === 'binance') return binanceKeyId;
     if (desiredExchange === 'bybit') return bybitKeyId;
@@ -100,6 +105,7 @@ export default function WorkflowUpdateModal({
       setInstructions(workflow.agentInstructions);
       setUseEarn(workflow.useEarn);
       setModel(workflow.model || '');
+      setAiProvider(workflow.aiProvider ?? 'openai');
       setTokenSymbols([
         workflow.cashToken,
         ...workflow.tokens.map((t) => t.token),
@@ -108,12 +114,12 @@ export default function WorkflowUpdateModal({
   }, [open, workflow, reset, bybitKeyId, binanceKeyId]);
 
   useEffect(() => {
-    if (!hasOpenAIKey) {
+    if (!hasAiKey) {
       setModel('');
     } else if (!model) {
       setModel(workflow.model || models[0] || '');
     }
-  }, [hasOpenAIKey, models, workflow.model, model]);
+  }, [hasAiKey, models, workflow.model, model, aiProvider]);
 
   useEffect(() => {
     if (!open) return;
@@ -166,6 +172,7 @@ export default function WorkflowUpdateModal({
       const [cashToken, ...positions] = values.tokens;
       await api.put(`/portfolio-workflows/${workflow.id}`, {
         model,
+        aiProvider,
         status: workflow.status,
         cash: cashToken.token.toUpperCase(),
         tokens: positions.map((t) => ({
@@ -223,7 +230,7 @@ export default function WorkflowUpdateModal({
               value={aiProvider}
               onChange={setAiProvider}
             />
-            {hasOpenAIKey && (models.length || workflow.model) && (
+            {hasAiKey && (models.length || workflow.model) && (
               <div className="mt-2">
                 <h2 className="text-md font-bold">{t('model')}</h2>
                 <SelectInput
