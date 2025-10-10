@@ -3,6 +3,7 @@ import WorkflowStatusLabel from './WorkflowStatusLabel';
 import TokenDisplay from './TokenDisplay';
 import WorkflowPnl from './WorkflowPnl';
 import FormattedDate from './ui/FormattedDate';
+import WorkflowAllocationPie from './WorkflowAllocationPie';
 import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 
 interface Props {
@@ -30,6 +31,9 @@ export default function WorkflowDetailsDesktop({ workflow }: Props) {
           </span>
         ))}
       </div>
+      {workflow.status === 'active' && (
+        <WorkflowAllocationPie cashToken={workflow.cashToken} tokens={workflow.tokens} />
+      )}
       <WorkflowPnl
         tokens={tokens}
         startBalanceUsd={workflow.startBalanceUsd}
