@@ -40,9 +40,21 @@ export async function getOpenLimitOrdersForWorkflow(
   portfolioWorkflowId: string,
 ): Promise<LimitOrderOpenWorkflow[]> {
   const { rows } = await db.query(
-    `SELECT e.user_id, e.order_id, e.planned_json
+    `SELECT e.user_id,
+            e.order_id,
+            e.planned_json,
+            CASE
+              WHEN pw.exchange_key_id IS NOT NULL THEN pk.provider
+              WHEN ek.id IS NOT NULL THEN 'binance'
+              WHEN bek.id IS NOT NULL THEN 'bybit'
+              ELSE NULL
+            END AS exchange_provider
        FROM limit_order e
        JOIN review_result r ON e.review_result_id = r.id
+       JOIN portfolio_workflow pw ON r.portfolio_workflow_id = pw.id
+       LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
+       LEFT JOIN exchange_keys bek ON bek.user_id = pw.user_id AND bek.provider = 'bybit'
+       LEFT JOIN exchange_keys pk ON pk.id = pw.exchange_key_id
       WHERE r.portfolio_workflow_id = $1 AND e.status = $2`,
     [portfolioWorkflowId, LimitOrderStatus.Open],
   );
@@ -51,10 +63,23 @@ export async function getOpenLimitOrdersForWorkflow(
 
 export async function getAllOpenLimitOrders(): Promise<LimitOrderOpen[]> {
   const { rows } = await db.query(
-    `SELECT e.user_id, e.order_id, e.planned_json, r.portfolio_workflow_id, pw.status AS workflow_status
+    `SELECT e.user_id,
+            e.order_id,
+            e.planned_json,
+            r.portfolio_workflow_id,
+            pw.status AS workflow_status,
+            CASE
+              WHEN pw.exchange_key_id IS NOT NULL THEN pk.provider
+              WHEN ek.id IS NOT NULL THEN 'binance'
+              WHEN bek.id IS NOT NULL THEN 'bybit'
+              ELSE NULL
+            END AS exchange_provider
        FROM limit_order e
        JOIN review_result r ON e.review_result_id = r.id
        JOIN portfolio_workflow pw ON r.portfolio_workflow_id = pw.id
+       LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
+       LEFT JOIN exchange_keys bek ON bek.user_id = pw.user_id AND bek.provider = 'bybit'
+       LEFT JOIN exchange_keys pk ON pk.id = pw.exchange_key_id
       WHERE e.status = $1`,
     [LimitOrderStatus.Open],
   );

@@ -36,6 +36,10 @@ import {
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
+import {
+  resolveSupportedExchange,
+  type SupportedExchange,
+} from '../services/exchange-gateway.js';
 import { getRebalanceInfo } from '../repos/review-result.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
@@ -604,11 +608,14 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manuallyEdited = true;
       }
       if (manuallyEdited) updatedOrder.manuallyEdited = true;
+      const exchange: SupportedExchange =
+        resolveSupportedExchange(workflow.exchangeProvider) ?? 'binance';
       await createDecisionLimitOrders({
         userId,
         orders: [updatedOrder],
         reviewResultId: logId,
         log: log.child({ execLogId: logId }),
+        exchange,
       });
       const orders = await getLimitOrdersByReviewResult(id, logId);
       if (!orders.length) {
@@ -642,7 +649,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
-      const { id, userId, log } = ctx;
+      const { id, userId, log, workflow } = ctx;
       const lp = parseRequestParams(orderIdParams, req, reply);
       if (!lp) return;
       const { logId, orderId } = lp;
@@ -656,10 +663,38 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         log.error({ execLogId: logId, orderId }, 'order not open');
         return reply.code(400).send(errorResponse('order not open'));
       }
-      const planned = JSON.parse(row.plannedJson);
+      let planned: Record<string, unknown> | null = null;
+      try {
+        planned = JSON.parse(row.plannedJson) as Record<string, unknown> | null;
+      } catch (err) {
+        log.error({ err, execLogId: logId, orderId }, 'failed to parse planned order');
+        return reply
+          .code(500)
+          .send(errorResponse('failed to cancel order'));
+      }
+      if (!planned) {
+        log.error({ execLogId: logId, orderId }, 'missing planned order payload');
+        return reply
+          .code(500)
+          .send(errorResponse('failed to cancel order'));
+      }
+      const symbol =
+        typeof planned.symbol === 'string' ? planned.symbol : undefined;
+      if (!symbol) {
+        log.error({ execLogId: logId, orderId }, 'planned order missing symbol');
+        return reply
+          .code(500)
+          .send(errorResponse('failed to cancel order'));
+      }
+      const exchange: SupportedExchange =
+        resolveSupportedExchange(
+          typeof planned.exchange === 'string' ? planned.exchange : null,
+          workflow.exchangeProvider,
+        ) ?? 'binance';
       try {
         await cancelLimitOrder(userId, {
-          symbol: planned.symbol,
+          exchange,
+          symbol,
           orderId,
           reason: 'Canceled by user',
         });
@@ -667,10 +702,16 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return { ok: true } as const;
       } catch (err) {
         log.error({ err, execLogId: logId, orderId }, 'failed to cancel order');
-        const { msg } = parseBinanceError(err);
+        let message = 'failed to cancel order';
+        if (exchange === 'binance') {
+          const { msg } = parseBinanceError(err);
+          if (msg) message = msg;
+        } else if (err instanceof Error && err.message) {
+          message = err.message;
+        }
         return reply
           .code(500)
-          .send(errorResponse(msg || 'failed to cancel order'));
+          .send(errorResponse(message));
       }
     },
   );
@@ -814,12 +855,6 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('model required'));
       }
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
-      const pairErr = await validateTradingPairs(
-        log,
-        existing.cashToken,
-        tokens,
-      );
-      if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
       const conflict = await validateTokenConflicts(log, userId, tokens, id);
       if (conflict) return reply.code(conflict.code).send(conflict.body);
       const ensuredKeys = await ensureApiKeys(log, userId, {
@@ -827,6 +862,15 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       });
       if ('code' in ensuredKeys)
         return reply.code(ensuredKeys.code).send(ensuredKeys.body);
+      if (ensuredKeys.exchangeProvider) {
+        const pairErr = await validateTradingPairs(
+          log,
+          ensuredKeys.exchangeProvider,
+          existing.cashToken,
+          tokens,
+        );
+        if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
+      }
       let startBalance: number | null = null;
       if (ensuredKeys.exchangeProvider === 'binance') {
         const bal = await getStartBalance(log, userId, tokens);

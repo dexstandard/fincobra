@@ -2,12 +2,8 @@ import type { FastifyBaseLogger } from 'fastify';
 import { insertLimitOrder } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import type { MainTraderOrder } from '../agents/main-trader.types.js';
-import {
-  fetchPairInfo,
-  fetchSymbolPrice,
-  createLimitOrder,
-  parseBinanceError,
-} from './binance-client.js';
+import { parseBinanceError } from './binance-client.js';
+import { getExchangeGateway, type SupportedExchange } from './exchange-gateway.js';
 import { TOKEN_SYMBOLS } from '../util/tokens.js';
 
 interface CreateDecisionLimitOrdersResult {
@@ -124,6 +120,7 @@ export async function createDecisionLimitOrders(opts: {
   orders: (MainTraderOrder & { manuallyEdited?: boolean })[];
   reviewResultId: string;
   log: FastifyBaseLogger;
+  exchange: SupportedExchange;
 }): Promise<CreateDecisionLimitOrdersResult> {
   const result: CreateDecisionLimitOrdersResult = {
     placed: 0,
@@ -131,21 +128,28 @@ export async function createDecisionLimitOrders(opts: {
     priceDivergenceCancellations: 0,
     needsPriceDivergenceRetry: false,
   };
+  const gateway = getExchangeGateway(opts.exchange);
+  const spot = gateway.spot;
+  if (!spot) {
+    throw new Error(`spot trading is not supported on ${opts.exchange}`);
+  }
   for (const o of opts.orders) {
     const [a, b] = splitPair(o.pair);
     if (!a || !b) continue;
-    const info = await fetchPairInfo(a, b);
-    const { currentPrice } = await fetchSymbolPrice(info.symbol);
+    const market = await gateway.metadata.fetchMarket(a, b);
+    const ticker = await gateway.metadata.fetchTicker(market.symbol);
+    const currentPrice = ticker.price;
     const requestedSide = o.side;
     const requestedToken =
       typeof o.token === 'string' ? o.token.toUpperCase() : '';
     const manuallyEdited = o.manuallyEdited ?? false;
     const plannedBase: Record<string, unknown> = {
-      symbol: info.symbol,
+      symbol: market.symbol,
       pair: o.pair,
       token: requestedToken || o.token,
       side: requestedSide,
       manuallyEdited,
+      exchange: opts.exchange,
       basePrice: o.basePrice,
       limitPrice: o.limitPrice,
       maxPriceDriftPct: o.maxPriceDriftPct,
@@ -156,11 +160,11 @@ export async function createDecisionLimitOrders(opts: {
     if (requestedSide !== 'BUY' && requestedSide !== 'SELL') {
       await insertLimitOrder({
         userId: opts.userId,
-        planned: plannedBase,
-        status: LimitOrderStatus.Canceled,
-        reviewResultId: opts.reviewResultId,
-        orderId: String(Date.now()),
-        cancellationReason: `Invalid order side: ${requestedSide}`,
+      planned: plannedBase,
+      status: LimitOrderStatus.Canceled,
+      reviewResultId: opts.reviewResultId,
+      orderId: String(Date.now()),
+      cancellationReason: `Invalid order side: ${requestedSide}`,
       });
       result.canceled += 1;
       continue;
@@ -253,7 +257,7 @@ export async function createDecisionLimitOrders(opts: {
     );
     const roundedLimit = roundLimitPrice(
       adjustedLimit,
-      info.pricePrecision,
+      market.pricePrecision,
       side,
     );
     if (!Number.isFinite(roundedLimit) || roundedLimit <= 0) {
@@ -275,30 +279,30 @@ export async function createDecisionLimitOrders(opts: {
     }
 
     let quantity: number;
-    if (requestedToken === info.baseAsset) {
+    if (requestedToken === market.baseAsset) {
       quantity = o.qty;
-    } else if (requestedToken === info.quoteAsset) {
+    } else if (requestedToken === market.quoteAsset) {
       quantity = o.qty / roundedLimit;
     } else {
       continue;
     }
     const rawQty = quantity;
-    let qty = Number(rawQty.toFixed(info.quantityPrecision));
+    let qty = Number(rawQty.toFixed(market.quantityPrecision));
     const freshNominal = rawQty * roundedLimit;
     const roundedNominal = qty * roundedLimit;
     const meetsRoundedNominal = meetsMinNotional(
       roundedNominal,
-      info.minNotional,
+      market.minNotional,
     );
-    if (!meetsRoundedNominal && info.minNotional > 0) {
+    if (!meetsRoundedNominal && market.minNotional > 0) {
       let minForRequestedToken: number | null = null;
-      if (o.token === info.baseAsset) {
+      if (o.token === market.baseAsset) {
         minForRequestedToken =
           Number.isFinite(roundedLimit) && roundedLimit > 0
-            ? info.minNotional / roundedLimit
+            ? market.minNotional / roundedLimit
             : null;
-      } else if (o.token === info.quoteAsset) {
-        minForRequestedToken = info.minNotional;
+      } else if (o.token === market.quoteAsset) {
+        minForRequestedToken = market.minNotional;
       }
 
       if (
@@ -307,10 +311,10 @@ export async function createDecisionLimitOrders(opts: {
         matchesTruncatedPrefix(o.qty, minForRequestedToken)
       ) {
         const targetNominal =
-          Math.max(freshNominal, info.minNotional) * NOMINAL_BUFFER_RATIO;
+          Math.max(freshNominal, market.minNotional) * NOMINAL_BUFFER_RATIO;
         const adjustedQty = increaseQuantityToMeetNominal({
           price: roundedLimit,
-          precision: info.quantityPrecision,
+          precision: market.quantityPrecision,
           targetNominal,
         });
         if (adjustedQty !== null && adjustedQty > qty) {
@@ -320,13 +324,14 @@ export async function createDecisionLimitOrders(opts: {
     }
     const nominalValue = qty * roundedLimit;
     const params = {
-      symbol: info.symbol,
+      symbol: market.symbol,
       side,
-      qty,
-      price: roundedLimit,
+      quantity: qty,
+      limitPrice: roundedLimit,
     } as const;
     const planned = {
       ...plannedBase,
+      exchange: opts.exchange,
       qty,
       price: roundedLimit,
       basePrice,
@@ -334,7 +339,7 @@ export async function createDecisionLimitOrders(opts: {
       maxPriceDriftPct: divergenceLimit,
     };
 
-    if (!meetsMinNotional(nominalValue, info.minNotional)) {
+    if (!meetsMinNotional(nominalValue, market.minNotional)) {
       await insertLimitOrder({
         userId: opts.userId,
         planned,
@@ -348,7 +353,12 @@ export async function createDecisionLimitOrders(opts: {
     }
 
     try {
-      const res = await createLimitOrder(opts.userId, params);
+      const res = await spot.placeLimitOrder(opts.userId, {
+        symbol: params.symbol,
+        side: params.side,
+        quantity: params.quantity,
+        limitPrice: params.limitPrice,
+      });
       if (!res || res.orderId === undefined || res.orderId === null) {
         await insertLimitOrder({
           userId: opts.userId,
@@ -374,9 +384,13 @@ export async function createDecisionLimitOrders(opts: {
         'step success',
       );
     } catch (err) {
-      const { msg } = parseBinanceError(err);
-      const reason =
-        msg || (err instanceof Error ? err.message : 'unknown error');
+      let reason = err instanceof Error ? err.message : 'unknown error';
+      if (opts.exchange === 'binance') {
+        const { msg } = parseBinanceError(err);
+        if (msg) {
+          reason = msg;
+        }
+      }
       await insertLimitOrder({
         userId: opts.userId,
         planned,
@@ -386,7 +400,10 @@ export async function createDecisionLimitOrders(opts: {
         cancellationReason: reason,
       });
       result.canceled += 1;
-      opts.log.error({ err, step: 'createLimitOrder' }, 'step failed');
+      opts.log.error(
+        { err, step: 'createLimitOrder', exchange: opts.exchange },
+        'step failed',
+      );
     }
   }
   result.needsPriceDivergenceRetry =

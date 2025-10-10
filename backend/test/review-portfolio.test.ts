@@ -256,6 +256,7 @@ describe('reviewPortfolio', () => {
     const args = createDecisionLimitOrders.mock.calls[0][0];
     expect(args.userId).toBe(user2);
     expect(args.orders).toHaveLength(2);
+    expect(args.exchange).toBe('binance');
   });
 
   it('treats missing orders as a hold decision', async () => {

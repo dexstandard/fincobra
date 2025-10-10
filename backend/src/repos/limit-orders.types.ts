@@ -25,6 +25,7 @@ export interface LimitOrderOpenWorkflow {
   userId: string;
   orderId: string;
   plannedJson: string;
+  exchangeProvider: 'binance' | 'bybit' | null;
 }
 
 export interface LimitOrderOpen extends LimitOrderOpenWorkflow {

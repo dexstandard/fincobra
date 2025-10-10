@@ -20,6 +20,10 @@ import type { ReviewResultInsert } from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
+import {
+  resolveSupportedExchange,
+  type SupportedExchange,
+} from '../services/exchange-gateway.js';
 import { type RebalancePrompt } from '../agents/main-trader.types.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
@@ -93,10 +97,33 @@ async function cleanupOpenOrders(
   await Promise.all(
     orders.map((o) =>
       limit(async () => {
-        const planned = JSON.parse(o.plannedJson);
+        let planned: Record<string, unknown> | null = null;
+        try {
+          planned = JSON.parse(o.plannedJson) as Record<string, unknown> | null;
+        } catch (err) {
+          log.error({ err, orderId: o.orderId }, 'failed to parse planned order');
+          return;
+        }
+        if (!planned) {
+          log.error({ orderId: o.orderId }, 'missing planned order payload');
+          return;
+        }
+        const symbol =
+          typeof planned.symbol === 'string' ? planned.symbol : undefined;
+        if (!symbol) {
+          log.error({ orderId: o.orderId }, 'planned order missing symbol');
+          return;
+        }
+        const exchange: SupportedExchange =
+          resolveSupportedExchange(
+            typeof planned.exchange === 'string' ? planned.exchange : null,
+            o.exchangeProvider,
+            wf.exchangeProvider,
+          ) ?? 'binance';
         try {
           const res = await cancelLimitOrder(o.userId, {
-            symbol: planned.symbol,
+            exchange,
+            symbol,
             orderId: o.orderId,
             reason: 'Could not fill within interval',
           });
@@ -203,6 +230,9 @@ async function runWorkflowAttempt(
     }
   };
 
+  const exchange: SupportedExchange =
+    resolveSupportedExchange(wf.exchangeProvider) ?? 'binance';
+
   let prompt: RebalancePrompt | undefined;
   try {
     await runStep('cleanupOpenOrders', () => cleanupOpenOrders(wf, runLog));
@@ -282,6 +312,7 @@ async function runWorkflowAttempt(
         orders: normalizedOrders,
         reviewResultId: resultId,
         log: runLog,
+        exchange,
       });
       if (orderResult.needsPriceDivergenceRetry) {
         runLog.warn(

@@ -94,6 +94,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const row = (await getLimitOrders())[0];
@@ -106,6 +107,7 @@ describe('createDecisionLimitOrders', () => {
       basePrice: 100,
       maxPriceDriftPct: 0.05,
       manuallyEdited: false,
+      exchange: 'binance',
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
@@ -160,6 +162,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const row2 = (await getLimitOrders())[0];
@@ -172,6 +175,7 @@ describe('createDecisionLimitOrders', () => {
       limitPrice: 95,
       maxPriceDriftPct: 0.05,
       manuallyEdited: false,
+      exchange: 'binance',
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
@@ -226,6 +230,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const row = (await getLimitOrders())[0];
@@ -238,6 +243,7 @@ describe('createDecisionLimitOrders', () => {
       limitPrice: 95,
       maxPriceDriftPct: 0.05,
       manuallyEdited: false,
+      exchange: 'binance',
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
@@ -292,6 +298,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const row = (await getLimitOrders())[0];
@@ -354,6 +361,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const row = (await getLimitOrders())[0];
@@ -413,6 +421,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const row = (await getLimitOrders())[0];
@@ -465,6 +474,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const rows = await getLimitOrders();
@@ -519,6 +529,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const rows = await getLimitOrders();
@@ -574,6 +585,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const rows = await getLimitOrders();
@@ -628,6 +640,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const rows = await getLimitOrders();
@@ -693,6 +706,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const rows = await getLimitOrders();
@@ -759,6 +773,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const rows = await getLimitOrders();
@@ -816,6 +831,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const rows = await getLimitOrders();
@@ -881,6 +897,7 @@ describe('createDecisionLimitOrders', () => {
         },
       ],
       reviewResultId,
+      exchange: 'binance',
       log,
     });
     const planned = JSON.parse((await getLimitOrders())[0].planned_json);

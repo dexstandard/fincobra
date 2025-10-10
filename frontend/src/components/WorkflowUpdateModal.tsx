@@ -63,7 +63,7 @@ export default function WorkflowUpdateModal({
   const [model, setModel] = useState(workflow.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
   const [exchangeProvider, setExchangeProvider] = useState<'binance' | 'bybit'>(
-    'binance',
+    workflow.exchangeProvider ?? 'binance',
   );
   const {
     hasOpenAIKey,
@@ -117,6 +117,7 @@ export default function WorkflowUpdateModal({
   useEffect(() => {
     if (!open) return;
     const desired = (() => {
+      if (workflow.exchangeProvider) return workflow.exchangeProvider;
       if (!workflow.exchangeApiKeyId) return null;
       if (workflow.exchangeApiKeyId === bybitKeyId) return 'bybit';
       if (workflow.exchangeApiKeyId === binanceKeyId) return 'binance';
@@ -128,6 +129,7 @@ export default function WorkflowUpdateModal({
   }, [
     open,
     workflow.exchangeApiKeyId,
+    workflow.exchangeProvider,
     binanceKeyId,
     bybitKeyId,
     exchangeProvider,

@@ -171,7 +171,13 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
+      planned: {
+        symbol: 'BTCETH',
+        side: 'BUY',
+        qty: 1,
+        price: 1,
+        exchange: 'binance',
+      },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -217,14 +223,26 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
+      planned: {
+        symbol: 'BTCETH',
+        side: 'BUY',
+        qty: 1,
+        price: 1,
+        exchange: 'binance',
+      },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
+      planned: {
+        symbol: 'BTCETH',
+        side: 'BUY',
+        qty: 1,
+        price: 1,
+        exchange: 'binance',
+      },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '456',
@@ -273,7 +291,13 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
+      planned: {
+        symbol: 'BTCETH',
+        side: 'BUY',
+        qty: 1,
+        price: 1,
+        exchange: 'binance',
+      },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -314,7 +338,13 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
+      planned: {
+        symbol: 'BTCETH',
+        side: 'BUY',
+        qty: 1,
+        price: 1,
+        exchange: 'binance',
+      },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '123',
@@ -353,7 +383,13 @@ describe('cleanup open orders', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'BTCETH', side: 'BUY', qty: 1, price: 1 },
+      planned: {
+        symbol: 'BTCETH',
+        side: 'BUY',
+        qty: 1,
+        price: 1,
+        exchange: 'binance',
+      },
       status: LimitOrderStatus.Open,
       reviewResultId: rrId,
       orderId: '789',

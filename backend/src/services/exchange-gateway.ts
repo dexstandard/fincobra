@@ -37,6 +37,21 @@ import type {
 
 export type SupportedExchange = 'binance' | 'bybit';
 
+export function isSupportedExchange(value: unknown): value is SupportedExchange {
+  return value === 'binance' || value === 'bybit';
+}
+
+export function resolveSupportedExchange(
+  ...candidates: Array<unknown | null | undefined>
+): SupportedExchange | null {
+  for (const candidate of candidates) {
+    if (isSupportedExchange(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 function normalizeOrderId(reference: ExchangeSpotOrderReference): number {
   if (typeof reference.orderId === 'number') {
     return reference.orderId;

@@ -19,6 +19,7 @@ export interface PortfolioWorkflow {
   useEarn: boolean;
   aiApiKeyId: string | null;
   exchangeApiKeyId: string | null;
+  exchangeProvider: 'binance' | 'bybit' | null;
   ownerEmail?: string | null;
 }
 

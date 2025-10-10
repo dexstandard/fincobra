@@ -19,6 +19,7 @@ export interface PortfolioWorkflow {
   useEarn: boolean;
   aiApiKeyId: string | null;
   exchangeApiKeyId: string | null;
+  exchangeProvider: 'binance' | 'bybit' | null;
   ownerEmailEnc: string | null;
 }
 
@@ -86,6 +87,7 @@ export interface ActivePortfolioWorkflow {
   aiApiKeyId: string | null;
   aiApiKeyEnc: string | null;
   exchangeApiKeyId: string | null;
+  exchangeProvider: 'binance' | 'bybit' | null;
   manualRebalance: boolean;
   useEarn: boolean;
   startBalance: number | null;

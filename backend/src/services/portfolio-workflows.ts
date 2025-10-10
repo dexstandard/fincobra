@@ -12,10 +12,10 @@ import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
 import { errorResponse, lengthMessage } from '../util/error-messages.js';
 import type { ErrorResponse } from '../util/error-messages.types.js';
 import {
-  fetchPairInfo,
   fetchTokensBalanceUsd,
   isInvalidSymbolError,
 } from './binance-client.js';
+import { getExchangeGateway, type SupportedExchange } from './exchange-gateway.js';
 
 function normalizeTokenSymbol(token: string): string {
   return token.trim().toUpperCase();
@@ -34,21 +34,45 @@ function validateAllocations(tokens: PortfolioWorkflowTokenInput[]) {
 
 export async function validateTradingPairs(
   log: FastifyBaseLogger,
+  exchange: SupportedExchange,
   cash: string,
   tokens: string[],
 ): Promise<ValidationErr | null> {
+  const gateway = getExchangeGateway(exchange);
+  if (!gateway.metadata) {
+    if (exchange === 'bybit') {
+      log.warn({ exchange }, 'skipping pair validation: metadata unavailable');
+      return null;
+    }
+    log.error({ exchange }, 'exchange metadata not available');
+    return {
+      code: 500,
+      body: errorResponse('failed to validate trading pair'),
+    };
+  }
   for (const token of tokens) {
     try {
-      await fetchPairInfo(token, cash);
+      await gateway.metadata.fetchMarket(token, cash);
     } catch (err) {
-      if (isInvalidSymbolError(err)) {
+      if (
+        exchange === 'bybit' &&
+        err instanceof Error &&
+        err.message.includes('not implemented')
+      ) {
+        log.warn(
+          { token, cash, exchange },
+          'skipping pair validation: metadata not implemented',
+        );
+        continue;
+      }
+      if (exchange === 'binance' && isInvalidSymbolError(err)) {
         log.error({ token, cash }, 'unsupported trading pair');
         return {
           code: 400,
           body: errorResponse(`unsupported trading pair: ${token}/${cash}`),
         };
       }
-      log.error({ err, token, cash }, 'failed to validate trading pair');
+      log.error({ err, token, cash, exchange }, 'failed to validate trading pair');
       return {
         code: 502,
         body: errorResponse('failed to validate trading pair'),
@@ -277,13 +301,14 @@ export async function preparePortfolioWorkflowForUpsert(
 
   let startBalance: number | null = null;
   if (body.status === PortfolioWorkflowStatus.Active) {
-    const pairErr = await validateTradingPairs(
-      log,
-      body.cash,
-      body.tokens.map((t) => t.token),
-    );
-    if (pairErr) return pairErr;
     if (ensuredKeys.exchangeProvider === 'binance') {
+      const pairErr = await validateTradingPairs(
+        log,
+        ensuredKeys.exchangeProvider,
+        body.cash,
+        body.tokens.map((t) => t.token),
+      );
+      if (pairErr) return pairErr;
       const bal = await getStartBalance(log, userId, [
         body.cash,
         ...body.tokens.map((t) => t.token),

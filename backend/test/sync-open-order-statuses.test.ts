@@ -65,7 +65,13 @@ describe('syncOpenOrderStatuses', () => {
     });
     await insertLimitOrder({
       userId,
-      planned: { symbol: 'SOLUSDT', side: 'BUY', qty: 0.1, price: 10 },
+      planned: {
+        symbol: 'SOLUSDT',
+        side: 'BUY',
+        qty: 0.1,
+        price: 10,
+        exchange: 'binance',
+      },
       status: LimitOrderStatus.Open,
       reviewResultId,
       orderId,
