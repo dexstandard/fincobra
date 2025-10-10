@@ -15,7 +15,6 @@ interface Props {
 
 export default function ExchangeApiKeySection({ exchange, label }: Props) {
   const t = useTranslation();
-  const supportsBalances = exchange === 'binance';
   const supportsWhitelist = exchange === 'binance' || exchange === 'bybit';
   const exchangeFields = [
     {
@@ -35,10 +34,6 @@ export default function ExchangeApiKeySection({ exchange, label }: Props) {
     getKeyPath: (id: string) => `/users/${id}/${exchange}-key`,
     fields: exchangeFields,
     videoGuideUrl: videoGuideLinks[exchange],
-    balanceQueryKey: supportsBalances ? `${exchange}-balance` : undefined,
-    getBalancePath: supportsBalances
-      ? (id: string) => `/users/${id}/${exchange}-balance`
-      : undefined,
   } as const;
 
   const whitelistQuery = useQuery<string>({

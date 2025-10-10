@@ -27,8 +27,6 @@ interface ApiKeySectionProps {
   getKeyPath: (id: string) => string;
   fields: Field[];
   videoGuideUrl?: string;
-  balanceQueryKey?: string;
-  getBalancePath?: (id: string) => string;
   whitelistHost?: string;
   sharePath?: (id: string) => string;
 }
@@ -43,8 +41,6 @@ export default function ApiKeySection({
   getKeyPath,
   fields,
   videoGuideUrl,
-  balanceQueryKey,
-  getBalancePath,
   whitelistHost,
   sharePath,
 }: ApiKeySectionProps) {
@@ -151,15 +147,6 @@ export default function ApiKeySection({
   const revokeMut = useMutation({
     mutationFn: async (email: string) => {
       await api.delete(sharePath!(id), { data: { email } });
-    },
-  });
-
-  const balanceQuery = useQuery<{ totalUsd: number }>({
-    queryKey: [balanceQueryKey ?? 'balance-disabled', id],
-    enabled: !!query.data && !editing && !!balanceQueryKey && !!getBalancePath,
-    queryFn: async () => {
-      const res = await api.get(getBalancePath!(id));
-      return res.data as { totalUsd: number };
     },
   });
 
@@ -333,14 +320,6 @@ export default function ApiKeySection({
               </>
             )}
           </div>
-          {balanceQueryKey &&
-            (balanceQuery.isLoading ? (
-              <p>{t('loading_balance')}</p>
-            ) : balanceQuery.data ? (
-              <p className="text-sm text-gray-600">
-                {t('total_balance')} ${balanceQuery.data.totalUsd.toFixed(2)}
-              </p>
-            ) : null)}
         </div>
       )}
       {whitelistHost && (
