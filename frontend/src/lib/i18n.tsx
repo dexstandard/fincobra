@@ -119,8 +119,6 @@ const translations: Record<Lang, Record<string, string>> = {
     delete_key_confirm:
       'Deleting this key will stop all active portfolio workflows. Continue?',
     shared_by_admin: 'Shared by admin',
-    loading_balance: 'Loading balance...',
-    total_balance: 'Total balance:',
     whitelist_ip: 'Whitelist IP:',
     share: 'Share',
     revoke: 'Revoke',
@@ -335,8 +333,6 @@ const translations: Record<Lang, Record<string, string>> = {
     delete_key_confirm:
       'Удаление этого ключа остановит все активные портфолио. Продолжить?',
     shared_by_admin: 'Предоставлено администратором',
-    loading_balance: 'Загрузка баланса...',
-    total_balance: 'Общий баланс:',
     whitelist_ip: 'Белый список IP:',
     share: 'Поделиться',
     revoke: 'Отозвать',
