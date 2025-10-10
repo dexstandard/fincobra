@@ -6,11 +6,11 @@ import axios from 'axios';
 import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
 import ApiKeyProviderSelector from '../components/forms/ApiKeyProviderSelector';
+import SelectInput from '../components/forms/SelectInput';
 import { useToast } from '../lib/useToast';
 import Button from '../components/ui/Button';
 import { usePrerequisites } from '../lib/usePrerequisites';
 import WorkflowStartButton from '../components/WorkflowStartButton';
-import SelectInput from '../components/forms/SelectInput';
 import WalletBalances from '../components/WalletBalances';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,6 +22,7 @@ import {
 import PortfolioWorkflowFields from '../components/forms/PortfolioWorkflowFields';
 import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 import { useDeveloperInstructions } from '../lib/useDeveloperInstructions';
+import type { TradingMode } from '../lib/exchange.types';
 
 interface Props {
   workflow?: PortfolioWorkflow;
@@ -52,9 +53,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
 
   const [model, setModel] = useState(workflow?.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
-  const [exchangeProvider, setExchangeProvider] = useState<
-    'binance' | 'bybit' | null
-  >(null);
+  const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
   const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? false);
   const [tokenSymbols, setTokenSymbols] = useState(
     defaultValues.tokens.map((t) => t.token),
@@ -65,6 +64,8 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     defaultValues,
   });
   const { reset } = methods;
+  const desiredExchange: 'binance' | 'bybit' =
+    tradingMode === 'futures' ? 'bybit' : 'binance';
   const {
     hasOpenAIKey,
     hasBinanceKey,
@@ -77,14 +78,14 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     isAccountLoading,
     activeExchange,
   } = usePrerequisites(tokenSymbols, {
-    exchange: exchangeProvider ?? undefined,
+    exchange: desiredExchange,
   });
   const hasExchangeKey = hasBinanceKey || hasBybitKey;
   const selectedExchangeKeyId = useMemo(() => {
-    if (exchangeProvider === 'binance') return binanceKeyId;
-    if (exchangeProvider === 'bybit') return bybitKeyId;
+    if (desiredExchange === 'binance') return binanceKeyId;
+    if (desiredExchange === 'bybit') return bybitKeyId;
     return null;
-  }, [exchangeProvider, binanceKeyId, bybitKeyId]);
+  }, [desiredExchange, binanceKeyId, bybitKeyId]);
 
   const [instructions, setInstructions] = useState(
     workflow?.agentInstructions || '',
@@ -95,17 +96,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const values = methods.watch();
   const { data: defaultDeveloperInstructions } = useDeveloperInstructions();
-
-  const exchangeOptions = useMemo(() => {
-    const options: { value: 'binance' | 'bybit'; label: string }[] = [];
-    if (hasBinanceKey) {
-      options.push({ value: 'binance', label: 'Binance' });
-    }
-    if (hasBybitKey) {
-      options.push({ value: 'bybit', label: 'Bybit' });
-    }
-    return options;
-  }, [hasBinanceKey, hasBybitKey]);
 
   useEffect(() => {
     setModel(workflow?.model || '');
@@ -149,40 +139,49 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   }, [workflow, defaultDeveloperInstructions, instructions]);
 
   useEffect(() => {
-    if (!exchangeOptions.length) {
-      if (exchangeProvider !== null) {
-        setExchangeProvider(null);
-      }
-      return;
-    }
-    const desiredExchange = (() => {
-      if (!workflow?.exchangeApiKeyId) return null;
-      if (workflow.exchangeApiKeyId === bybitKeyId) return 'bybit';
-      if (workflow.exchangeApiKeyId === binanceKeyId) return 'binance';
-      return null;
-    })();
-    if (
-      desiredExchange &&
-      exchangeProvider !== desiredExchange &&
-      exchangeOptions.some((opt) => opt.value === desiredExchange)
+    if (!workflow?.exchangeApiKeyId) return;
+    if (workflow.exchangeApiKeyId === bybitKeyId && tradingMode !== 'futures') {
+      setTradingMode('futures');
+    } else if (
+      workflow.exchangeApiKeyId === binanceKeyId &&
+      tradingMode !== 'spot'
     ) {
-      setExchangeProvider(desiredExchange);
-      return;
+      setTradingMode('spot');
     }
-    if (!exchangeProvider) {
-      setExchangeProvider(exchangeOptions[0].value);
-      return;
+  }, [workflow?.exchangeApiKeyId, binanceKeyId, bybitKeyId, tradingMode]);
+
+  useEffect(() => {
+    if (workflow) return;
+    if (tradingMode === 'spot' && !hasBinanceKey && hasBybitKey) {
+      setTradingMode('futures');
+    } else if (
+      tradingMode === 'futures' &&
+      !hasBybitKey &&
+      hasBinanceKey
+    ) {
+      setTradingMode('spot');
     }
-    if (!exchangeOptions.some((opt) => opt.value === exchangeProvider)) {
-      setExchangeProvider(exchangeOptions[0].value);
-    }
-  }, [
-    exchangeOptions,
-    exchangeProvider,
-    workflow?.exchangeApiKeyId,
-    binanceKeyId,
-    bybitKeyId,
-  ]);
+  }, [workflow, tradingMode, hasBinanceKey, hasBybitKey]);
+
+  const tradingModeConfigs = useMemo(
+    () => [
+      {
+        id: 'spot' as const,
+        label: t('spot_trading'),
+        description: t('trading_mode_spot_description'),
+        exchangeLabel: 'Binance',
+        enabled: hasBinanceKey,
+      },
+      {
+        id: 'futures' as const,
+        label: t('futures_trading'),
+        description: t('trading_mode_futures_description'),
+        exchangeLabel: 'Bybit',
+        enabled: hasBybitKey,
+      },
+    ],
+    [t, hasBinanceKey, hasBybitKey],
+  );
 
   function WarningSign({ children }: { children: ReactNode }) {
     return (
@@ -236,26 +235,46 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               </div>
             )}
           </div>
-          {exchangeOptions.length > 0 && (
-            <div className="mt-4">
-              <label
-                htmlFor="exchange-provider"
-                className="block text-md font-bold"
-              >
-                {t('exchange')}
-              </label>
-              <SelectInput
-                id="exchange-provider"
-                value={
-                  exchangeProvider ?? exchangeOptions[0]?.value ?? 'binance'
+          <div className="mt-4">
+            <span className="block text-md font-bold">{t('trading_mode')}</span>
+            <div className="mt-2 flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                {tradingModeConfigs.map((mode) => {
+                  const isActive = tradingMode === mode.id;
+                  const disabled = !mode.enabled;
+                  const hint = disabled
+                    ? t('trading_mode_connect_exchange', {
+                        exchange: mode.exchangeLabel,
+                      })
+                    : undefined;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => {
+                        if (!disabled) setTradingMode(mode.id);
+                      }}
+                      disabled={disabled}
+                      title={hint}
+                      className={`px-3 py-1.5 rounded border text-sm transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white border-transparent'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-sm text-gray-600">
+                {
+                  tradingModeConfigs.find((mode) => mode.id === tradingMode)
+                    ?.description ?? ''
                 }
-                onChange={(value) =>
-                  setExchangeProvider(value as 'binance' | 'bybit')
-                }
-                options={exchangeOptions}
-              />
+              </p>
             </div>
-          )}
+          </div>
           {activeExchange && (
             <div className="mt-2">
               <WalletBalances

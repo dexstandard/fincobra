@@ -24,8 +24,9 @@
    Extended `createDecisionLimitOrders` with futures-aware execution that records intent metadata, forwards leverage/stop requests through the exchange gateway, and preserves spot behaviour with exchange tagging for reconciliation.【F:backend/src/services/rebalance.ts†L1-L420】
    Workflow automation now resolves the workflow's active exchange before delegating, and manual order entry reuses the provider so futures instructions flow through consistently.【F:backend/src/workflows/portfolio-review.ts†L200-L320】【F:backend/src/routes/portfolio-workflows.ts†L560-L660】
 
-5. **Modernize frontend exchange UX**
-   Update key management, workflow setup, and balance displays to reflect the new abstraction: surface exchange capabilities and add a bot setup toggle that chooses between futures and spot trading, switching the balance view accordingly while exposing Bybit-only actions alongside Binance. Ensure hooks and components fetch data from the new endpoints while keeping copy localized.【F:frontend/src/components/forms/ExchangeApiKeySection.tsx†L1-L48】【F:frontend/src/lib/usePrerequisites.ts†L1-L206】【F:frontend/src/routes/PortfolioWorkflowSetup.tsx†L1-L258】
+5. **Modernize frontend exchange UX** ✅
+   - Highlighted exchange capabilities directly in the API key sections so users immediately see the supported trading modes and futures-specific controls with localized copy.【F:frontend/src/components/forms/ExchangeApiKeySection.tsx†L1-L61】【F:frontend/src/lib/i18n.tsx†L1-L380】
+   - Added a trading mode toggle to the workflow setup and update flows, wiring the selection into prerequisite hooks so balance widgets switch between Binance spot and Bybit futures data automatically.【F:frontend/src/routes/PortfolioWorkflowSetup.tsx†L1-L360】【F:frontend/src/components/WorkflowUpdateModal.tsx†L1-L320】【F:frontend/src/lib/usePrerequisites.ts†L1-L220】
 
 6. **Backfill tests and documentation**
    Add unit/integration coverage for the abstraction adapters, orchestration changes, and new routes. Update user-facing docs or onboarding copy to explain exchange selection, futures-only constraints, and any new prerequisites.【F:backend/test/binance-orders.test.ts†L1-L120】【F:frontend/src/lib/usePrerequisites.ts†L1-L206】
