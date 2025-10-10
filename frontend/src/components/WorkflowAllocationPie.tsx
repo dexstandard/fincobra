@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import TokenDisplay from './TokenDisplay';
+import { useWorkflowTokenBalances } from '../lib/useWorkflowTokenBalances';
 
 interface AllocationToken {
   token: string;
@@ -8,6 +10,7 @@ interface AllocationToken {
 interface Props {
   cashToken: string;
   tokens: AllocationToken[];
+  ownerId: string;
 }
 
 const TOKEN_COLORS: Record<string, string> = {
@@ -39,38 +42,68 @@ function getColor(symbol: string, index: number) {
   return TOKEN_COLORS[key] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 }
 
-export default function WorkflowAllocationPie({ cashToken, tokens }: Props) {
-  const sortedTokens = tokens
-    .map((token, index) => ({
-      token: token.token.toUpperCase(),
-      minAllocation: token.minAllocation,
-      order: index,
-    }))
-    .filter((token) => token.minAllocation > 0)
-    .sort((a, b) => a.order - b.order);
+export default function WorkflowAllocationPie({ cashToken, tokens, ownerId }: Props) {
+  const tokenSymbols = useMemo(
+    () => [cashToken, ...tokens.map((token) => token.token)],
+    [cashToken, tokens],
+  );
+  const { balances, isLoading, enabled } = useWorkflowTokenBalances(
+    tokenSymbols,
+    ownerId,
+  );
 
-  const totalMin = sortedTokens.reduce((sum, token) => sum + token.minAllocation, 0);
-  const remaining = Math.max(0, 100 - totalMin);
-
-  const slices: Slice[] = [];
-  let fallbackIndex = 0;
-
-  if (remaining > 0) {
-    slices.push({
-      token: cashToken.toUpperCase(),
-      allocation: remaining,
-      color: getColor(cashToken, fallbackIndex++),
+  const actualSlices: Slice[] = useMemo(() => {
+    if (!enabled || isLoading || !balances?.length) return [];
+    const aggregated = new Map<string, number>();
+    balances.forEach((balance) => {
+      if (balance.usdValue <= 0) return;
+      const key = balance.token.toUpperCase();
+      aggregated.set(key, (aggregated.get(key) ?? 0) + balance.usdValue);
     });
-  }
+    const entries = Array.from(aggregated.entries());
+    if (!entries.length) return [];
+    return entries.map(([token, allocation], index) => ({
+      token,
+      allocation,
+      color: getColor(token, index),
+    }));
+  }, [balances, enabled, isLoading]);
 
-  sortedTokens.forEach((token) => {
-    slices.push({
-      token: token.token,
-      allocation: token.minAllocation,
-      color: getColor(token.token, fallbackIndex++),
-    });
-  });
+  const fallbackSlices: Slice[] = useMemo(() => {
+    const orderedTokens = tokens
+      .map((token, index) => ({
+        token: token.token.toUpperCase(),
+        minAllocation: token.minAllocation,
+        order: index,
+      }))
+      .filter((token) => token.minAllocation > 0)
+      .sort((a, b) => a.order - b.order);
 
+    const totalMin = orderedTokens.reduce(
+      (sum, token) => sum + token.minAllocation,
+      0,
+    );
+    const remaining = Math.max(0, 100 - totalMin);
+
+    const allocations = new Map<string, number>();
+    const addSlice = (token: string, allocation: number) => {
+      if (allocation <= 0) return;
+      const upper = token.toUpperCase();
+      allocations.set(upper, (allocations.get(upper) ?? 0) + allocation);
+    };
+
+    addSlice(cashToken, remaining);
+    orderedTokens.forEach((token) => addSlice(token.token, token.minAllocation));
+
+    const entries = Array.from(allocations.entries());
+    return entries.map(([token, allocation], index) => ({
+      token,
+      allocation,
+      color: getColor(token, index),
+    }));
+  }, [cashToken, tokens]);
+
+  const slices = actualSlices.length > 0 ? actualSlices : fallbackSlices;
   const totalAllocation = slices.reduce((sum, slice) => sum + slice.allocation, 0);
 
   if (!totalAllocation) {
@@ -98,7 +131,8 @@ export default function WorkflowAllocationPie({ cashToken, tokens }: Props) {
       <div className="flex flex-col gap-1">
         {slices.map((slice) => {
           const percentage = (slice.allocation / totalAllocation) * 100;
-          const formatted = percentage >= 10 ? Math.round(percentage) : percentage.toFixed(1);
+          const formatted =
+            percentage >= 10 ? Math.round(percentage) : percentage.toFixed(1);
           return (
             <div key={slice.token} className="flex items-center gap-2">
               <span

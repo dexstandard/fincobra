@@ -32,7 +32,11 @@ export default function WorkflowDetailsDesktop({ workflow }: Props) {
         ))}
       </div>
       {workflow.status === 'active' && (
-        <WorkflowAllocationPie cashToken={workflow.cashToken} tokens={workflow.tokens} />
+        <WorkflowAllocationPie
+          cashToken={workflow.cashToken}
+          tokens={workflow.tokens}
+          ownerId={workflow.userId}
+        />
       )}
       <WorkflowPnl
         tokens={tokens}
