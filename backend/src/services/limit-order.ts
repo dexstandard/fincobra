@@ -109,7 +109,13 @@ export async function cancelLimitOrder(
         return LimitOrderStatus.Canceled;
       }
     }
-    throw err;
+    await updateLimitOrderStatus(
+      userId,
+      opts.orderId,
+      LimitOrderStatus.Canceled,
+      opts.reason,
+    );
+    return LimitOrderStatus.Canceled;
   }
 
   await updateLimitOrderStatus(
