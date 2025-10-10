@@ -1,3 +1,5 @@
+export type AiApiProvider = 'openai' | 'groq';
+
 export interface AiApiKeyDetails {
   id: string;
   aiApiKeyEnc: string;
@@ -10,6 +12,7 @@ export interface SharedAiApiKeyDetails extends AiApiKeyDetails {
 export interface AiApiKeyUpsert {
   userId: string;
   apiKeyEnc: string;
+  provider?: AiApiProvider;
 }
 
 export interface AiApiKeyShareUpsert {
