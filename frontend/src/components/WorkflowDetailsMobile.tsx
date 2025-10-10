@@ -1,5 +1,4 @@
 import WorkflowStatusLabel from './WorkflowStatusLabel';
-import TokenDisplay from './TokenDisplay';
 import WorkflowPnlMobile from './WorkflowPnlMobile';
 import FormattedDate from './ui/FormattedDate';
 import WorkflowAllocationPie from './WorkflowAllocationPie';
@@ -23,14 +22,6 @@ export default function WorkflowDetailsMobile({ workflow }: Props) {
       </div>
       <p className="text-xs text-gray-500">
         <FormattedDate date={workflow.createdAt} />
-      </p>
-      <p className="flex items-center gap-1 mt-2 text-sm text-gray-600">
-        {tokens.map((tok, i) => (
-          <span key={tok} className="flex items-center gap-1">
-            {i > 0 && <span>/</span>}
-            <TokenDisplay token={tok} />
-          </span>
-        ))}
       </p>
       {workflow.status === 'active' && (
         <WorkflowAllocationPie

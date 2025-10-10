@@ -1,6 +1,5 @@
 import { useTranslation } from '../lib/i18n';
 import WorkflowStatusLabel from './WorkflowStatusLabel';
-import TokenDisplay from './TokenDisplay';
 import WorkflowPnl from './WorkflowPnl';
 import FormattedDate from './ui/FormattedDate';
 import WorkflowAllocationPie from './WorkflowAllocationPie';
@@ -22,14 +21,6 @@ export default function WorkflowDetailsDesktop({ workflow }: Props) {
       </div>
       <div className="text-sm text-gray-500">
         <FormattedDate date={workflow.createdAt} />
-      </div>
-      <div className="flex items-center gap-1 mt-2 text-sm text-gray-600">
-        {tokens.map((tok, i) => (
-          <span key={tok} className="flex items-center gap-1">
-            {i > 0 && <span>/</span>}
-            <TokenDisplay token={tok} />
-          </span>
-        ))}
       </div>
       {workflow.status === 'active' && (
         <WorkflowAllocationPie
