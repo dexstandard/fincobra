@@ -23,8 +23,9 @@
 4. **Expand HTTP surface for futures trading** ✅
    Added `backend/src/routes/exchange-futures.ts` with leverage, open/close position, and stop control endpoints for Binance and Bybit, delegating through the exchange gateway and reusing shared guards and rate limits. Covered the routes with Vitest to assert gateway delegation, reduce-only closures, hedge metadata propagation, and credential validation.【F:backend/src/routes/exchange-futures.ts†L1-L220】【F:backend/test/exchange-futures-routes.test.ts†L1-L200】
 
-5. **Wire AI decision outputs to exchange futures operations**  
-   Extend the review/rebalance pipeline so futures-directed orders map onto the abstraction, including translating agent instructions into futures parameters (position side, leverage, stop-loss / take-profit). Guarantee backward compatibility for existing spot workflows during the transition.【F:backend/src/services/rebalance.ts†L1-L200】【F:backend/src/services/binance-futures.ts†L1-L112】
+5. **Wire AI decision outputs to exchange futures operations** ✅
+   Extended `createDecisionLimitOrders` with futures-aware execution that records intent metadata, forwards leverage/stop requests through the exchange gateway, and preserves spot behaviour with exchange tagging for reconciliation.【F:backend/src/services/rebalance.ts†L1-L420】
+   Workflow automation now resolves the workflow's active exchange before delegating, and manual order entry reuses the provider so futures instructions flow through consistently.【F:backend/src/workflows/portfolio-review.ts†L200-L320】【F:backend/src/routes/portfolio-workflows.ts†L560-L660】
 
 6. **Modernize frontend exchange UX**  
    Update key management, workflow setup, and balance displays to reflect the new abstraction: surface exchange capabilities, allow futures configuration, and expose Bybit-only actions alongside Binance. Ensure hooks and components fetch data from the new endpoints while keeping copy localized.【F:frontend/src/components/forms/ExchangeApiKeySection.tsx†L1-L48】【F:frontend/src/lib/usePrerequisites.ts†L1-L206】【F:frontend/src/routes/PortfolioWorkflowSetup.tsx†L1-L258】

@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
+import { randomUUID } from 'crypto';
 import { insertLimitOrder } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
 import type { MainTraderOrder } from '../agents/main-trader.types.js';
@@ -8,12 +9,15 @@ import {
   createLimitOrder,
   parseBinanceError,
 } from './binance-client.js';
+import { getExchangeGateway, type SupportedExchange } from './exchange-gateway.js';
 import { TOKEN_SYMBOLS } from '../util/tokens.js';
 
 interface CreateDecisionLimitOrdersResult {
   placed: number;
   canceled: number;
   priceDivergenceCancellations: number;
+  futuresExecuted: number;
+  futuresFailed: number;
   needsPriceDivergenceRetry: boolean;
 }
 
@@ -119,39 +123,249 @@ function meetsMinNotional(value: number, minNotional: number): boolean {
   return value + tolerance >= minNotional;
 }
 
+function normalizeExchangeName(value: unknown): SupportedExchange | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.toLowerCase();
+  if (normalized === 'bybit') return 'bybit';
+  if (normalized === 'binance') return 'binance';
+  return null;
+}
+
+function resolveOrderExchange(
+  order: MainTraderOrder,
+  defaultExchange?: SupportedExchange,
+): SupportedExchange {
+  return (
+    normalizeExchangeName(order.exchange) ?? defaultExchange ?? 'binance'
+  );
+}
+
+function toPositiveNumber(value: unknown): number | null {
+  if (typeof value !== 'number') return null;
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value;
+}
+
+async function executeFuturesOrder(
+  opts: {
+    userId: string;
+    reviewResultId: string;
+    log: FastifyBaseLogger;
+  },
+  order: MainTraderOrder & { manuallyEdited?: boolean },
+  exchange: SupportedExchange,
+  plannedBase: Record<string, unknown>,
+): Promise<'success' | 'failure' | 'skipped'> {
+  const futuresIntent = order.futures;
+  if (!futuresIntent) return 'skipped';
+
+  const symbol =
+    typeof order.pair === 'string' && order.pair
+      ? order.pair.toUpperCase()
+      : '';
+  const planned: Record<string, unknown> = {
+    ...plannedBase,
+    symbol,
+    futures: {
+      positionSide: futuresIntent.positionSide,
+      quantity: futuresIntent.quantity ?? order.qty,
+      type: futuresIntent.type ?? undefined,
+      price: futuresIntent.price,
+      reduceOnly: futuresIntent.reduceOnly ?? false,
+      leverage: futuresIntent.leverage,
+      stopLoss: futuresIntent.stopLoss,
+      takeProfit: futuresIntent.takeProfit,
+      hedgeMode: futuresIntent.hedgeMode,
+      positionIdx: futuresIntent.positionIdx,
+    },
+  };
+
+  const recordResult = async (
+    status: LimitOrderStatus,
+    reason?: string,
+  ): Promise<void> => {
+    await insertLimitOrder({
+      userId: opts.userId,
+      planned,
+      status,
+      reviewResultId: opts.reviewResultId,
+      orderId: randomUUID(),
+      cancellationReason: reason,
+    });
+  };
+
+  if (
+    futuresIntent.positionSide !== 'LONG' &&
+    futuresIntent.positionSide !== 'SHORT'
+  ) {
+    await recordResult(
+      LimitOrderStatus.Canceled,
+      `Invalid futures positionSide: ${String(futuresIntent.positionSide)}`,
+    );
+    return 'failure';
+  }
+
+  const quantity = toPositiveNumber(futuresIntent.quantity ?? order.qty);
+  if (quantity === null) {
+    await recordResult(
+      LimitOrderStatus.Canceled,
+      `Malformed futures quantity: ${String(futuresIntent.quantity ?? order.qty)}`,
+    );
+    return 'failure';
+  }
+  (planned.futures as Record<string, unknown>).quantity = quantity;
+
+  if (futuresIntent.type === 'LIMIT' && futuresIntent.price === undefined) {
+    await recordResult(
+      LimitOrderStatus.Canceled,
+      'price is required for limit futures orders',
+    );
+    return 'failure';
+  }
+  if (
+    futuresIntent.price !== undefined &&
+    toPositiveNumber(futuresIntent.price) === null
+  ) {
+    await recordResult(
+      LimitOrderStatus.Canceled,
+      `Malformed futures price: ${String(futuresIntent.price)}`,
+    );
+    return 'failure';
+  }
+
+  const gateway = getExchangeGateway(exchange);
+  if (!gateway.futures) {
+    await recordResult(
+      LimitOrderStatus.Canceled,
+      'futures trading not supported for exchange',
+    );
+    opts.log.error(
+      { exchange, symbol },
+      'futures trading unavailable for exchange',
+    );
+    return 'failure';
+  }
+
+  const leverage = toPositiveNumber(futuresIntent.leverage ?? null);
+  const stopLoss = toPositiveNumber(futuresIntent.stopLoss ?? null);
+  const takeProfit = toPositiveNumber(futuresIntent.takeProfit ?? null);
+
+  try {
+    if (leverage !== null) {
+      await gateway.futures.setLeverage(opts.userId, {
+        symbol,
+        leverage: Math.max(1, Math.min(125, Math.round(leverage))),
+      });
+    }
+
+    await gateway.futures.openPosition(opts.userId, {
+      symbol,
+      positionSide: futuresIntent.positionSide,
+      quantity,
+      type: futuresIntent.type,
+      price: futuresIntent.price,
+      reduceOnly: futuresIntent.reduceOnly,
+      hedgeMode: futuresIntent.hedgeMode,
+      positionIdx: futuresIntent.positionIdx,
+    });
+
+    if (stopLoss !== null) {
+      await gateway.futures.setStopLoss(opts.userId, {
+        symbol,
+        positionSide: futuresIntent.positionSide,
+        stopPrice: stopLoss,
+        hedgeMode: futuresIntent.hedgeMode,
+        positionIdx: futuresIntent.positionIdx,
+      });
+    }
+
+    if (takeProfit !== null) {
+      await gateway.futures.setTakeProfit(opts.userId, {
+        symbol,
+        positionSide: futuresIntent.positionSide,
+        stopPrice: takeProfit,
+        hedgeMode: futuresIntent.hedgeMode,
+        positionIdx: futuresIntent.positionIdx,
+      });
+    }
+
+    await recordResult(LimitOrderStatus.Filled);
+    opts.log.info(
+      { step: 'createDecisionFuturesOrder', exchange, symbol },
+      'executed futures order',
+    );
+    return 'success';
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'unknown error';
+    await recordResult(LimitOrderStatus.Canceled, reason);
+    opts.log.error(
+      { err, step: 'createDecisionFuturesOrder', exchange, symbol },
+      'failed to execute futures order',
+    );
+    return 'failure';
+  }
+}
+
 export async function createDecisionLimitOrders(opts: {
   userId: string;
   orders: (MainTraderOrder & { manuallyEdited?: boolean })[];
   reviewResultId: string;
   log: FastifyBaseLogger;
+  defaultExchange?: SupportedExchange;
 }): Promise<CreateDecisionLimitOrdersResult> {
   const result: CreateDecisionLimitOrdersResult = {
     placed: 0,
     canceled: 0,
     priceDivergenceCancellations: 0,
+    futuresExecuted: 0,
+    futuresFailed: 0,
     needsPriceDivergenceRetry: false,
   };
   for (const o of opts.orders) {
-    const [a, b] = splitPair(o.pair);
-    if (!a || !b) continue;
-    const info = await fetchPairInfo(a, b);
-    const { currentPrice } = await fetchSymbolPrice(info.symbol);
-    const requestedSide = o.side;
+    const exchange = resolveOrderExchange(o, opts.defaultExchange);
     const requestedToken =
       typeof o.token === 'string' ? o.token.toUpperCase() : '';
     const manuallyEdited = o.manuallyEdited ?? false;
     const plannedBase: Record<string, unknown> = {
-      symbol: info.symbol,
+      exchange,
+      symbol:
+        typeof o.pair === 'string' && o.pair ? o.pair.toUpperCase() : o.pair,
       pair: o.pair,
       token: requestedToken || o.token,
-      side: requestedSide,
+      side: o.side,
       manuallyEdited,
       basePrice: o.basePrice,
       limitPrice: o.limitPrice,
       maxPriceDriftPct: o.maxPriceDriftPct,
       requestedQty: o.qty,
-      observedPrice: currentPrice,
     };
+
+    const futuresStatus = await executeFuturesOrder(
+      {
+        userId: opts.userId,
+        reviewResultId: opts.reviewResultId,
+        log: opts.log,
+      },
+      o,
+      exchange,
+      plannedBase,
+    );
+    if (futuresStatus === 'success') {
+      result.futuresExecuted += 1;
+      continue;
+    }
+    if (futuresStatus === 'failure') {
+      result.futuresFailed += 1;
+      continue;
+    }
+
+    const [a, b] = splitPair(o.pair);
+    if (!a || !b) continue;
+    const info = await fetchPairInfo(a, b);
+    const { currentPrice } = await fetchSymbolPrice(info.symbol);
+    plannedBase.symbol = info.symbol;
+    plannedBase.observedPrice = currentPrice;
+    const requestedSide = o.side;
 
     if (requestedSide !== 'BUY' && requestedSide !== 'SELL') {
       await insertLimitOrder({

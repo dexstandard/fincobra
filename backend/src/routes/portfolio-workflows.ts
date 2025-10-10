@@ -604,11 +604,20 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manuallyEdited = true;
       }
       if (manuallyEdited) updatedOrder.manuallyEdited = true;
+      const ensuredKeys = await ensureApiKeys(log, userId, {
+        exchangeKeyId: workflow.exchangeApiKeyId,
+        requireAi: false,
+        requireExchange: false,
+      });
+      if ('code' in ensuredKeys)
+        return reply.code(ensuredKeys.code).send(ensuredKeys.body);
+      const defaultExchange = ensuredKeys.exchangeProvider ?? undefined;
       await createDecisionLimitOrders({
         userId,
         orders: [updatedOrder],
         reviewResultId: logId,
         log: log.child({ execLogId: logId }),
+        defaultExchange,
       });
       const orders = await getLimitOrdersByReviewResult(id, logId);
       if (!orders.length) {
