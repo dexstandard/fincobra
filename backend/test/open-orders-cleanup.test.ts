@@ -131,6 +131,8 @@ vi.mock('../src/services/rebalance.js', () => ({
     placed: 0,
     canceled: 0,
     priceDivergenceCancellations: 0,
+    futuresExecuted: 0,
+    futuresFailed: 0,
     needsPriceDivergenceRetry: false,
   }),
 }));

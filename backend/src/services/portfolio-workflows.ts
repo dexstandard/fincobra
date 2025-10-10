@@ -11,11 +11,11 @@ import {
 import { getAiKey, getSharedAiKey } from '../repos/ai-api-key.js';
 import { errorResponse, lengthMessage } from '../util/error-messages.js';
 import type { ErrorResponse } from '../util/error-messages.types.js';
+import { fetchTokensBalanceUsd, isInvalidSymbolError } from './binance-client.js';
 import {
-  fetchPairInfo,
-  fetchTokensBalanceUsd,
-  isInvalidSymbolError,
-} from './binance-client.js';
+  getExchangeGateway,
+  type SupportedExchange,
+} from './exchange-gateway.js';
 
 function normalizeTokenSymbol(token: string): string {
   return token.trim().toUpperCase();
@@ -36,19 +36,25 @@ export async function validateTradingPairs(
   log: FastifyBaseLogger,
   cash: string,
   tokens: string[],
+  exchange: SupportedExchange,
 ): Promise<ValidationErr | null> {
+  if (exchange === 'bybit') return null;
+  const gateway = getExchangeGateway(exchange);
   for (const token of tokens) {
     try {
-      await fetchPairInfo(token, cash);
+      await gateway.metadata.fetchMarket(token, cash);
     } catch (err) {
-      if (isInvalidSymbolError(err)) {
+      if (exchange === 'binance' && isInvalidSymbolError(err)) {
         log.error({ token, cash }, 'unsupported trading pair');
         return {
           code: 400,
           body: errorResponse(`unsupported trading pair: ${token}/${cash}`),
         };
       }
-      log.error({ err, token, cash }, 'failed to validate trading pair');
+      log.error(
+        { err, token, cash, exchange },
+        'failed to validate trading pair',
+      );
       return {
         code: 502,
         body: errorResponse('failed to validate trading pair'),
@@ -170,6 +176,7 @@ interface EnsureApiKeysOptions {
   exchangeKeyId?: string | null;
   requireAi?: boolean;
   requireExchange?: boolean;
+  preferredExchange?: 'binance' | 'bybit';
 }
 
 export async function ensureApiKeys(
@@ -177,7 +184,12 @@ export async function ensureApiKeys(
   userId: string,
   options: EnsureApiKeysOptions = {},
 ): Promise<ValidationErr | EnsuredExchangeKey> {
-  const { exchangeKeyId, requireAi = true, requireExchange = true } = options;
+  const {
+    exchangeKeyId,
+    requireAi = true,
+    requireExchange = true,
+    preferredExchange,
+  } = options;
   const userRow = await getUserApiKeys(userId);
   if (!userRow) {
     log.error('missing api keys');
@@ -202,6 +214,17 @@ export async function ensureApiKeys(
       exchangeProvider = 'bybit';
     } else {
       log.error({ exchangeKeyId }, 'missing api keys');
+      return { code: 400, body: errorResponse('missing api keys') };
+    }
+  } else if (preferredExchange) {
+    if (preferredExchange === 'binance' && hasBinanceKey) {
+      resolvedKeyId = userRow.binanceKeyId ?? null;
+      exchangeProvider = 'binance';
+    } else if (preferredExchange === 'bybit' && hasBybitKey) {
+      resolvedKeyId = userRow.bybitKeyId ?? null;
+      exchangeProvider = 'bybit';
+    } else {
+      log.error({ preferredExchange }, 'missing api keys');
       return { code: 400, body: errorResponse('missing api keys') };
     }
   } else if (hasBinanceKey) {
@@ -275,15 +298,18 @@ export async function preparePortfolioWorkflowForUpsert(
   if ('code' in ensuredKeys) return ensuredKeys;
   body.exchangeKeyId = ensuredKeys.exchangeKeyId;
 
+  const exchangeProvider = ensuredKeys.exchangeProvider ?? 'binance';
+
   let startBalance: number | null = null;
   if (body.status === PortfolioWorkflowStatus.Active) {
     const pairErr = await validateTradingPairs(
       log,
       body.cash,
       body.tokens.map((t) => t.token),
+      exchangeProvider,
     );
     if (pairErr) return pairErr;
-    if (ensuredKeys.exchangeProvider === 'binance') {
+    if (exchangeProvider === 'binance') {
       const bal = await getStartBalance(log, userId, [
         body.cash,
         ...body.tokens.map((t) => t.token),

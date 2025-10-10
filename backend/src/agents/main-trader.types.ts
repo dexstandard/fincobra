@@ -96,6 +96,19 @@ export interface RebalancePrompt {
   reports?: PromptReport[];
 }
 
+export interface MainTraderFuturesIntent {
+  positionSide: 'LONG' | 'SHORT';
+  quantity?: number;
+  type?: 'MARKET' | 'LIMIT';
+  price?: number;
+  reduceOnly?: boolean;
+  leverage?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  hedgeMode?: boolean;
+  positionIdx?: 0 | 1 | 2;
+}
+
 export interface MainTraderOrder {
   pair: string;
   token: string;
@@ -104,6 +117,8 @@ export interface MainTraderOrder {
   limitPrice: number;
   basePrice: number;
   maxPriceDriftPct: number;
+  exchange?: 'binance' | 'bybit';
+  futures?: MainTraderFuturesIntent | null;
 }
 
 export interface MainTraderDecision {

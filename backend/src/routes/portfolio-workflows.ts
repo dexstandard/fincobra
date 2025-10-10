@@ -604,11 +604,20 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manuallyEdited = true;
       }
       if (manuallyEdited) updatedOrder.manuallyEdited = true;
+      const ensuredKeys = await ensureApiKeys(log, userId, {
+        exchangeKeyId: workflow.exchangeApiKeyId,
+        requireAi: false,
+        requireExchange: false,
+      });
+      if ('code' in ensuredKeys)
+        return reply.code(ensuredKeys.code).send(ensuredKeys.body);
+      const defaultExchange = ensuredKeys.exchangeProvider ?? undefined;
       await createDecisionLimitOrders({
         userId,
         orders: [updatedOrder],
         reviewResultId: logId,
         log: log.child({ execLogId: logId }),
+        defaultExchange,
       });
       const orders = await getLimitOrdersByReviewResult(id, logId);
       if (!orders.length) {
@@ -657,11 +666,17 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('order not open'));
       }
       const planned = JSON.parse(row.plannedJson);
+      const exchange =
+        typeof planned.exchange === 'string' &&
+        planned.exchange.toLowerCase() === 'bybit'
+          ? 'bybit'
+          : 'binance';
       try {
         await cancelLimitOrder(userId, {
           symbol: planned.symbol,
           orderId,
           reason: 'Canceled by user',
+          exchange,
         });
         log.info({ execLogId: logId, orderId }, 'canceled order');
         return { ok: true } as const;
@@ -814,21 +829,23 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('model required'));
       }
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
-      const pairErr = await validateTradingPairs(
-        log,
-        existing.cashToken,
-        tokens,
-      );
-      if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
-      const conflict = await validateTokenConflicts(log, userId, tokens, id);
-      if (conflict) return reply.code(conflict.code).send(conflict.body);
       const ensuredKeys = await ensureApiKeys(log, userId, {
         exchangeKeyId: existing.exchangeApiKeyId,
       });
       if ('code' in ensuredKeys)
         return reply.code(ensuredKeys.code).send(ensuredKeys.body);
+      const exchangeProvider = ensuredKeys.exchangeProvider ?? 'binance';
+      const pairErr = await validateTradingPairs(
+        log,
+        existing.cashToken,
+        tokens,
+        exchangeProvider,
+      );
+      if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
+      const conflict = await validateTokenConflicts(log, userId, tokens, id);
+      if (conflict) return reply.code(conflict.code).send(conflict.body);
       let startBalance: number | null = null;
-      if (ensuredKeys.exchangeProvider === 'binance') {
+      if (exchangeProvider === 'binance') {
         const bal = await getStartBalance(log, userId, tokens);
         if (typeof bal !== 'number')
           return reply.code(bal.code).send(bal.body);

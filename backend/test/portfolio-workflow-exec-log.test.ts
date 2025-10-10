@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import buildServer from '../src/server.js';
 import { parseExecLog } from '../src/util/parse-exec-log.js';
 import { insertReviewResult } from '../src/repos/review-result.js';
@@ -13,6 +13,16 @@ import {
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 import { db } from '../src/db/index.js';
 import * as binance from '../src/services/binance-client.js';
+
+const cancelOrderSpy = vi.spyOn(binance, 'cancelOrder');
+const fetchOrderSpy = vi.spyOn(binance, 'fetchOrder');
+
+beforeEach(() => {
+  cancelOrderSpy.mockReset();
+  cancelOrderSpy.mockResolvedValue({} as any);
+  fetchOrderSpy.mockReset();
+  fetchOrderSpy.mockResolvedValue({ status: 'CANCELED' } as any);
+});
 import { authCookies } from './helpers.js';
 
 describe('portfolio workflow exec log routes', () => {
@@ -104,14 +114,14 @@ describe('portfolio workflow exec log routes', () => {
       reviewResultId,
       orderId: '2',
     });
-    const spy = vi.spyOn(binance, 'cancelOrder').mockResolvedValue({} as any);
+    cancelOrderSpy.mockResolvedValue({} as any);
     let res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/2/cancel`,
       cookies: authCookies(user1Id),
     });
     expect(res.statusCode).toBe(200);
-    expect(spy).toHaveBeenCalledWith(user1Id, {
+    expect(cancelOrderSpy).toHaveBeenCalledWith(user1Id, {
       symbol: 'BTCETH',
       orderId: 2,
     });
@@ -127,7 +137,6 @@ describe('portfolio workflow exec log routes', () => {
     row = await getLimitOrder('2');
     expect(row?.status).toBe(LimitOrderStatus.Canceled);
     expect(row?.cancellation_reason).toBe('Canceled by user');
-    spy.mockRestore();
     await app.close();
   });
 
@@ -160,9 +169,7 @@ describe('portfolio workflow exec log routes', () => {
       reviewResultId,
       orderId: '3',
     });
-    const spy = vi
-      .spyOn(binance, 'cancelOrder')
-      .mockResolvedValue({ status: 'FILLED' } as any);
+    cancelOrderSpy.mockResolvedValue({ status: 'FILLED' } as any);
     const res = await app.inject({
       method: 'POST',
       url: `/api/portfolio-workflows/${agent.id}/exec-log/${reviewResultId}/orders/3/cancel`,
@@ -172,7 +179,6 @@ describe('portfolio workflow exec log routes', () => {
     const row = await getLimitOrder('3');
     expect(row?.status).toBe(LimitOrderStatus.Filled);
     expect(row?.cancellation_reason).toBeNull();
-    spy.mockRestore();
     await app.close();
   });
 

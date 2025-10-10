@@ -20,9 +20,11 @@ import type { ReviewResultInsert } from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
 import { createDecisionLimitOrders } from '../services/rebalance.js';
+import { ensureApiKeys } from '../services/portfolio-workflows.js';
 import { type RebalancePrompt } from '../agents/main-trader.types.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
+import type { SupportedExchange } from '../services/exchange-gateway.js';
 
 /** Workflows currently running. Used to avoid concurrent runs. */
 const runningWorkflows = new Set<string>();
@@ -94,11 +96,17 @@ async function cleanupOpenOrders(
     orders.map((o) =>
       limit(async () => {
         const planned = JSON.parse(o.plannedJson);
+        const exchange =
+          typeof planned.exchange === 'string' &&
+          planned.exchange.toLowerCase() === 'bybit'
+            ? 'bybit'
+            : 'binance';
         try {
           const res = await cancelLimitOrder(o.userId, {
             symbol: planned.symbol,
             orderId: o.orderId,
             reason: 'Could not fill within interval',
+            exchange,
           });
           log.info(
             { orderId: o.orderId },
@@ -204,6 +212,7 @@ async function runWorkflowAttempt(
   };
 
   let prompt: RebalancePrompt | undefined;
+  let defaultExchange: SupportedExchange | undefined;
   try {
     await runStep('cleanupOpenOrders', () => cleanupOpenOrders(wf, runLog));
 
@@ -214,6 +223,15 @@ async function runWorkflowAttempt(
     if (!wf.model) {
       runLog.error('workflow run failed: missing model');
       return { kind: 'error' };
+    }
+
+    const ensuredExchange = await ensureApiKeys(runLog, wf.userId, {
+      exchangeKeyId: wf.exchangeApiKeyId,
+      requireAi: false,
+      requireExchange: false,
+    });
+    if (!('code' in ensuredExchange)) {
+      defaultExchange = ensuredExchange.exchangeProvider ?? undefined;
     }
 
     const key = decrypt(wf.aiApiKeyEnc, env.KEY_PASSWORD);
@@ -282,6 +300,7 @@ async function runWorkflowAttempt(
         orders: normalizedOrders,
         reviewResultId: resultId,
         log: runLog,
+        defaultExchange,
       });
       if (orderResult.needsPriceDivergenceRetry) {
         runLog.warn(

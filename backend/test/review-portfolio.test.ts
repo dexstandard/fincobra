@@ -179,6 +179,8 @@ const createDecisionLimitOrders = vi.hoisted(() =>
       placed: 0,
       canceled: 0,
       priceDivergenceCancellations: 0,
+      futuresExecuted: 0,
+      futuresFailed: 0,
       needsPriceDivergenceRetry: false,
     }),
 );
@@ -286,12 +288,16 @@ describe('reviewPortfolio', () => {
         placed: 0,
         canceled: 1,
         priceDivergenceCancellations: 1,
+        futuresExecuted: 0,
+        futuresFailed: 0,
         needsPriceDivergenceRetry: true,
       })
       .mockResolvedValueOnce({
         placed: 1,
         canceled: 0,
         priceDivergenceCancellations: 0,
+        futuresExecuted: 0,
+        futuresFailed: 0,
         needsPriceDivergenceRetry: false,
       });
     const log = mockLogger();

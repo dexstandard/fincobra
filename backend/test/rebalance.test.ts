@@ -35,6 +35,17 @@ vi.mock('../src/services/binance-client.js', () => ({
     .mockName('isInvalidSymbolError'),
 }));
 
+vi.mock('../src/services/exchange-gateway.js', () => ({
+  getExchangeGateway: vi.fn(() => ({
+    metadata: {
+      fetchMarket: vi.fn(),
+      fetchTicker: vi.fn(),
+    },
+    spot: undefined,
+    futures: undefined,
+  })),
+}));
+
 import { createDecisionLimitOrders } from '../src/services/rebalance.js';
 import {
   createLimitOrder,
@@ -42,12 +53,14 @@ import {
   fetchPairInfo,
   fetchSymbolPrice,
 } from '../src/services/binance-client.js';
+import { getExchangeGateway } from '../src/services/exchange-gateway.js';
 
 describe('createDecisionLimitOrders', () => {
   beforeEach(async () => {
     await clearLimitOrders();
     vi.mocked(createLimitOrder).mockClear();
     vi.mocked(fetchAccount).mockClear();
+    vi.mocked(getExchangeGateway).mockClear();
   });
 
   it('keeps side when quantity is given in quote asset', async () => {
@@ -106,6 +119,7 @@ describe('createDecisionLimitOrders', () => {
       basePrice: 100,
       maxPriceDriftPct: 0.05,
       manuallyEdited: false,
+      exchange: 'binance',
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
@@ -172,6 +186,7 @@ describe('createDecisionLimitOrders', () => {
       limitPrice: 95,
       maxPriceDriftPct: 0.05,
       manuallyEdited: false,
+      exchange: 'binance',
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
@@ -238,6 +253,7 @@ describe('createDecisionLimitOrders', () => {
       limitPrice: 95,
       maxPriceDriftPct: 0.05,
       manuallyEdited: false,
+      exchange: 'binance',
     });
     expect(createLimitOrder).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
@@ -885,5 +901,170 @@ describe('createDecisionLimitOrders', () => {
     });
     const planned = JSON.parse((await getLimitOrders())[0].planned_json);
     expect(planned.manuallyEdited).toBe(true);
+  });
+
+  it('routes futures instructions through the exchange gateway', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('30');
+    const agent = await insertPortfolioWorkflow({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
+    const futuresModule = {
+      setLeverage: vi.fn().mockResolvedValue(undefined),
+      openPosition: vi.fn().mockResolvedValue(undefined),
+      setStopLoss: vi.fn().mockResolvedValue(undefined),
+      setTakeProfit: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(getExchangeGateway).mockReturnValueOnce({
+      metadata: { fetchMarket: vi.fn(), fetchTicker: vi.fn() },
+      spot: undefined,
+      futures: futuresModule,
+    } as any);
+
+    const outcome = await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'BTCUSDT',
+          token: 'USDT',
+          side: 'BUY',
+          qty: 2,
+          limitPrice: 99,
+          basePrice: 98,
+          maxPriceDriftPct: 0.05,
+          exchange: 'bybit',
+          futures: {
+            positionSide: 'LONG',
+            quantity: 0.25,
+            type: 'LIMIT',
+            price: 101,
+            reduceOnly: false,
+            leverage: 10,
+            stopLoss: 90,
+            takeProfit: 120,
+            hedgeMode: true,
+            positionIdx: 1,
+          },
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+
+    expect(outcome.futuresExecuted).toBe(1);
+    expect(outcome.futuresFailed).toBe(0);
+    expect(futuresModule.setLeverage).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      leverage: 10,
+    });
+    expect(futuresModule.openPosition).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      positionSide: 'LONG',
+      quantity: 0.25,
+      type: 'LIMIT',
+      price: 101,
+      reduceOnly: false,
+      hedgeMode: true,
+      positionIdx: 1,
+    });
+    expect(futuresModule.setStopLoss).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      positionSide: 'LONG',
+      stopPrice: 90,
+      hedgeMode: true,
+      positionIdx: 1,
+    });
+    expect(futuresModule.setTakeProfit).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      positionSide: 'LONG',
+      stopPrice: 120,
+      hedgeMode: true,
+      positionIdx: 1,
+    });
+
+    const rows = await getLimitOrders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe(LimitOrderStatus.Filled);
+    const planned = JSON.parse(rows[0].planned_json);
+    expect(planned.exchange).toBe('bybit');
+    expect(planned.futures.positionSide).toBe('LONG');
+    expect(planned.futures.quantity).toBe(0.25);
+    expect(planned.futures.leverage).toBe(10);
+  });
+
+  it('records a canceled entry when futures trading is unavailable', async () => {
+    const log = mockLogger();
+    const userId = await insertUser('31');
+    const agent = await insertPortfolioWorkflow({
+      userId,
+      model: 'm',
+      status: 'active',
+      startBalance: null,
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'USDT', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: true,
+    });
+    const reviewResultId = await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: '',
+    });
+    vi.mocked(getExchangeGateway).mockReturnValueOnce({
+      metadata: { fetchMarket: vi.fn(), fetchTicker: vi.fn() },
+      spot: undefined,
+      futures: undefined,
+    } as any);
+
+    const outcome = await createDecisionLimitOrders({
+      userId,
+      orders: [
+        {
+          pair: 'ETHUSDT',
+          token: 'USDT',
+          side: 'BUY',
+          qty: 1,
+          limitPrice: 1800,
+          basePrice: 1750,
+          maxPriceDriftPct: 0.05,
+          exchange: 'bybit',
+          futures: {
+            positionSide: 'LONG',
+            quantity: 0.5,
+          },
+        },
+      ],
+      reviewResultId,
+      log,
+    });
+
+    expect(outcome.futuresExecuted).toBe(0);
+    expect(outcome.futuresFailed).toBe(1);
+    const rows = await getLimitOrders();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe(LimitOrderStatus.Canceled);
+    expect(rows[0].cancellation_reason).toBe(
+      'futures trading not supported for exchange',
+    );
   });
 });
