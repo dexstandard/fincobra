@@ -3,6 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import api from './axios';
 import { useUser } from './useUser';
 import { useBinanceAccount } from './useBinanceAccount';
+import type { BybitWalletBalance } from './usePrerequisites.types';
 
 export interface BalanceInfo {
   token: string;
@@ -97,6 +98,22 @@ export function usePrerequisites(
   const accountQuery = useBinanceAccount();
   const accountBalances = accountQuery.data?.balances ?? [];
 
+  const bybitWalletQuery = useQuery<BybitWalletBalance | null>({
+    queryKey: ['bybit-wallet', user?.id],
+    enabled: !!user && hasBybitKey,
+    queryFn: async () => {
+      try {
+        const res = await api.get(`/users/${user!.id}/bybit-wallet`);
+        return res.data as BybitWalletBalance;
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          return null;
+        }
+        throw err;
+      }
+    },
+  });
+
   const earnBalanceQueries = useQueries({
     queries: tokens.map((token) => ({
       queryKey: ['binance-earn-balance', user?.id, token.toUpperCase()],
@@ -159,5 +176,7 @@ export function usePrerequisites(
     balances,
     accountBalances,
     isAccountLoading: accountQuery.isLoading,
+    bybitWallet: bybitWalletQuery.data ?? null,
+    isBybitWalletLoading: bybitWalletQuery.isLoading,
   } as const;
 }

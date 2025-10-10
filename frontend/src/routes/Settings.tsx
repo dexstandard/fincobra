@@ -4,14 +4,17 @@ import { Copy } from 'lucide-react';
 import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
 import Button from '../components/ui/Button';
+import Toggle from '../components/ui/Toggle';
 import { useToast } from '../lib/useToast';
 import { useTranslation, useLanguage, type Lang } from '../lib/i18n';
+import { useUiSettings } from '../lib/useUiSettings';
 
 export default function Settings() {
   const { user } = useUser();
   const toast = useToast();
   const t = useTranslation();
   const { lang, setLang } = useLanguage();
+  const { settings, toggleNavigationItem } = useUiSettings();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [setup, setSetup] = useState<{
     secret: string;
@@ -169,6 +172,27 @@ export default function Settings() {
           <option value="en">EN</option>
           <option value="ru">RU</option>
         </select>
+      </div>
+      <div className="space-y-3 border rounded-lg p-4">
+        <div>
+          <h3 className="text-lg font-semibold">{t('ui_settings')}</h3>
+          <p className="text-sm text-gray-600">{t('navigation_menu_description')}</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <div>
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+              {t('navigation_menu')}
+            </h4>
+          </div>
+          <Toggle
+            label={t('crypto_dashboard')}
+            checked={settings.navigation.cryptoDashboard}
+            onChange={(checked) => toggleNavigationItem('cryptoDashboard', checked)}
+          />
+          <p className="text-xs text-gray-500">
+            {t('crypto_dashboard_description')}
+          </p>
+        </div>
       </div>
     </div>
   );

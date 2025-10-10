@@ -36,6 +36,12 @@ const translations: Record<Lang, Record<string, string>> = {
       'API keys for AI providers and exchanges, as well as your email address, are encrypted using a server-side password before being saved in our database. These keys are used solely to make requests on your behalf and are never shared with third parties.',
     privacy_p3:
       'You may delete your API keys or disable two-factor authentication at any time from the application settings.',
+    crypto_dashboard: 'Crypto Dashboard',
+    ui_settings: 'Interface Settings',
+    navigation_menu: 'Navigation menu',
+    navigation_menu_description: 'Choose which services appear in the sidebar.',
+    crypto_dashboard_description:
+      'Show Binance and Bybit balances in a dedicated dashboard.',
     language: 'Language',
     please_log_in: 'Please log in.',
     loading: 'Loading...',
@@ -59,8 +65,14 @@ const translations: Record<Lang, Record<string, string>> = {
     binance_api_credentials: 'Binance API Credentials',
     bybit_api_credentials: 'Bybit API Credentials',
     binance_balances: 'Binance Balances',
+    bybit_balances: 'Bybit Balances',
     connect_binance_api: 'Connect your Binance API',
+    connect_binance_in_keys:
+      'Connect your Binance API in the Keys section to view balances.',
+    connect_bybit_in_keys:
+      'Connect your Bybit API in the Keys section to view balances.',
     connect_exchange_api: 'Connect your exchange API',
+    no_balances: 'No balances to display.',
     my_workflows: 'Portfolios',
     only_active: 'Only Active',
     only_my: 'Only My',
@@ -72,6 +84,10 @@ const translations: Record<Lang, Record<string, string>> = {
     tokens: 'Tokens',
     balance_usd: 'Balance',
     pnl_usd: 'PnL',
+    available: 'Available',
+    locked: 'Locked',
+    total: 'Total',
+    equity: 'Equity',
     model: 'Model',
     interval: 'Interval',
     owner: 'Owner',
@@ -237,6 +253,13 @@ const translations: Record<Lang, Record<string, string>> = {
       'API‑ключи поставщиков ИИ и бирж, а также ваш email шифруются серверным паролем перед сохранением в нашей базе данных. Эти ключи используются исключительно для запросов от вашего имени и никогда не передаются третьим лицам.',
     privacy_p3:
       'Вы можете удалить свои API‑ключи или отключить двухфакторную аутентификацию в настройках приложения в любое время.',
+    crypto_dashboard: 'Крипто-дашборд',
+    ui_settings: 'Настройки интерфейса',
+    navigation_menu: 'Навигационное меню',
+    navigation_menu_description:
+      'Выберите, какие сервисы показывать в боковом меню.',
+    crypto_dashboard_description:
+      'Показывает балансы Binance и Bybit на отдельной странице.',
     language: 'Язык',
     please_log_in: 'Пожалуйста, войдите.',
     loading: 'Загрузка...',
@@ -260,8 +283,14 @@ const translations: Record<Lang, Record<string, string>> = {
     binance_api_credentials: 'Учётные данные Binance API',
     bybit_api_credentials: 'Учётные данные Bybit API',
     binance_balances: 'Балансы Binance',
+    bybit_balances: 'Балансы Bybit',
     connect_binance_api: 'Подключите ваш Binance API',
+    connect_binance_in_keys:
+      'Подключите Binance API в разделе «Ключи», чтобы увидеть балансы.',
+    connect_bybit_in_keys:
+      'Подключите Bybit API в разделе «Ключи», чтобы увидеть балансы.',
     connect_exchange_api: 'Подключите API биржи',
+    no_balances: 'Нет балансов для отображения.',
     my_workflows: 'Портфели',
     only_active: 'Только активные',
     only_my: 'Только мои',
@@ -274,6 +303,10 @@ const translations: Record<Lang, Record<string, string>> = {
     tokens: 'Токены',
     balance_usd: 'Баланс',
     pnl_usd: 'PnL',
+    available: 'Доступно',
+    locked: 'Заморожено',
+    total: 'Итого',
+    equity: 'Эквити',
     model: 'Модель',
     interval: 'Интервал',
     owner: 'Владелец',

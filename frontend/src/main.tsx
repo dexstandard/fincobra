@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import queryClient from './lib/queryClient';
 import { UserProvider } from './lib/UserProvider';
+import { UiSettingsProvider } from './lib/UiSettingsProvider';
 import { ToastProvider } from './components/Toast';
 import './index.css';
 
@@ -12,11 +13,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <UserProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </ToastProvider>
+        <UiSettingsProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ToastProvider>
+        </UiSettingsProvider>
       </UserProvider>
     </QueryClientProvider>
   </React.StrictMode>,

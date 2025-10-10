@@ -8,6 +8,7 @@ import Settings from './routes/Settings';
 import Terms from './routes/Terms';
 import Privacy from './routes/Privacy';
 import Users from './routes/Users';
+import CryptoDashboard from './routes/CryptoDashboard';
 import { LanguageProvider } from './lib/i18n';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/keys" element={<Keys />} />
+          <Route path="/crypto-dashboard" element={<CryptoDashboard />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/users" element={<Users />} />
           <Route

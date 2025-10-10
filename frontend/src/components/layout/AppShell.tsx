@@ -10,10 +10,12 @@ import {
   Users as UsersIcon,
   ChevronLeft,
   ChevronRight,
+  Coins,
 } from 'lucide-react';
 import { useUser } from '../../lib/useUser';
 import { useState } from 'react';
 import { useTranslation } from '../../lib/i18n';
+import { useUiSettings } from '../../lib/useUiSettings';
 
 function ApiStatus() {
   const { isSuccess } = useQuery({
@@ -33,6 +35,7 @@ export default function AppShell() {
   const { user } = useUser();
   const [navCollapsed, setNavCollapsed] = useState(true);
   const t = useTranslation();
+  const { settings } = useUiSettings();
   return (
     <div className="h-screen flex flex-col">
       <header className="fixed top-0 left-0 right-0 bg-gray-800 text-white p-4 flex justify-between z-10">
@@ -75,6 +78,18 @@ export default function AppShell() {
               <Key className={`${navCollapsed ? 'w-6 h-6' : 'w-4 h-4'}`} />
               {!navCollapsed && t('keys')}
             </Link>
+            {settings.navigation.cryptoDashboard && (
+              <Link
+                to="/crypto-dashboard"
+                className={`flex items-center text-gray-700 hover:text-gray-900 ${
+                  navCollapsed ? 'justify-center' : 'gap-2'
+                }`}
+                title={navCollapsed ? t('crypto_dashboard') : undefined}
+              >
+                <Coins className={`${navCollapsed ? 'w-6 h-6' : 'w-4 h-4'}`} />
+                {!navCollapsed && t('crypto_dashboard')}
+              </Link>
+            )}
             <Link
               to="/settings"
               className={`flex items-center text-gray-700 hover:text-gray-900 ${
@@ -146,6 +161,15 @@ export default function AppShell() {
         >
           <Bot className="w-6 h-6" />
         </Link>
+        {settings.navigation.cryptoDashboard && (
+          <Link
+            to="/crypto-dashboard"
+            className="text-gray-700 hover:text-gray-900"
+            aria-label={t('crypto_dashboard')}
+          >
+            <Coins className="w-6 h-6" />
+          </Link>
+        )}
         <Link
           to="/keys"
           className="text-gray-700 hover:text-gray-900"
