@@ -176,6 +176,7 @@ interface EnsureApiKeysOptions {
   exchangeKeyId?: string | null;
   requireAi?: boolean;
   requireExchange?: boolean;
+  preferredExchange?: 'binance' | 'bybit';
 }
 
 export async function ensureApiKeys(
@@ -183,7 +184,12 @@ export async function ensureApiKeys(
   userId: string,
   options: EnsureApiKeysOptions = {},
 ): Promise<ValidationErr | EnsuredExchangeKey> {
-  const { exchangeKeyId, requireAi = true, requireExchange = true } = options;
+  const {
+    exchangeKeyId,
+    requireAi = true,
+    requireExchange = true,
+    preferredExchange,
+  } = options;
   const userRow = await getUserApiKeys(userId);
   if (!userRow) {
     log.error('missing api keys');
@@ -208,6 +214,17 @@ export async function ensureApiKeys(
       exchangeProvider = 'bybit';
     } else {
       log.error({ exchangeKeyId }, 'missing api keys');
+      return { code: 400, body: errorResponse('missing api keys') };
+    }
+  } else if (preferredExchange) {
+    if (preferredExchange === 'binance' && hasBinanceKey) {
+      resolvedKeyId = userRow.binanceKeyId ?? null;
+      exchangeProvider = 'binance';
+    } else if (preferredExchange === 'bybit' && hasBybitKey) {
+      resolvedKeyId = userRow.bybitKeyId ?? null;
+      exchangeProvider = 'bybit';
+    } else {
+      log.error({ preferredExchange }, 'missing api keys');
       return { code: 400, body: errorResponse('missing api keys') };
     }
   } else if (hasBinanceKey) {
