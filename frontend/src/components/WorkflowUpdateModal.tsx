@@ -228,7 +228,9 @@ export default function WorkflowUpdateModal({
               type="exchange"
               label={t('exchange')}
               value={exchangeProvider}
-              onChange={setExchangeProvider}
+              onChange={(value) =>
+                setExchangeProvider(value as 'binance' | 'bybit')
+              }
             />
             <div className="mt-2">
               <WalletBalances

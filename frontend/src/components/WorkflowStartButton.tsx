@@ -6,6 +6,7 @@ import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
 import { useToast } from '../lib/useToast';
 import { useTranslation } from '../lib/i18n';
+import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 import Button from './ui/Button';
 import ConfirmDialog from './ui/ConfirmDialog';
 
@@ -19,14 +20,8 @@ interface WorkflowPreviewDetails {
   exchangeKeyId: string | null;
 }
 
-interface ExistingWorkflow extends WorkflowPreviewDetails {
-  id: string;
-  userId: string;
-  model: string | null;
-}
-
 interface Props {
-  workflow?: ExistingWorkflow;
+  workflow?: PortfolioWorkflow;
   workflowData: WorkflowPreviewDetails;
   model: string;
   disabled: boolean;
