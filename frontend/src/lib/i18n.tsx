@@ -60,6 +60,19 @@ const translations: Record<Lang, Record<string, string>> = {
     bybit_api_credentials: 'Bybit API Credentials',
     binance_balances: 'Binance Balances',
     bybit_futures_balances: 'Bybit Futures Balances',
+    spot_trading: 'Spot trading',
+    futures_trading: 'Futures trading',
+    binance_capabilities:
+      'Supports Binance spot trading, Earn balances, and USD value previews.',
+    bybit_capabilities:
+      'Supports Bybit USDT perpetual futures trading with leverage controls.',
+    trading_mode: 'Trading mode',
+    trading_mode_spot_description:
+      'Spot bots trade from your Binance spot wallet and can include Earn balances when enabled.',
+    trading_mode_futures_description:
+      'Futures bots trade from your Bybit USDT perpetual account with leverage-aware execution.',
+    trading_mode_connect_exchange:
+      'Connect your {{exchange}} API key to enable this mode.',
     connect_binance_api: 'Connect your Binance API',
     connect_exchange_api: 'Connect your exchange API',
     my_workflows: 'Portfolios',
@@ -262,6 +275,19 @@ const translations: Record<Lang, Record<string, string>> = {
     bybit_api_credentials: 'Учётные данные Bybit API',
     binance_balances: 'Балансы Binance',
     bybit_futures_balances: 'Балансы фьючерсов Bybit',
+    spot_trading: 'Спот-торговля',
+    futures_trading: 'Фьючерсная торговля',
+    binance_capabilities:
+      'Поддерживает спот-торговлю на Binance, балансы Earn и просмотр стоимости в USD.',
+    bybit_capabilities:
+      'Поддерживает торговлю фьючерсами USDT perpetual на Bybit с управлением плечом.',
+    trading_mode: 'Режим торговли',
+    trading_mode_spot_description:
+      'Спотовые боты работают с вашим спотовым кошельком Binance и при необходимости учитывают балансы Earn.',
+    trading_mode_futures_description:
+      'Фьючерсные боты работают с вашим счётом Bybit USDT perpetual и учитывают настройки плеча.',
+    trading_mode_connect_exchange:
+      'Подключите API ключ {{exchange}}, чтобы включить этот режим.',
     connect_binance_api: 'Подключите ваш Binance API',
     connect_exchange_api: 'Подключите API биржи',
     my_workflows: 'Портфели',

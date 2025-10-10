@@ -4,6 +4,7 @@ import api from './axios';
 import { useUser } from './useUser';
 import { useBinanceAccount } from './useBinanceAccount';
 import { useBybitFuturesBalance } from './useBybitFuturesBalance';
+import type { TradingMode } from './exchange.types';
 
 export interface BalanceInfo {
   token: string;
@@ -16,6 +17,7 @@ export interface BalanceInfo {
 interface UsePrerequisitesOptions {
   includeAiKey?: boolean;
   exchange?: 'binance' | 'bybit';
+  mode?: TradingMode;
 }
 
 interface ExchangeKeySummary {
@@ -26,7 +28,7 @@ export function usePrerequisites(
   tokens: string[],
   options?: UsePrerequisitesOptions,
 ) {
-  const { includeAiKey = true, exchange } = options ?? {};
+  const { includeAiKey = true, exchange, mode } = options ?? {};
   const { user } = useUser();
 
   const aiKeyQuery = useQuery<string | null>({
@@ -106,24 +108,34 @@ export function usePrerequisites(
     },
   });
 
-  const preferBinance = exchange === 'binance';
-  const preferBybit = exchange === 'bybit';
+  const preferredExchange =
+    exchange ??
+    (mode === 'futures'
+      ? 'bybit'
+      : mode === 'spot'
+        ? 'binance'
+        : undefined);
+  const preferBinance = preferredExchange === 'binance';
+  const preferBybit = preferredExchange === 'bybit';
+
+  const shouldLoadBinanceAccount =
+    hasBinanceKey && (!preferBybit || !hasBybitKey);
+  const shouldLoadBybitAccount =
+    hasBybitKey && (preferBybit || (!preferBinance && !hasBinanceKey));
 
   const accountQuery = useBinanceAccount({
-    enabled: hasBinanceKey && (!preferBybit || !hasBybitKey),
+    enabled: shouldLoadBinanceAccount,
   });
 
   const bybitAccountQuery = useBybitFuturesBalance({
-    enabled:
-      hasBybitKey && (preferBybit || (!preferBinance && !hasBinanceKey)),
+    enabled: shouldLoadBybitAccount,
   });
 
-  const activeExchange =
-    hasBinanceKey && (!preferBybit || !hasBybitKey)
-      ? 'binance'
-      : hasBybitKey && (preferBybit || (!preferBinance && !hasBinanceKey))
-        ? 'bybit'
-        : null;
+  const activeExchange = shouldLoadBinanceAccount
+    ? 'binance'
+    : shouldLoadBybitAccount
+      ? 'bybit'
+      : null;
 
   const accountBalances =
     activeExchange === 'binance'
@@ -135,7 +147,7 @@ export function usePrerequisites(
   const earnBalanceQueries = useQueries({
     queries: tokens.map((token) => ({
       queryKey: ['binance-earn-balance', user?.id, token.toUpperCase()],
-      enabled: !!user && hasBinanceKey,
+      enabled: !!user && shouldLoadBinanceAccount,
       queryFn: async () => {
         try {
           const res = await api.get(
@@ -177,8 +189,8 @@ export function usePrerequisites(
     return {
       token,
       isLoading:
-        (activeExchange === 'binance' ? accountQuery.isLoading : false) ||
-        (activeExchange === 'bybit' ? bybitAccountQuery.isLoading : false) ||
+        (shouldLoadBinanceAccount ? accountQuery.isLoading : false) ||
+        (shouldLoadBybitAccount ? bybitAccountQuery.isLoading : false) ||
         (earnBalanceQueries[idx]?.isLoading ?? false) ||
         (priceQueries[idx]?.isLoading ?? false),
       walletBalance: wallet,
@@ -186,6 +198,13 @@ export function usePrerequisites(
       usdValue: (wallet + earn) * price,
     };
   });
+
+  const activeTradingMode: TradingMode | null =
+    activeExchange === 'bybit'
+      ? 'futures'
+      : activeExchange === 'binance'
+        ? 'spot'
+        : null;
 
   return {
     hasOpenAIKey,
@@ -203,5 +222,6 @@ export function usePrerequisites(
           ? bybitAccountQuery.isLoading
           : false,
     activeExchange,
+    activeTradingMode,
   } as const;
 }

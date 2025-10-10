@@ -12,6 +12,7 @@ import {
 import { usePrerequisites } from '../lib/usePrerequisites';
 import { useToast } from '../lib/useToast';
 import { useTranslation } from '../lib/i18n';
+import type { TradingMode } from '../lib/exchange.types';
 import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 
 import AgentInstructions from './AgentInstructions';
@@ -62,9 +63,9 @@ export default function WorkflowUpdateModal({
 
   const [model, setModel] = useState(workflow.model || '');
   const [aiProvider, setAiProvider] = useState('openai');
-  const [exchangeProvider, setExchangeProvider] = useState<'binance' | 'bybit'>(
-    'binance',
-  );
+  const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
+  const desiredExchange: 'binance' | 'bybit' =
+    tradingMode === 'futures' ? 'bybit' : 'binance';
   const {
     hasOpenAIKey,
     hasBinanceKey,
@@ -76,12 +77,12 @@ export default function WorkflowUpdateModal({
     accountBalances,
     isAccountLoading,
     activeExchange,
-  } = usePrerequisites(tokenSymbols, { exchange: exchangeProvider });
+  } = usePrerequisites(tokenSymbols, { exchange: desiredExchange });
   const selectedExchangeKeyId = useMemo(() => {
-    if (exchangeProvider === 'binance') return binanceKeyId;
-    if (exchangeProvider === 'bybit') return bybitKeyId;
+    if (desiredExchange === 'binance') return binanceKeyId;
+    if (desiredExchange === 'bybit') return bybitKeyId;
     return null;
-  }, [exchangeProvider, binanceKeyId, bybitKeyId]);
+  }, [desiredExchange, binanceKeyId, bybitKeyId]);
 
   useEffect(() => {
     if (open) {
@@ -104,7 +105,7 @@ export default function WorkflowUpdateModal({
         ...workflow.tokens.map((t) => t.token),
       ]);
     }
-  }, [open, workflow, reset]);
+  }, [open, workflow, reset, bybitKeyId, binanceKeyId]);
 
   useEffect(() => {
     if (!hasOpenAIKey) {
@@ -116,34 +117,49 @@ export default function WorkflowUpdateModal({
 
   useEffect(() => {
     if (!open) return;
-    const desired = (() => {
-      if (!workflow.exchangeApiKeyId) return null;
-      if (workflow.exchangeApiKeyId === bybitKeyId) return 'bybit';
-      if (workflow.exchangeApiKeyId === binanceKeyId) return 'binance';
-      return null;
-    })();
-    if (desired && exchangeProvider !== desired) {
-      setExchangeProvider(desired);
+    if (workflow.exchangeApiKeyId === bybitKeyId && tradingMode !== 'futures') {
+      setTradingMode('futures');
+    } else if (
+      workflow.exchangeApiKeyId === binanceKeyId &&
+      tradingMode !== 'spot'
+    ) {
+      setTradingMode('spot');
     }
   }, [
     open,
     workflow.exchangeApiKeyId,
     binanceKeyId,
     bybitKeyId,
-    exchangeProvider,
+    tradingMode,
   ]);
 
   useEffect(() => {
-    if (exchangeProvider === 'binance' && !hasBinanceKey && hasBybitKey) {
-      setExchangeProvider('bybit');
-    } else if (
-      exchangeProvider === 'bybit' &&
-      !hasBybitKey &&
-      hasBinanceKey
-    ) {
-      setExchangeProvider('binance');
+    if (tradingMode === 'spot' && !hasBinanceKey && hasBybitKey) {
+      setTradingMode('futures');
+    } else if (tradingMode === 'futures' && !hasBybitKey && hasBinanceKey) {
+      setTradingMode('spot');
     }
-  }, [exchangeProvider, hasBinanceKey, hasBybitKey]);
+  }, [tradingMode, hasBinanceKey, hasBybitKey]);
+
+  const tradingModeConfigs = useMemo(
+    () => [
+      {
+        id: 'spot' as const,
+        label: t('spot_trading'),
+        description: t('trading_mode_spot_description'),
+        exchangeLabel: 'Binance',
+        enabled: hasBinanceKey,
+      },
+      {
+        id: 'futures' as const,
+        label: t('futures_trading'),
+        description: t('trading_mode_futures_description'),
+        exchangeLabel: 'Bybit',
+        enabled: hasBybitKey,
+      },
+    ],
+    [t, hasBinanceKey, hasBybitKey],
+  );
 
   const updateMut = useMutation<void, unknown, PortfolioReviewFormValues>({
     mutationFn: async (values: PortfolioReviewFormValues) => {
@@ -224,15 +240,46 @@ export default function WorkflowUpdateModal({
             )}
           </div>
           <div>
-            <ApiKeyProviderSelector
-              type="exchange"
-              label={t('exchange')}
-              value={exchangeProvider}
-              onChange={(value) =>
-                setExchangeProvider(value as 'binance' | 'bybit')
-              }
-            />
-            <div className="mt-2">
+            <span className="block text-md font-bold">{t('trading_mode')}</span>
+            <div className="mt-2 flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
+                {tradingModeConfigs.map((mode) => {
+                  const isActive = tradingMode === mode.id;
+                  const disabled = !mode.enabled;
+                  const hint = disabled
+                    ? t('trading_mode_connect_exchange').replace(
+                        '{{exchange}}',
+                        mode.exchangeLabel,
+                      )
+                    : undefined;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => {
+                        if (!disabled) setTradingMode(mode.id);
+                      }}
+                      disabled={disabled}
+                      title={hint}
+                      className={`px-3 py-1.5 rounded border text-sm transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white border-transparent'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-sm text-gray-600">
+                {
+                  tradingModeConfigs.find((mode) => mode.id === tradingMode)
+                    ?.description ?? ''
+                }
+              </p>
+            </div>
+            <div className="mt-4">
               <WalletBalances
                 balances={balances}
                 exchange={activeExchange}

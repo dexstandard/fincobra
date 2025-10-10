@@ -17,6 +17,12 @@ export default function ExchangeApiKeySection({ exchange, label }: Props) {
   const t = useTranslation();
   const supportsBalances = exchange === 'binance';
   const supportsWhitelist = exchange === 'binance' || exchange === 'bybit';
+  const capabilityCopy =
+    exchange === 'binance'
+      ? t('binance_capabilities')
+      : t('bybit_capabilities');
+  const modeLabel =
+    exchange === 'binance' ? t('spot_trading') : t('futures_trading');
   const exchangeFields = [
     {
       name: 'key',
@@ -50,9 +56,25 @@ export default function ExchangeApiKeySection({ exchange, label }: Props) {
     },
   });
 
+  const headerLabel = (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span>{label}</span>
+        <span className="uppercase tracking-wide text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
+          {modeLabel}
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-gray-600">{capabilityCopy}</p>
+    </div>
+  );
+
   return supportsWhitelist ? (
-    <ApiKeySection {...commonProps} whitelistHost={whitelistQuery.data} />
+    <ApiKeySection
+      {...commonProps}
+      label={headerLabel}
+      whitelistHost={whitelistQuery.data}
+    />
   ) : (
-    <ApiKeySection {...commonProps} />
+    <ApiKeySection {...commonProps} label={headerLabel} />
   );
 }
