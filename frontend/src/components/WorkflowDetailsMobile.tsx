@@ -33,7 +33,11 @@ export default function WorkflowDetailsMobile({ workflow }: Props) {
         ))}
       </p>
       {workflow.status === 'active' && (
-        <WorkflowAllocationPie cashToken={workflow.cashToken} tokens={workflow.tokens} />
+        <WorkflowAllocationPie
+          cashToken={workflow.cashToken}
+          tokens={workflow.tokens}
+          ownerId={workflow.userId}
+        />
       )}
       <WorkflowPnlMobile
         tokens={tokens}
