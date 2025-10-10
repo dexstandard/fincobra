@@ -9,13 +9,13 @@ import {
   LimitOrderStatus,
   type LimitOrderOpen,
 } from '../repos/limit-orders.types.js';
-import {
-  fetchOpenOrders,
-  fetchOrder,
-  parseBinanceError,
-} from './binance-client.js';
-import type { OpenOrder } from './binance-client.types.js';
+import { parseBinanceError } from './binance-client.js';
 import { cancelLimitOrder } from './limit-order.js';
+import { getExchangeGateway, type SupportedExchange } from './exchange-gateway.js';
+import type {
+  ExchangeGatewaySpotModule,
+  ExchangeSpotOpenOrder,
+} from './exchange-gateway.types.js';
 import type { CancelOrderReason } from './order-orchestrator.types.js';
 
 interface CancelOrdersForWorkflowOptions {
@@ -26,6 +26,7 @@ interface CancelOrdersForWorkflowOptions {
 
 interface PlannedOrder {
   symbol: string;
+  exchange: SupportedExchange;
 }
 
 interface GroupedOrder extends LimitOrderOpen {
@@ -44,10 +45,24 @@ const CLOSED_ORDER_STATUSES = new Set<string>(
   Object.keys(CLOSED_ORDER_STATUS_DESCRIPTIONS),
 );
 
-function resolveExternalCancellationReason(status: string): string {
+function formatExchangeName(exchange: SupportedExchange): string {
+  return exchange.charAt(0).toUpperCase() + exchange.slice(1);
+}
+
+function resolveExternalCancellationReason(
+  exchange: SupportedExchange,
+  status: string,
+): string {
   const description =
     CLOSED_ORDER_STATUS_DESCRIPTIONS[status] ?? 'closed the order';
-  return `Binance ${description} (status ${status})`;
+  return `${formatExchangeName(exchange)} ${description} (status ${status})`;
+}
+
+function normalizeOrderStatus(value: unknown): string | null {
+  if (typeof value === 'string') return value.toUpperCase();
+  if (!value || typeof value !== 'object') return null;
+  const maybeStatus = (value as { status?: unknown }).status;
+  return typeof maybeStatus === 'string' ? maybeStatus.toUpperCase() : null;
 }
 
 export async function syncOpenOrderStatuses(
@@ -85,12 +100,11 @@ export async function cancelOrdersForWorkflow({
 }: CancelOrdersForWorkflowOptions): Promise<void> {
   const openOrders = await getOpenLimitOrdersForWorkflow(workflowId);
   for (const order of openOrders) {
-    const symbol = parsePlannedOrderSymbol(
-      order.plannedJson,
-      log,
-      order.orderId,
-    );
-    if (!symbol) {
+    let planned: PlannedOrder;
+    try {
+      planned = parsePlannedOrder(order.plannedJson, order.orderId);
+    } catch (err) {
+      log.error({ err, orderId: order.orderId }, 'failed to parse planned order');
       await updateLimitOrderStatus(
         order.userId,
         order.orderId,
@@ -101,9 +115,10 @@ export async function cancelOrdersForWorkflow({
     }
     try {
       await cancelLimitOrder(order.userId, {
-        symbol,
+        symbol: planned.symbol,
         orderId: order.orderId,
         reason,
+        exchange: planned.exchange,
       });
     } catch (err) {
       log.error({ err, orderId: order.orderId }, 'failed to cancel order');
@@ -115,7 +130,7 @@ function groupByUserAndSymbol(orders: LimitOrderOpen[]) {
   const groups = new Map<string, GroupedOrder[]>();
   for (const order of orders) {
     const planned = parsePlannedOrder(order.plannedJson, order.orderId);
-    const key = `${order.userId}-${planned.symbol}`;
+    const key = `${order.userId}-${planned.exchange}-${planned.symbol}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push({ ...order, planned });
   }
@@ -124,20 +139,29 @@ function groupByUserAndSymbol(orders: LimitOrderOpen[]) {
 
 async function reconcileGroup(log: FastifyBaseLogger, list: GroupedOrder[]) {
   const { userId, planned } = list[0];
-  let open: OpenOrder[] = [];
+  const gateway = getExchangeGateway(planned.exchange);
+  const spot = gateway.spot;
+  if (!spot) {
+    log.error(
+      { userId, exchange: planned.exchange },
+      'spot trading not supported for exchange',
+    );
+    return;
+  }
+  let open: ExchangeSpotOpenOrder[] = [];
   try {
-    const res = await fetchOpenOrders(userId, { symbol: planned.symbol });
+    const res = await spot.fetchOpenOrders(userId, { symbol: planned.symbol });
     open = Array.isArray(res) ? res : [];
   } catch (err) {
     log.error(
-      { err, userId, symbol: planned.symbol },
+      { err, userId, symbol: planned.symbol, exchange: planned.exchange },
       'failed to fetch open orders',
     );
     return;
   }
   for (const order of list) {
     try {
-      await reconcileOrder(log, order, planned.symbol, open);
+      await reconcileOrder(log, order, planned.symbol, open, planned.exchange, spot);
     } catch (err) {
       log.error({ err, orderId: order.orderId }, 'failed to reconcile order');
     }
@@ -152,52 +176,54 @@ async function resolveClosedStatus(
   log: FastifyBaseLogger,
   order: GroupedOrder,
   symbol: string,
+  exchange: SupportedExchange,
+  spot: ExchangeGatewaySpotModule,
 ): Promise<ResolvedClosedStatus | null> {
-  const orderId = Number(order.orderId);
-  if (!Number.isFinite(orderId)) {
-    log.error(
-      { orderId: order.orderId },
-      'invalid order id while reconciling limit order',
-    );
-    return null;
-  }
+  const orderReference = {
+    symbol,
+    orderId: Number.isFinite(Number(order.orderId))
+      ? Number(order.orderId)
+      : order.orderId,
+  } as const;
 
   try {
-    const res = await fetchOrder(order.userId, { symbol, orderId });
-    if (!res || !res.status) {
+    const res = await spot.fetchOrder(order.userId, orderReference);
+    const status = normalizeOrderStatus(res);
+    if (!status) {
       log.error(
-        { orderId: order.orderId },
-        'missing Binance order status while reconciling',
+        { orderId: order.orderId, exchange },
+        'missing order status while reconciling',
       );
       return null;
     }
-    const status = res.status.toUpperCase();
     if (status === 'FILLED') return { type: LimitOrderStatus.Filled };
     if (CLOSED_ORDER_STATUSES.has(status)) {
       return {
         type: LimitOrderStatus.Canceled,
-        reason: resolveExternalCancellationReason(status),
+        reason: resolveExternalCancellationReason(exchange, status),
       };
     }
     log.error(
-      { orderId: order.orderId, status },
-      'unexpected Binance order status while reconciling',
+      { orderId: order.orderId, status, exchange },
+      'unexpected order status while reconciling',
     );
     return null;
   } catch (err) {
-    const { code, msg } = parseBinanceError(err);
-    if (code === -2013) {
-      const message = typeof msg === 'string' ? msg.trim() : '';
-      return {
-        type: LimitOrderStatus.Canceled,
-        reason: message
-          ? `Binance: ${message}`
-          : 'Binance could not find the order (code -2013)',
-      };
+    if (exchange === 'binance') {
+      const { code, msg } = parseBinanceError(err);
+      if (code === -2013) {
+        const message = typeof msg === 'string' ? msg.trim() : '';
+        return {
+          type: LimitOrderStatus.Canceled,
+          reason: message
+            ? `Binance: ${message}`
+            : 'Binance could not find the order (code -2013)',
+        };
+      }
     }
     log.error(
-      { err, orderId: order.orderId },
-      'failed to fetch Binance order while reconciling',
+      { err, orderId: order.orderId, exchange },
+      'failed to fetch order while reconciling',
     );
     return null;
   }
@@ -207,11 +233,15 @@ async function reconcileOrder(
   log: FastifyBaseLogger,
   order: GroupedOrder,
   symbol: string,
-  open: OpenOrder[],
+  open: ExchangeSpotOpenOrder[],
+  exchange: SupportedExchange,
+  spot: ExchangeGatewaySpotModule,
 ) {
-  const exists = open.some((entry) => String(entry.orderId) === order.orderId);
+  const exists = open.some(
+    (entry) => String(entry.orderId ?? '') === order.orderId,
+  );
   if (!exists) {
-    const status = await resolveClosedStatus(log, order, symbol);
+    const status = await resolveClosedStatus(log, order, symbol, exchange, spot);
     if (status?.type === LimitOrderStatus.Filled) {
       await updateLimitOrderStatus(
         order.userId,
@@ -235,6 +265,7 @@ async function reconcileOrder(
         symbol,
         orderId: order.orderId,
         reason: 'Workflow inactive',
+        exchange,
       });
     } catch (err) {
       log.error({ err }, 'failed to cancel order');
@@ -242,17 +273,12 @@ async function reconcileOrder(
   }
 }
 
-function parsePlannedOrderSymbol(
-  plannedJson: string,
-  log: FastifyBaseLogger,
-  orderId: string,
-): string | undefined {
-  try {
-    return parsePlannedOrder(plannedJson, orderId).symbol;
-  } catch (err) {
-    log.error({ err, orderId }, 'failed to parse planned order');
-    return undefined;
+function resolvePlannedExchange(value: unknown): SupportedExchange {
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase();
+    if (normalized === 'bybit') return 'bybit';
   }
+  return 'binance';
 }
 
 function parsePlannedOrder(plannedJson: string, orderId: string): PlannedOrder {
@@ -269,5 +295,6 @@ function parsePlannedOrder(plannedJson: string, orderId: string): PlannedOrder {
   if (typeof symbol !== 'string') {
     throw new Error(`missing planned order symbol ${orderId}`);
   }
-  return { symbol };
+  const exchange = resolvePlannedExchange(parsed.exchange);
+  return { symbol, exchange };
 }

@@ -94,11 +94,17 @@ async function cleanupOpenOrders(
     orders.map((o) =>
       limit(async () => {
         const planned = JSON.parse(o.plannedJson);
+        const exchange =
+          typeof planned.exchange === 'string' &&
+          planned.exchange.toLowerCase() === 'bybit'
+            ? 'bybit'
+            : 'binance';
         try {
           const res = await cancelLimitOrder(o.userId, {
             symbol: planned.symbol,
             orderId: o.orderId,
             reason: 'Could not fill within interval',
+            exchange,
           });
           log.info(
             { orderId: o.orderId },
