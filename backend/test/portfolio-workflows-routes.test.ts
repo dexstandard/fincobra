@@ -7,7 +7,11 @@ import {
 } from '../src/repos/portfolio-workflows.js';
 import { insertAdminUser, insertUser, insertUserWithKeys } from './repos/users.js';
 import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
-import { setBybitKey, getBybitKey } from '../src/repos/exchange-api-keys.js';
+import {
+  setBybitKey,
+  getBybitKey,
+  getBinanceKey,
+} from '../src/repos/exchange-api-keys.js';
 import {
   setWorkflowStatus,
   getPortfolioWorkflowStatus,
@@ -147,6 +151,9 @@ describe('portfolio workflow routes', () => {
       ...rest,
       startBalanceUsd: 100,
     });
+    expect(res.json().mode).toBe('spot');
+    expect(res.json().futuresDefaultLeverage).toBeNull();
+    expect(res.json().futuresMarginMode).toBeNull();
     expect(typeof res.json().aiApiKeyId).toBe('string');
     expect(typeof res.json().exchangeApiKeyId).toBe('string');
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -163,6 +170,9 @@ describe('portfolio workflow routes', () => {
       ...rest,
       startBalanceUsd: 100,
     });
+    expect(res.json().mode).toBe('spot');
+    expect(res.json().futuresDefaultLeverage).toBeNull();
+    expect(res.json().futuresMarginMode).toBeNull();
     expect(typeof res.json().aiApiKeyId).toBe('string');
     expect(typeof res.json().exchangeApiKeyId).toBe('string');
 
@@ -194,6 +204,7 @@ describe('portfolio workflow routes', () => {
     expect(res.statusCode).toBe(200);
     const { cash: cashUpd, ...restUpd } = update;
     expect(res.json()).toMatchObject({ id, cashToken: cashUpd, ...restUpd });
+    expect(res.json().mode).toBe('spot');
 
     res = await app.inject({
       method: 'GET',
@@ -268,6 +279,73 @@ describe('portfolio workflow routes', () => {
     (globalThis as any).fetch = originalFetch;
   });
 
+  it('persists futures mode configuration', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('futures-mode-user');
+
+    const payload = {
+      model: 'gpt-5',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'prompt',
+      cash: 'USDT',
+      status: 'inactive',
+      mode: 'futures' as const,
+      futuresDefaultLeverage: 15,
+      futuresMarginMode: 'cross' as const,
+    };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/portfolio-workflows',
+      cookies: authCookies(userId),
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().mode).toBe('futures');
+    expect(res.json().futuresDefaultLeverage).toBe(15);
+    expect(res.json().futuresMarginMode).toBe('cross');
+
+    await app.close();
+  });
+
+  it('rejects futures mode without leverage configuration', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('futures-mode-missing-config');
+
+    const payload = {
+      model: 'gpt-5',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'prompt',
+      cash: 'USDT',
+      status: 'inactive',
+      mode: 'futures' as const,
+      futuresMarginMode: 'cross' as const,
+    };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/portfolio-workflows',
+      cookies: authCookies(userId),
+      payload,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('futures leverage required');
+
+    await app.close();
+  });
+
   it('persists bybit exchange selection when starting a workflow', async () => {
     const app = await buildServer();
     const userId = await insertUser('bybit-user');
@@ -316,6 +394,63 @@ describe('portfolio workflow routes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().exchangeApiKeyId).toBe(storedBybitKey.id);
     expect(res.json().startBalanceUsd).toBeNull();
+
+    await app.close();
+  });
+
+  it('skips spot validations when starting futures workflows', async () => {
+    const app = await buildServer();
+    const userId = await insertUserWithKeys('futures-start-user');
+    const binanceKey = await getBinanceKey(userId);
+    expect(binanceKey).not.toBeNull();
+    if (!binanceKey) throw new Error('missing binance key');
+
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/portfolio-workflows',
+      cookies: authCookies(userId),
+      payload: {
+        model: 'gpt-5',
+        tokens: [
+          { token: 'BTC', minAllocation: 10 },
+          { token: 'ETH', minAllocation: 20 },
+        ],
+        risk: 'low',
+        reviewInterval: '1h',
+        agentInstructions: 'prompt',
+        cash: 'USDT',
+        status: 'inactive',
+        exchangeKeyId: binanceKey.id,
+        mode: 'futures' as const,
+        futuresDefaultLeverage: 5,
+        futuresMarginMode: 'cross' as const,
+      },
+    });
+
+    expect(createRes.statusCode).toBe(200);
+    const workflowId = createRes.json().id as string;
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(() => {
+      throw new Error('spot validation should be skipped for futures');
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    let startRes: Awaited<ReturnType<typeof app.inject>>;
+    try {
+      startRes = await app.inject({
+        method: 'POST',
+        url: `/api/portfolio-workflows/${workflowId}/start`,
+        cookies: authCookies(userId),
+      });
+    } finally {
+      (globalThis as any).fetch = originalFetch;
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(startRes.statusCode).toBe(200);
+    expect(startRes.json().mode).toBe('futures');
+    expect(startRes.json().startBalanceUsd).toBeNull();
 
     await app.close();
   });

@@ -20,6 +20,9 @@ export interface PortfolioWorkflow {
   useEarn: boolean;
   aiApiKeyId: string | null;
   exchangeApiKeyId: string | null;
+  mode: 'spot' | 'futures';
+  futuresDefaultLeverage: number | null;
+  futuresMarginMode: 'cross' | 'isolated' | null;
   ownerEmail?: string | null;
 }
 

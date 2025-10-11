@@ -88,6 +88,20 @@ const workflowUpsertSchema = z
       .union([z.string().regex(/^\d+$/), z.null()])
       .optional()
       .transform((value) => (value === undefined ? null : value)),
+    mode: z
+      .enum(['spot', 'futures'])
+      .optional()
+      .transform((value) => value ?? 'spot'),
+    futuresDefaultLeverage: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .transform((value) => (value === undefined ? null : value)),
+    futuresMarginMode: z
+      .enum(['cross', 'isolated'])
+      .optional()
+      .transform((value) => (value === undefined ? null : value)),
   })
   .strip();
 
@@ -430,6 +444,9 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
         exchangeKeyId: validated.exchangeKeyId,
+        mode: validated.mode,
+        futuresDefaultLeverage: validated.futuresDefaultLeverage,
+        futuresMarginMode: validated.futuresMarginMode,
       });
       if (status === PortfolioWorkflowStatus.Active)
         reviewWorkflowPortfolio(req.log, row.id).catch((err) =>
@@ -797,6 +814,9 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
         exchangeKeyId: validated.exchangeKeyId,
+        mode: validated.mode,
+        futuresDefaultLeverage: validated.futuresDefaultLeverage,
+        futuresMarginMode: validated.futuresMarginMode,
       });
       const row = (await getPortfolioWorkflow(id))!;
       if (status === PortfolioWorkflowStatus.Active)
@@ -848,28 +868,42 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         return reply.code(400).send(errorResponse('model required'));
       }
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
+      const isFuturesWorkflow = existing.mode === 'futures';
       const ensuredKeys = await ensureApiKeys(log, userId, {
         exchangeKeyId: existing.exchangeApiKeyId,
         aiProvider,
+        preferredExchange: isFuturesWorkflow ? undefined : 'binance',
       });
       if ('code' in ensuredKeys)
         return reply.code(ensuredKeys.code).send(ensuredKeys.body);
       const exchangeProvider = ensuredKeys.exchangeProvider ?? 'binance';
-      const pairErr = await validateTradingPairs(
-        log,
-        existing.cashToken,
-        tokens,
-        exchangeProvider,
-      );
-      if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
       const conflict = await validateTokenConflicts(log, userId, tokens, id);
       if (conflict) return reply.code(conflict.code).send(conflict.body);
       let startBalance: number | null = null;
-      if (exchangeProvider === 'binance') {
-        const bal = await getStartBalance(log, userId, tokens);
-        if (typeof bal !== 'number')
-          return reply.code(bal.code).send(bal.body);
-        startBalance = bal;
+      if (isFuturesWorkflow) {
+        if (
+          existing.futuresDefaultLeverage === null ||
+          existing.futuresMarginMode === null
+        ) {
+          log.error('missing futures configuration');
+          return reply
+            .code(400)
+            .send(errorResponse('futures configuration required'));
+        }
+      } else {
+        const pairErr = await validateTradingPairs(
+          log,
+          existing.cashToken,
+          tokens,
+          exchangeProvider,
+        );
+        if (pairErr) return reply.code(pairErr.code).send(pairErr.body);
+        if (exchangeProvider === 'binance') {
+          const bal = await getStartBalance(log, userId, tokens);
+          if (typeof bal !== 'number')
+            return reply.code(bal.code).send(bal.body);
+          startBalance = bal;
+        }
       }
       await repoStartWorkflow(id, startBalance, aiProvider);
       reviewWorkflowPortfolio(req.log, id).catch((err) =>

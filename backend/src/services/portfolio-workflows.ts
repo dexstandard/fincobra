@@ -151,6 +151,7 @@ async function validateWorkflowInput(
         agentInstructions: body.agentInstructions,
         manualRebalance: body.manualRebalance,
         useEarn: body.useEarn,
+        mode: body.mode,
       },
       id,
     );
@@ -285,6 +286,36 @@ export async function preparePortfolioWorkflowForUpsert(
 ): Promise<
   { body: PortfolioWorkflowInput; startBalance: number | null } | ValidationErr
 > {
+  body.mode = body.mode ?? 'spot';
+  if (body.mode === 'spot') {
+    body.futuresDefaultLeverage = null;
+    body.futuresMarginMode = null;
+  } else {
+    if (
+      body.futuresDefaultLeverage === null ||
+      body.futuresDefaultLeverage === undefined
+    ) {
+      log.error('missing futures leverage');
+      return {
+        code: 400,
+        body: errorResponse('futures leverage required'),
+      };
+    }
+    if (body.futuresDefaultLeverage < 1 || body.futuresDefaultLeverage > 125) {
+      log.error('invalid futures leverage');
+      return {
+        code: 400,
+        body: errorResponse('invalid futures leverage'),
+      };
+    }
+    if (!body.futuresMarginMode) {
+      log.error('missing futures margin mode');
+      return {
+        code: 400,
+        body: errorResponse('futures margin mode required'),
+      };
+    }
+  }
   try {
     body.manualRebalance = !!body.manualRebalance;
     body.useEarn = body.useEarn === true;
@@ -301,10 +332,14 @@ export async function preparePortfolioWorkflowForUpsert(
   const err = await validateWorkflowInput(log, userId, body, id);
   if (err) return err;
 
+  const requiresExchangeKey =
+    body.status === PortfolioWorkflowStatus.Active;
   const ensuredKeys = await ensureApiKeys(log, userId, {
     exchangeKeyId: body.exchangeKeyId,
     requireAi: body.status === PortfolioWorkflowStatus.Active,
-    requireExchange: body.status === PortfolioWorkflowStatus.Active,
+    requireExchange: requiresExchangeKey,
+    preferredExchange:
+      requiresExchangeKey && body.mode === 'spot' ? 'binance' : undefined,
     aiProvider: body.aiProvider,
   });
   if ('code' in ensuredKeys) return ensuredKeys;
@@ -312,8 +347,16 @@ export async function preparePortfolioWorkflowForUpsert(
 
   const exchangeProvider = ensuredKeys.exchangeProvider ?? 'binance';
 
+  if (body.mode === 'futures' && !ensuredKeys.exchangeProvider && requiresExchangeKey) {
+    log.error('missing exchange key for futures');
+    return { code: 400, body: errorResponse('missing api keys') };
+  }
+
   let startBalance: number | null = null;
-  if (body.status === PortfolioWorkflowStatus.Active) {
+  if (
+    body.status === PortfolioWorkflowStatus.Active &&
+    body.mode === 'spot'
+  ) {
     const pairErr = await validateTradingPairs(
       log,
       body.cash,

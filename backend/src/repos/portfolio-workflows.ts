@@ -32,6 +32,9 @@ export function toApi(row: PortfolioWorkflow) {
     agentInstructions: row.agentInstructions,
     manualRebalance: row.manualRebalance,
     useEarn: row.useEarn,
+    mode: row.mode,
+    futuresDefaultLeverage: row.futuresDefaultLeverage ?? null,
+    futuresMarginMode: row.futuresMarginMode ?? null,
     aiApiKeyId: row.aiApiKeyId ?? null,
     exchangeApiKeyId: row.exchangeApiKeyId ?? null,
     ownerEmail:
@@ -46,6 +49,7 @@ const baseSelect = `
          COALESCE(json_agg(json_build_object('token', t.token, 'min_allocation', t.min_allocation) ORDER BY t.position)
                   FILTER (WHERE t.token IS NOT NULL), '[]') AS tokens,
          pw.risk, pw.review_interval, pw.agent_instructions, pw.manual_rebalance, pw.use_earn,
+         pw.mode, pw.futures_default_leverage, pw.futures_margin_mode,
          CASE
            WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
            WHEN pw.ai_provider = 'groq' THEN gk.id
@@ -166,8 +170,8 @@ export async function findIdenticalInactiveWorkflow(
     WHERE pw.user_id = $1 AND pw.status = 'inactive' AND ($2::bigint IS NULL OR pw.id != $2)
       AND pw.model = $3 AND pw.cash_token = $4
       AND pw.risk = $5 AND pw.review_interval = $6 AND pw.agent_instructions = $7 AND pw.manual_rebalance = $8 AND pw.use_earn = $9
-      AND pw.ai_provider = $10
-      AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $11::jsonb`;
+      AND pw.ai_provider = $10 AND pw.mode = $11
+      AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $12::jsonb`;
   const params: unknown[] = [
     data.userId,
     excludeId ?? null,
@@ -179,6 +183,7 @@ export async function findIdenticalInactiveWorkflow(
     data.manualRebalance,
     data.useEarn,
     data.aiProvider,
+    data.mode,
     JSON.stringify(
       data.tokens.map((t) => ({
         token: t.token,
@@ -232,8 +237,8 @@ export async function insertPortfolioWorkflow(
   let id = '';
   await withTransaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO portfolio_workflow (user_id, model, ai_provider, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn, exchange_key_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO portfolio_workflow (user_id, model, ai_provider, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn, exchange_key_id, mode, futures_default_leverage, futures_margin_mode)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id`,
       [
         data.userId,
@@ -248,6 +253,9 @@ export async function insertPortfolioWorkflow(
         data.manualRebalance,
         data.useEarn,
         data.exchangeKeyId,
+        data.mode ?? 'spot',
+        data.futuresDefaultLeverage ?? null,
+        data.futuresMarginMode ?? null,
       ],
     );
     id = rows[0].id as string;
@@ -271,7 +279,7 @@ export async function updatePortfolioWorkflow(
 ): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `UPDATE portfolio_workflow SET model = $1, ai_provider = $2, status = $3, cash_token = $4, risk = $5, review_interval = $6, agent_instructions = $7, start_balance = $8, manual_rebalance = $9, use_earn = $10, exchange_key_id = $11 WHERE id = $12`,
+      `UPDATE portfolio_workflow SET model = $1, ai_provider = $2, status = $3, cash_token = $4, risk = $5, review_interval = $6, agent_instructions = $7, start_balance = $8, manual_rebalance = $9, use_earn = $10, exchange_key_id = $11, mode = $12, futures_default_leverage = $13, futures_margin_mode = $14 WHERE id = $15`,
       [
         data.model,
         data.aiProvider,
@@ -284,6 +292,9 @@ export async function updatePortfolioWorkflow(
         data.manualRebalance,
         data.useEarn,
         data.exchangeKeyId,
+        data.mode ?? 'spot',
+        data.futuresDefaultLeverage ?? null,
+        data.futuresMarginMode ?? null,
         data.id,
       ],
     );
@@ -343,6 +354,7 @@ export async function getActivePortfolioWorkflowById(
   const sql = `SELECT pw.id, pw.user_id, pw.model, pw.ai_provider,
                       pw.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       pw.risk, pw.review_interval, pw.agent_instructions,
+                      pw.mode, pw.futures_default_leverage, pw.futures_margin_mode,
                       CASE
                         WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
                         WHEN pw.ai_provider = 'groq' THEN gk.id
@@ -384,6 +396,7 @@ export async function getActivePortfolioWorkflowsByInterval(
   const sql = `SELECT pw.id, pw.user_id, pw.model, pw.ai_provider,
                       pw.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       pw.risk, pw.review_interval, pw.agent_instructions,
+                      pw.mode, pw.futures_default_leverage, pw.futures_margin_mode,
                       CASE
                         WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
                         WHEN pw.ai_provider = 'groq' THEN gk.id
@@ -421,6 +434,7 @@ export async function getActivePortfolioWorkflowsByInterval(
 const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model, pw.ai_provider,
                       pw.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       pw.risk, pw.review_interval, pw.agent_instructions,
+                      pw.mode, pw.futures_default_leverage, pw.futures_margin_mode,
                       CASE
                         WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
                         WHEN pw.ai_provider = 'groq' THEN gk.id

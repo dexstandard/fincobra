@@ -55,10 +55,20 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const [aiProvider, setAiProvider] = useState<AiProvider>(
     workflow?.aiProvider ?? 'openai',
   );
-  const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
+  const [tradingMode, setTradingMode] = useState<TradingMode>(
+    workflow?.mode ?? 'spot',
+  );
   const [selectedExchange, setSelectedExchange] = useState<'binance' | 'bybit'>(
     'binance',
   );
+  const [futuresLeverage, setFuturesLeverage] = useState(
+    workflow?.futuresDefaultLeverage
+      ? workflow.futuresDefaultLeverage.toString()
+      : '20',
+  );
+  const [futuresMarginMode, setFuturesMarginMode] = useState<
+    'cross' | 'isolated'
+  >(workflow?.futuresMarginMode ?? 'cross');
   const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? false);
   const [tokenSymbols, setTokenSymbols] = useState(
     defaultValues.tokens.map((t) => t.token),
@@ -136,12 +146,22 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     setUseEarn(workflow?.useEarn ?? false);
     setInstructions(workflow?.agentInstructions || DEFAULT_AGENT_INSTRUCTIONS);
     setManualRebalance(workflow?.manualRebalance || false);
+    setTradingMode(workflow?.mode ?? 'spot');
+    setFuturesLeverage(
+      workflow?.futuresDefaultLeverage
+        ? workflow.futuresDefaultLeverage.toString()
+        : '20',
+    );
+    setFuturesMarginMode(workflow?.futuresMarginMode ?? 'cross');
   }, [
     workflowFormValues,
     workflow?.agentInstructions,
     workflow?.manualRebalance,
     workflow?.useEarn,
     reset,
+    workflow?.mode,
+    workflow?.futuresDefaultLeverage,
+    workflow?.futuresMarginMode,
   ]);
 
   useEffect(() => {
@@ -232,6 +252,10 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
       </div>
     );
   }
+
+  const futuresLeverageValue = Number.parseInt(futuresLeverage, 10);
+  const futuresLeverageValid =
+    Number.isFinite(futuresLeverageValue) && futuresLeverageValue >= 1;
 
   return (
     <div className="p-4">
@@ -354,18 +378,79 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
                 }
               </p>
             </div>
+            {tradingMode === 'futures' && (
+              <div className="mt-4 space-y-3">
+                <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {t('futures_agent_warning')}
+                </div>
+                <div>
+                  <label
+                    htmlFor="futures-default-leverage"
+                    className="block text-md font-bold"
+                  >
+                    {t('futures_default_leverage')}
+                  </label>
+                  <input
+                    id="futures-default-leverage"
+                    type="number"
+                    min={1}
+                    max={125}
+                    value={futuresLeverage}
+                    onChange={(e) => setFuturesLeverage(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 p-2"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('futures_default_leverage_hint')}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-md font-bold">
+                    {t('futures_margin_mode')}
+                  </span>
+                  <div className="mt-2 flex gap-2">
+                    {(['cross', 'isolated'] as const).map((mode) => {
+                      const isActive = futuresMarginMode === mode;
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setFuturesMarginMode(mode)}
+                          className={`px-3 py-1.5 rounded border text-sm transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white border-transparent'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {mode === 'cross'
+                            ? t('futures_margin_mode_cross')
+                            : t('futures_margin_mode_isolated')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       <div className="mt-4 max-w-xl">
         <WarningSign>
-          {t('trading_agent_warning').replace(
-            '{tokens}',
-            tokenSymbols.map((t) => t.toUpperCase()).join(` ${t('and')} `),
-          )}
-          <br />
-          <strong>{t('dont_move_funds_warning')}</strong>
+          {tradingMode === 'spot'
+            ? (
+                <>
+                  {t('trading_agent_warning').replace(
+                    '{tokens}',
+                    tokenSymbols
+                      .map((t) => t.toUpperCase())
+                      .join(` ${t('and')} `),
+                  )}
+                  <br />
+                  <strong>{t('dont_move_funds_warning')}</strong>
+                </>
+              )
+            : t('futures_wallet_warning')}
         </WarningSign>
         <label className="mt-4 flex items-center gap-2">
           <input
@@ -390,6 +475,12 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               try {
                 const values = methods.getValues();
                 const [cashToken, ...positions] = values.tokens;
+                const leverage = Number.parseInt(futuresLeverage, 10);
+                if (tradingMode === 'futures' && !futuresLeverageValid) {
+                  toast.show(t('futures_leverage_required'));
+                  setIsSaving(false);
+                  return;
+                }
                 const payload = {
                   model,
                   aiProvider,
@@ -405,6 +496,11 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
                   useEarn,
                   status: 'inactive',
                   exchangeKeyId: selectedExchangeKeyId,
+                  mode: tradingMode,
+                  futuresDefaultLeverage:
+                    tradingMode === 'futures' ? leverage : null,
+                  futuresMarginMode:
+                    tradingMode === 'futures' ? futuresMarginMode : null,
                 };
                 if (workflow) {
                   await api.put(`/portfolio-workflows/${workflow.id}`, payload);
@@ -440,6 +536,11 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               useEarn,
               exchangeKeyId: selectedExchangeKeyId,
               aiProvider,
+              mode: tradingMode,
+              futuresDefaultLeverage:
+                tradingMode === 'futures' ? futuresLeverageValue : null,
+              futuresMarginMode:
+                tradingMode === 'futures' ? futuresMarginMode : null,
             }}
             model={model}
             disabled={
@@ -447,7 +548,8 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               !(aiProvider === 'groq' ? hasGroqKey : hasOpenAIKey) ||
               !hasExchangeKey ||
               !model ||
-              !selectedExchangeKeyId
+              !selectedExchangeKeyId ||
+              (tradingMode === 'futures' && !futuresLeverageValid)
             }
           />
         </div>

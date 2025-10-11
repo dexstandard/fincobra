@@ -19,6 +19,9 @@ interface WorkflowPreviewDetails {
   useEarn: boolean;
   exchangeKeyId: string | null;
   aiProvider: 'openai' | 'groq';
+  mode: 'spot' | 'futures';
+  futuresDefaultLeverage: number | null;
+  futuresMarginMode: 'cross' | 'isolated' | null;
 }
 
 interface Props {
@@ -48,6 +51,14 @@ export default function WorkflowStartButton({
       toast.show(t('model_required'));
       return;
     }
+    if (
+      workflowData.mode === 'futures' &&
+      (!workflowData.futuresDefaultLeverage ||
+        workflowData.futuresDefaultLeverage < 1)
+    ) {
+      toast.show(t('futures_leverage_required'));
+      return;
+    }
     setConfirmOpen(false);
     setIsCreating(true);
     try {
@@ -75,6 +86,9 @@ export default function WorkflowStartButton({
           useEarn: workflowData.useEarn,
           status: 'active',
           exchangeKeyId: workflowData.exchangeKeyId,
+          mode: workflowData.mode,
+          futuresDefaultLeverage: workflowData.futuresDefaultLeverage,
+          futuresMarginMode: workflowData.futuresMarginMode,
         });
         navigate(`/portfolio-workflows/${res.data.id}`);
       }

@@ -12,6 +12,7 @@ export const insertPortfolioWorkflow = (
   insertWorkflowProd({
     aiProvider: 'openai',
     cashToken: 'USDT',
+    mode: 'spot',
     ...data,
   });
 export {

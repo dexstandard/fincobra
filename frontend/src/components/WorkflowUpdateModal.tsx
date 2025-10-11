@@ -66,10 +66,18 @@ export default function WorkflowUpdateModal({
   const [aiProvider, setAiProvider] = useState<AiProvider>(
     workflow.aiProvider ?? 'openai',
   );
-  const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
+  const [tradingMode, setTradingMode] = useState<TradingMode>(workflow.mode);
   const [selectedExchange, setSelectedExchange] = useState<'binance' | 'bybit'>(
     'binance',
   );
+  const [futuresLeverage, setFuturesLeverage] = useState(
+    workflow.futuresDefaultLeverage
+      ? workflow.futuresDefaultLeverage.toString()
+      : '20',
+  );
+  const [futuresMarginMode, setFuturesMarginMode] = useState<
+    'cross' | 'isolated'
+  >(workflow.futuresMarginMode ?? 'cross');
   const desiredExchange = selectedExchange;
   const {
     hasOpenAIKey,
@@ -116,8 +124,23 @@ export default function WorkflowUpdateModal({
         workflow.cashToken,
         ...workflow.tokens.map((t) => t.token),
       ]);
+      setTradingMode(workflow.mode);
+      setFuturesLeverage(
+        workflow.futuresDefaultLeverage
+          ? workflow.futuresDefaultLeverage.toString()
+          : '20',
+      );
+      setFuturesMarginMode(workflow.futuresMarginMode ?? 'cross');
     }
-  }, [open, workflow, reset, bybitKeyId, binanceKeyId]);
+  }, [
+    open,
+    workflow,
+    reset,
+    bybitKeyId,
+    binanceKeyId,
+    workflow.futuresDefaultLeverage,
+    workflow.futuresMarginMode,
+  ]);
 
   useEffect(() => {
     const hasAiKey = aiProvider === 'groq' ? hasGroqKey : hasOpenAIKey;
@@ -195,6 +218,10 @@ export default function WorkflowUpdateModal({
     [hasBinanceKey, hasBybitKey],
   );
 
+  const futuresLeverageValue = Number.parseInt(futuresLeverage, 10);
+  const futuresLeverageValid =
+    Number.isFinite(futuresLeverageValue) && futuresLeverageValue >= 1;
+
   const updateMut = useMutation<void, unknown, PortfolioReviewFormValues>({
     mutationFn: async (values: PortfolioReviewFormValues) => {
       const [cashToken, ...positions] = values.tokens;
@@ -213,6 +240,11 @@ export default function WorkflowUpdateModal({
         manualRebalance: workflow.manualRebalance,
         useEarn,
         exchangeKeyId: selectedExchangeKeyId,
+        mode: tradingMode,
+        futuresDefaultLeverage:
+          tradingMode === 'futures' ? futuresLeverageValue : null,
+        futuresMarginMode:
+          tradingMode === 'futures' ? futuresMarginMode : null,
       });
     },
     onSuccess: () => {
@@ -351,6 +383,59 @@ export default function WorkflowUpdateModal({
                 }
               </p>
             </div>
+            {tradingMode === 'futures' && (
+              <div className="mt-4 space-y-3">
+                <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {t('futures_agent_warning')}
+                </div>
+                <div>
+                  <label
+                    htmlFor="update-futures-default-leverage"
+                    className="block text-md font-bold"
+                  >
+                    {t('futures_default_leverage')}
+                  </label>
+                  <input
+                    id="update-futures-default-leverage"
+                    type="number"
+                    min={1}
+                    max={125}
+                    value={futuresLeverage}
+                    onChange={(e) => setFuturesLeverage(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 p-2"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('futures_default_leverage_hint')}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-md font-bold">
+                    {t('futures_margin_mode')}
+                  </span>
+                  <div className="mt-2 flex gap-2">
+                    {(['cross', 'isolated'] as const).map((mode) => {
+                      const isActive = futuresMarginMode === mode;
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setFuturesMarginMode(mode)}
+                          className={`px-3 py-1.5 rounded border text-sm transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white border-transparent'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {mode === 'cross'
+                            ? t('futures_margin_mode_cross')
+                            : t('futures_margin_mode_isolated')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="mt-4">
               <WalletBalances
                 balances={balances}
@@ -367,6 +452,10 @@ export default function WorkflowUpdateModal({
           disabled={updateMut.isPending}
           loading={updateMut.isPending}
           onClick={handleSubmit((values) => {
+            if (tradingMode === 'futures' && !futuresLeverageValid) {
+              toast.show(t('futures_leverage_required'));
+              return;
+            }
             setFormValues(values);
             setConfirmOpen(true);
           })}
