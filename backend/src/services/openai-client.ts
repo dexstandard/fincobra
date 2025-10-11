@@ -154,7 +154,10 @@ function filterSupportedModels(models: { id: string }[]): string[] {
     .map((m) => m.id)
     .filter(
       (id) =>
-        id.startsWith('gpt-5') || id.startsWith('o3') || id.includes('search'),
+        !id.includes('codex') &&
+        (id.startsWith('gpt-5') ||
+          id.startsWith('o3') ||
+          id.includes('search')),
     );
 }
 
