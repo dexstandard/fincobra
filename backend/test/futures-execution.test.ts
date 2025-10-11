@@ -51,6 +51,7 @@ describe('executeFuturesDecision', () => {
     });
 
     const futuresModule = {
+      setMarginMode: vi.fn().mockResolvedValue(undefined),
       setLeverage: vi.fn().mockResolvedValue(undefined),
       openPosition: vi.fn().mockResolvedValue(undefined),
       setStopLoss: vi.fn().mockResolvedValue(undefined),
@@ -85,6 +86,11 @@ describe('executeFuturesDecision', () => {
     });
 
     expect(outcome).toEqual({ executed: 1, failed: 0, skipped: 0 });
+    expect(futuresModule.setMarginMode).toHaveBeenCalledWith(userId, {
+      symbol: 'BTCUSDT',
+      marginMode: 'cross',
+      leverage: 10,
+    });
     expect(futuresModule.setLeverage).toHaveBeenCalledWith(userId, {
       symbol: 'BTCUSDT',
       leverage: 10,
@@ -195,6 +201,7 @@ describe('executeFuturesDecision', () => {
     });
 
     const futuresModule = {
+      setMarginMode: vi.fn(),
       setLeverage: vi.fn(),
       openPosition: vi.fn(),
       setStopLoss: vi.fn(),

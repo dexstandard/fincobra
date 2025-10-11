@@ -120,7 +120,8 @@ export async function executeFuturesDecision({
 
   for (const action of actions) {
     const symbol = normalizeSymbol(action.symbol);
-    const planned = {
+    const reduceOnly = resolveReduceOnly(action);
+    const planned: Record<string, unknown> = {
       exchange,
       symbol,
       action: action.action,
@@ -128,11 +129,12 @@ export async function executeFuturesDecision({
       type: action.type,
       quantity: action.quantity,
       price: action.price,
-      reduceOnly: resolveReduceOnly(action),
+      reduceOnly,
       leverage: action.leverage ?? defaultLeverage ?? null,
-      stopLoss: action.stopLoss,
-      takeProfit: action.takeProfit,
+      stopLoss: action.stopLoss ?? null,
+      takeProfit: action.takeProfit ?? null,
       notes: action.notes,
+      marginMode: marginMode ?? null,
     };
 
     if (!symbol) {
@@ -210,8 +212,17 @@ export async function executeFuturesDecision({
     planned.leverage = leverage;
     planned.stopLoss = stopLoss;
     planned.takeProfit = takeProfit;
+    planned.quantity = quantity;
 
     try {
+      if (marginMode && futuresGateway.setMarginMode) {
+        await futuresGateway.setMarginMode(userId, {
+          symbol,
+          marginMode,
+          ...(leverage !== null ? { leverage } : {}),
+        });
+      }
+
       if (leverage !== null) {
         await futuresGateway.setLeverage(userId, {
           symbol,
@@ -225,7 +236,7 @@ export async function executeFuturesDecision({
         quantity,
         type: action.type,
         price: action.price,
-        reduceOnly: resolveReduceOnly(action),
+        reduceOnly,
         ...(marginMode === 'isolated' ? { hedgeMode: false } : {}),
       });
 
