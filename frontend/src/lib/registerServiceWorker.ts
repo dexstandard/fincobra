@@ -57,7 +57,26 @@ async function registerServiceWorker(): Promise<void> {
   }
 
   registration.addEventListener('updatefound', () => {
-    activateWaitingWorker(registration.installing);
+    const installing = registration.installing;
+
+    if (!installing) {
+      return;
+    }
+
+    const handleStateChange = () => {
+      if (installing.state !== 'installed') {
+        return;
+      }
+
+      installing.removeEventListener('statechange', handleStateChange);
+      activateWaitingWorker(registration.waiting);
+    };
+
+    installing.addEventListener('statechange', handleStateChange);
+
+    if (installing.state === 'installed') {
+      handleStateChange();
+    }
   });
 
   const requestUpdate = () => {
