@@ -187,10 +187,10 @@ export async function executeWorkflow(
       return;
     }
     if (result.kind === 'retry') {
-      const referenceTime =
+      const referenceTime: number =
         typeof result.lastAiRequestAt === 'number'
           ? result.lastAiRequestAt
-          : lastAiRequestAt ?? attemptStartedAt;
+          : (lastAiRequestAt ?? attemptStartedAt);
       lastAiRequestAt = referenceTime;
       if (wf.aiProvider === 'groq') {
         const elapsed = Date.now() - referenceTime;
