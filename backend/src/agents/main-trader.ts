@@ -267,23 +267,23 @@ async function buildStablecoinOracleReport(
   try {
     const symbol: SupportedOracleSymbol = normalized;
     const quote = await getUsdPrice(symbol);
-    const quotes: Partial<
-      Record<SupportedOracleSymbol, StablecoinOracleQuoteReport>
-    > = {
-      [symbol]: {
-        usdPrice: quote.price,
-        updatedAt: quote.updatedAt.toISOString(),
-      },
+    const pair = `${symbol}/USD`;
+    const quotePayload: StablecoinOracleQuoteReport = {
+      usdPrice: quote.price,
+      updatedAt: quote.updatedAt.toISOString(),
     };
     return {
-      token: 'USDC/USDT',
+      token: pair,
       stablecoinOracle: {
-        pair: 'USDC/USDT',
-        quotes,
+        pair,
+        quote: quotePayload,
       },
     };
   } catch (err) {
-    log.error({ err }, 'failed to fetch stablecoin oracle quotes');
+    log.error(
+      { err, token: normalized },
+      'failed to fetch stablecoin oracle quote for stable cash token',
+    );
     return null;
   }
 }

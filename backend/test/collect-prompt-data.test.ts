@@ -201,17 +201,14 @@ describe('collectPromptData', () => {
     const prompt = await collectPromptData(row, mockLogger());
     expect(getUsdPriceMock).toHaveBeenCalledTimes(1);
     expect(getUsdPriceMock).toHaveBeenCalledWith('USDT');
-    const stableReport = prompt?.reports?.find((r) => r.token === 'USDC/USDT');
-    expect(stableReport?.stablecoinOracle?.pair).toBe('USDC/USDT');
-    expect(
-      stableReport?.stablecoinOracle?.quotes.USDT?.usdPrice ?? 0,
-    ).toBeCloseTo(0.999);
-    expect(
-      stableReport?.stablecoinOracle?.quotes.USDC,
-    ).toBeUndefined();
-    expect(
-      stableReport?.stablecoinOracle?.quotes.USDT?.updatedAt,
-    ).toBe('2025-01-01T00:00:00.000Z');
+    const stableReport = prompt?.reports?.find((r) => r.token === 'USDT/USD');
+    expect(stableReport?.stablecoinOracle?.pair).toBe('USDT/USD');
+    expect(stableReport?.stablecoinOracle?.quote.usdPrice ?? 0).toBeCloseTo(
+      0.999,
+    );
+    expect(stableReport?.stablecoinOracle?.quote.updatedAt).toBe(
+      '2025-01-01T00:00:00.000Z',
+    );
   });
 
   it('requests matching oracle quote for USDC cash token', async () => {
@@ -236,11 +233,11 @@ describe('collectPromptData', () => {
     const prompt = await collectPromptData(row, mockLogger());
     expect(getUsdPriceMock).toHaveBeenCalledTimes(1);
     expect(getUsdPriceMock).toHaveBeenCalledWith('USDC');
-    const stableReport = prompt?.reports?.find((r) => r.token === 'USDC/USDT');
-    expect(stableReport?.stablecoinOracle?.quotes.USDT).toBeUndefined();
-    expect(
-      stableReport?.stablecoinOracle?.quotes.USDC?.usdPrice ?? 0,
-    ).toBeCloseTo(1.001);
+    const stableReport = prompt?.reports?.find((r) => r.token === 'USDC/USD');
+    expect(stableReport?.stablecoinOracle?.pair).toBe('USDC/USD');
+    expect(stableReport?.stablecoinOracle?.quote.usdPrice ?? 0).toBeCloseTo(
+      1.001,
+    );
   });
 
   it('throws descriptive error when a token pair is unsupported', async () => {
