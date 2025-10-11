@@ -32,6 +32,7 @@ import type {
   NewsContext,
   PromptReport,
   StablecoinOracleQuoteReport,
+  StablecoinOracleReport,
 } from './main-trader.types.js';
 import {
   computeDerivedItem,
@@ -266,8 +267,9 @@ async function buildStablecoinOracleReport(
 
   try {
     const symbol: SupportedOracleSymbol = normalized;
+    const pair: StablecoinOracleReport['pair'] =
+      symbol === 'USDT' ? 'USDT/USD' : 'USDC/USD';
     const quote = await getUsdPrice(symbol);
-    const pair = `${symbol}/USD`;
     const quotePayload: StablecoinOracleQuoteReport = {
       usdPrice: quote.price,
       updatedAt: quote.updatedAt.toISOString(),
