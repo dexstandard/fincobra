@@ -17,6 +17,7 @@ import type { PortfolioWorkflow } from '../lib/useWorkflowData';
 
 import AgentInstructions from './AgentInstructions';
 import ApiKeyProviderSelector from './forms/ApiKeyProviderSelector';
+import type { AiProvider } from './forms/ApiKeyProviderSelector.types';
 import SelectInput from './forms/SelectInput';
 import PortfolioWorkflowFields from './forms/PortfolioWorkflowFields';
 import WalletBalances from './WalletBalances';
@@ -62,7 +63,7 @@ export default function WorkflowUpdateModal({
   ]);
 
   const [model, setModel] = useState(workflow.model || '');
-  const [aiProvider, setAiProvider] = useState<'openai' | 'groq'>(
+  const [aiProvider, setAiProvider] = useState<AiProvider>(
     workflow.aiProvider ?? 'openai',
   );
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');

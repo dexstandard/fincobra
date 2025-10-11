@@ -6,6 +6,7 @@ import axios from 'axios';
 import api from '../lib/axios';
 import { useUser } from '../lib/useUser';
 import ApiKeyProviderSelector from '../components/forms/ApiKeyProviderSelector';
+import type { AiProvider } from '../components/forms/ApiKeyProviderSelector.types';
 import SelectInput from '../components/forms/SelectInput';
 import { useToast } from '../lib/useToast';
 import Button from '../components/ui/Button';
@@ -52,7 +53,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const defaultValues = workflowFormValues ?? portfolioReviewDefaults;
 
   const [model, setModel] = useState(workflow?.model || '');
-  const [aiProvider, setAiProvider] = useState<'openai' | 'groq'>(
+  const [aiProvider, setAiProvider] = useState<AiProvider>(
     workflow?.aiProvider ?? 'openai',
   );
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');

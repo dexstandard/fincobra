@@ -78,6 +78,12 @@ vi.mock('../src/services/ai-service.js', async () => {
   return {
     ...actual,
     callAi: vi.fn().mockResolvedValue('ok'),
+    extractJson: vi.fn().mockReturnValue({
+      result: {
+        orders: [],
+        shortReport: 'ok',
+      },
+    }),
   };
 });
 
