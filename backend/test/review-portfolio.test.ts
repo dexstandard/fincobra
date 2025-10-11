@@ -235,7 +235,7 @@ describe('reviewPortfolio', () => {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'SELL', qty: 1 }],
       shortReport: 'ok',
     };
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, workflowId);
     expect(runMainTrader).toHaveBeenCalledTimes(1);
@@ -247,7 +247,10 @@ describe('reviewPortfolio', () => {
     );
     expect(btcReport?.news?.version).toBe('news_context.v1');
     const passedPrompt = runMainTrader.mock.calls[0]?.[1];
-    expect(passedPrompt?.reports?.find((r: any) => r.token === 'BTC')?.news)
+    expect(passedPrompt?.mode).toBe('spot');
+    expect(
+      passedPrompt?.prompt?.reports?.find((r: any) => r.token === 'BTC')?.news,
+    )
       .toBeDefined();
     expect(JSON.parse(row.response!)).toEqual(decision);
     const [res] = await getRecentReviewResults(workflowId, 1);
@@ -267,7 +270,7 @@ describe('reviewPortfolio', () => {
       ],
       shortReport: 's',
     };
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, agent2);
     expect(createDecisionLimitOrders).toHaveBeenCalledTimes(1);
@@ -279,7 +282,7 @@ describe('reviewPortfolio', () => {
   it('treats missing orders as a hold decision', async () => {
     const { workflowId } = await setupWorkflow(['BTC']);
     const decision = { shortReport: 'holding pattern' } as any;
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, workflowId);
     expect(createDecisionLimitOrders).not.toHaveBeenCalled();
@@ -297,7 +300,7 @@ describe('reviewPortfolio', () => {
       ],
       shortReport: 'retry',
     };
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const clearCachesSpy = vi.spyOn(mainTrader, 'clearMainTraderCaches');
     const firstOrderPromise = new Promise<void>((resolve) => {
       createDecisionLimitOrders.mockImplementationOnce(async () => {
@@ -335,7 +338,7 @@ describe('reviewPortfolio', () => {
       ],
       shortReport: 'retry',
     };
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const firstRunPromise = new Promise<void>((resolve) => {
       runMainTrader.mockImplementationOnce(async () => {
         resolve();
@@ -404,7 +407,7 @@ describe('reviewPortfolio', () => {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 }],
       shortReport: 's',
     };
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, agent3);
     expect(createDecisionLimitOrders).not.toHaveBeenCalled();
@@ -416,7 +419,7 @@ describe('reviewPortfolio', () => {
       orders: [{ pair: 'FOO', token: 'BTC', side: 'BUY', qty: 1 }],
       shortReport: 's',
     };
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, agent4);
     const [row] = await getRecentReviewResults(agent4, 1);
@@ -429,7 +432,7 @@ describe('reviewPortfolio', () => {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 0 }],
       shortReport: 's',
     };
-    runMainTrader.mockResolvedValue(decision);
+    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, agent5);
     const [row] = await getRecentReviewResults(agent5, 1);

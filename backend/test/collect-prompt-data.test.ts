@@ -151,6 +151,12 @@ describe('collectPromptData', () => {
     vi.mocked(fetchPairInfo).mockImplementation(defaultFetchPairInfo);
   });
 
+  async function getSpotPrompt(row: ActivePortfolioWorkflow) {
+    const result = await collectPromptData(row, mockLogger());
+    expect(result?.mode).toBe('spot');
+    return result?.prompt;
+  }
+
   it('includes start balance and PnL in prompt', async () => {
     const row: ActivePortfolioWorkflow = {
       id: '1',
@@ -168,9 +174,12 @@ describe('collectPromptData', () => {
       startBalance: 20000,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: '1',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
     expect(prompt?.portfolio.startBalanceUsd).toBe(20000);
     expect(prompt?.portfolio.startBalanceTs).toBe('2025-01-01T00:00:00.000Z');
     expect(prompt?.portfolio.pnlUsd).toBeCloseTo(1000);
@@ -196,12 +205,17 @@ describe('collectPromptData', () => {
       startBalance: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: 'stable-report',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
     expect(getUsdPriceMock).toHaveBeenCalledTimes(1);
     expect(getUsdPriceMock).toHaveBeenCalledWith('USDT');
-    const stableReport = prompt?.reports?.find((r) => r.token === 'USDT/USD');
+    const stableReport = prompt?.reports?.find(
+      (r) => r.token === 'USDT/USD',
+    );
     expect(stableReport?.stablecoinOracle?.pair).toBe('USDT/USD');
     expect(stableReport?.stablecoinOracle?.quote.usdPrice ?? 0).toBeCloseTo(
       0.999,
@@ -228,9 +242,12 @@ describe('collectPromptData', () => {
       startBalance: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: 'stable-report-usdc',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
     expect(getUsdPriceMock).toHaveBeenCalledTimes(1);
     expect(getUsdPriceMock).toHaveBeenCalledWith('USDC');
     const stableReport = prompt?.reports?.find((r) => r.token === 'USDC/USD');
@@ -257,6 +274,9 @@ describe('collectPromptData', () => {
       startBalance: 20000,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: '1',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
     vi.mocked(fetchPairPrice).mockImplementationOnce(() => {
@@ -287,9 +307,12 @@ describe('collectPromptData', () => {
       startBalance: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: '1',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
     expect(prompt?.previousReports).toHaveLength(3);
     expect(prompt?.previousReports?.[0]).toMatchObject({
       ts: '2025-01-05T00:00:00.000Z',
@@ -326,9 +349,12 @@ describe('collectPromptData', () => {
       startBalance: 20000,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: '1',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
 
     expect(prompt?.previousReports).toHaveLength(3);
     expect(prompt?.previousReports?.[0]?.pnlShiftUsd).toBeCloseTo(500);
@@ -356,9 +382,12 @@ describe('collectPromptData', () => {
       startBalance: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: '1',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
     expect(prompt?.portfolio.positions).toHaveLength(3);
     expect(prompt?.cash).toBe('USDT');
     expect(prompt?.routes).toHaveLength(3);
@@ -398,7 +427,7 @@ describe('collectPromptData', () => {
       portfolioId: '1',
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
     const btc = prompt?.portfolio.positions.find((p) => p.sym === 'BTC');
     const usdt = prompt?.portfolio.positions.find((p) => p.sym === 'USDT');
     expect(btc?.qty).toBe(1);
@@ -433,9 +462,12 @@ describe('collectPromptData', () => {
       startBalance: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: 'route-skip',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
-    const prompt = await collectPromptData(row, mockLogger());
+    const prompt = await getSpotPrompt(row);
     expect(prompt?.routes).toHaveLength(2);
     expect(prompt?.routes?.map((r) => r.pair)).toEqual(
       expect.arrayContaining(['BTCUSDT', 'ETHUSDT']),
@@ -464,6 +496,9 @@ describe('collectPromptData', () => {
       startBalance: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: 'route-fail',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
     await expect(collectPromptData(row, mockLogger())).rejects.toThrow(
@@ -488,6 +523,9 @@ describe('collectPromptData', () => {
       startBalance: null,
       createdAt: '2025-01-01T00:00:00.000Z',
       portfolioId: 'missing-interval',
+      mode: 'spot',
+      futuresDefaultLeverage: null,
+      futuresMarginMode: null,
     };
 
     await expect(collectPromptData(row, mockLogger())).rejects.toThrow(
@@ -555,9 +593,12 @@ describe('collectPromptData', () => {
         startBalance: null,
         createdAt: '2025-01-01T00:00:00.000Z',
         portfolioId: 'news-wf',
+        mode: 'spot',
+        futuresDefaultLeverage: null,
+        futuresMarginMode: null,
       };
 
-      const prompt = await collectPromptData(row, mockLogger());
+      const prompt = await getSpotPrompt(row);
       const news = prompt?.reports?.find((r) => r.token === 'BTC')?.news;
 
       expect(news?.version).toBe('news_context.v1');
@@ -607,9 +648,12 @@ describe('collectPromptData', () => {
         startBalance: null,
         createdAt: '2025-01-01T00:00:00.000Z',
         portfolioId: 'wf-cache',
+        mode: 'spot',
+        futuresDefaultLeverage: null,
+        futuresMarginMode: null,
       };
 
-      const firstPrompt = await collectPromptData(row, mockLogger());
+      const firstPrompt = await getSpotPrompt(row);
       expect(getNewsByTokenMock).toHaveBeenCalledTimes(1);
       const firstContext = firstPrompt?.reports?.find((r) => r.token === 'DOGE')?.news;
 
@@ -622,7 +666,7 @@ describe('collectPromptData', () => {
         },
       ]);
 
-      const secondPrompt = await collectPromptData(row, mockLogger());
+      const secondPrompt = await getSpotPrompt(row);
       expect(getNewsByTokenMock).toHaveBeenCalledTimes(1);
       const secondContext = secondPrompt?.reports?.find((r) => r.token === 'DOGE')?.news;
       expect(secondContext).toEqual(firstContext);
@@ -639,7 +683,7 @@ describe('collectPromptData', () => {
       ];
       getNewsByTokenMock.mockResolvedValueOnce(refreshedNews);
 
-      const thirdPrompt = await collectPromptData(row, mockLogger());
+      const thirdPrompt = await getSpotPrompt(row);
       expect(getNewsByTokenMock).toHaveBeenCalledTimes(2);
       const thirdContext = thirdPrompt?.reports?.find((r) => r.token === 'DOGE')?.news;
       expect(thirdContext).not.toEqual(firstContext);

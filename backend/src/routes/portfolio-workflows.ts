@@ -47,7 +47,10 @@ import type {
   MainTraderDecision,
   MainTraderOrder,
 } from '../agents/main-trader.types.js';
-import { developerInstructions } from '../agents/main-trader.js';
+import {
+  developerInstructions,
+  getDeveloperInstructionsForMode,
+} from '../agents/main-trader.js';
 import { adminOnlyPreHandlers, getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
@@ -149,6 +152,12 @@ const manualRebalanceBodySchema = z
   .strip()
   .optional()
   .transform((body): ManualRebalanceBody => body ?? {});
+
+const instructionsQuerySchema = z
+  .object({
+    mode: z.enum(['spot', 'futures']).optional(),
+  })
+  .strip();
 
 async function requireAuthenticatedUser(
   req: FastifyRequest,
@@ -518,9 +527,17 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       config: { rateLimit: RATE_LIMITS.RELAXED },
       preHandler: sessionPreHandlers,
     },
-    async (req) => {
-      req.log.info('fetched developer instructions');
-      return { instructions: developerInstructions };
+    async (req, reply) => {
+      const parsed = instructionsQuerySchema.safeParse(req.query ?? {});
+      if (!parsed.success) {
+        req.log.warn({ err: parsed.error }, 'invalid instructions query');
+        return reply
+          .code(400)
+          .send(errorResponse(ERROR_MESSAGES.validationFailed));
+      }
+      const mode = parsed.data.mode ?? 'spot';
+      req.log.info({ mode }, 'fetched developer instructions');
+      return { instructions: getDeveloperInstructionsForMode(mode) };
     },
   );
 

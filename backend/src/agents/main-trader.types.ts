@@ -1,144 +1,68 @@
-import type { FastifyBaseLogger } from 'fastify';
-import type { AiApiProvider } from '../repos/ai-api-key.types.js';
-import type { MarketOverviewPayload } from '../services/indicators.types.js';
-import type { SupportedOracleSymbol } from '../services/price-oracle.types.js';
-export interface RunParams {
-  log: FastifyBaseLogger;
-  model: string;
-  apiKey: string;
-  portfolioId: string;
-  aiProvider: AiApiProvider;
-}
+import type { PortfolioWorkflowMode } from '../repos/portfolio-workflows.types.js';
+import type {
+  RunParams,
+  SpotRebalancePrompt,
+  SpotRebalancePosition,
+  SpotPreviousReport,
+  SpotPreviousReportOrder,
+  SpotPromptReport,
+  SpotNewsContext,
+  SpotStablecoinOracleQuoteReport,
+  SpotStablecoinOracleReport,
+  SpotTraderDecision,
+  SpotTraderOrder,
+} from './spot-trader.types.js';
+import type {
+  FuturesTraderDecision,
+  FuturesTraderPrompt,
+  FuturesTraderAction,
+  FuturesTraderWalletBalance,
+  FuturesTraderPosition,
+  FuturesTraderFundingRate,
+  FuturesTraderRiskLimit,
+} from './futures-trader.types.js';
 
-export interface RebalancePosition {
-  sym: string;
-  qty: number;
-  priceUsdt: number;
-  valueUsdt: number;
-}
+export type {
+  RunParams,
+  SpotRebalancePrompt,
+  SpotRebalancePosition,
+  SpotPreviousReport,
+  SpotPreviousReportOrder,
+  SpotPromptReport,
+  SpotNewsContext,
+  SpotStablecoinOracleQuoteReport,
+  SpotStablecoinOracleReport,
+  SpotTraderDecision,
+  SpotTraderOrder,
+} from './spot-trader.types.js';
 
-export interface PreviousReportOrder {
-  symbol: string;
-  side: string;
-  qty: number;
-  status: string;
-  price?: number;
-  reason?: string;
-}
+export type {
+  FuturesTraderDecision,
+  FuturesTraderPrompt,
+  FuturesTraderAction,
+  FuturesTraderWalletBalance,
+  FuturesTraderPosition,
+  FuturesTraderFundingRate,
+  FuturesTraderRiskLimit,
+} from './futures-trader.types.js';
 
-export interface PreviousReport {
-  ts: string;
-  orders?: PreviousReportOrder[];
-  shortReport?: string;
-  error?: unknown;
-  strategyName?: string;
-  pnlShiftUsd?: number;
-}
+export type RebalancePrompt = SpotRebalancePrompt;
+export type RebalancePosition = SpotRebalancePosition;
+export type PreviousReport = SpotPreviousReport;
+export type PreviousReportOrder = SpotPreviousReportOrder;
+export type PromptReport = SpotPromptReport;
+export type NewsContext = SpotNewsContext;
+export type StablecoinOracleQuoteReport = SpotStablecoinOracleQuoteReport;
+export type StablecoinOracleReport = SpotStablecoinOracleReport;
+export type MainTraderDecision = SpotTraderDecision;
+export type MainTraderOrder = SpotTraderOrder;
 
-export interface RoutePrice {
-  pair: string;
-  price: number;
-  [token: string]: { minNotional: number } | string | number;
-}
+export type TraderPromptResult =
+  | { mode: 'spot'; prompt: SpotRebalancePrompt }
+  | { mode: 'futures'; prompt: FuturesTraderPrompt };
 
-export interface MarketTimeseries {
-  ret60m: number;
-  ret24h: number;
-  ret24m: number;
-}
+export type TraderRunResult =
+  | { mode: 'spot'; decision: SpotTraderDecision | null }
+  | { mode: 'futures'; decision: FuturesTraderDecision | null };
 
-export interface NewsContextItem {
-  title: string;
-  link: string | null;
-  pubDate: string | null;
-  domain: string | null;
-  eventType: string;
-  polarity: 'bullish' | 'bearish' | 'neutral';
-  severity: number;
-  eventConfidence: number;
-  headlineScore: number;
-}
-
-export interface NewsContext {
-  version: 'news_context.v1';
-  bias: number;
-  maxSev: number;
-  maxConf: number;
-  bull: number;
-  bear: number;
-  top: string | null;
-  warning: string;
-  items: NewsContextItem[];
-}
-
-export interface StablecoinOracleQuoteReport {
-  usdPrice: number;
-  updatedAt: string;
-}
-
-export interface StablecoinOracleReport {
-  pair: 'USDT/USD' | 'USDC/USD';
-  quote: StablecoinOracleQuoteReport;
-}
-
-export interface PromptReport {
-  token: string;
-  news?: NewsContext;
-  stablecoinOracle?: StablecoinOracleReport;
-}
-
-export interface RebalancePrompt {
-  reviewInterval: string;
-  policy: { floor: Record<string, number> };
-  cash: string;
-  portfolio: {
-    ts: string;
-    positions: RebalancePosition[];
-    startBalanceUsd?: number;
-    startBalanceTs?: string;
-    pnlUsd?: number;
-    pnlPct?: number;
-  };
-  routes: RoutePrice[];
-  marketData: {
-    marketOverview?: MarketOverviewPayload;
-    marketTimeseries?: Record<string, MarketTimeseries>;
-    fearGreedIndex?: { value: number; classification: string };
-    openInterest?: number;
-    fundingRate?: number;
-  };
-  previousReports?: PreviousReport[];
-  reports?: PromptReport[];
-}
-
-export interface MainTraderFuturesIntent {
-  positionSide: 'LONG' | 'SHORT';
-  quantity?: number;
-  type?: 'MARKET' | 'LIMIT';
-  price?: number;
-  reduceOnly?: boolean;
-  leverage?: number;
-  stopLoss?: number;
-  takeProfit?: number;
-  hedgeMode?: boolean;
-  positionIdx?: 0 | 1 | 2;
-}
-
-export interface MainTraderOrder {
-  pair: string;
-  token: string;
-  side: string;
-  qty: number;
-  limitPrice: number;
-  basePrice: number;
-  maxPriceDriftPct: number;
-  exchange?: 'binance' | 'bybit';
-  futures?: MainTraderFuturesIntent | null;
-}
-
-export interface MainTraderDecision {
-  orders: MainTraderOrder[];
-  shortReport: string;
-  strategyName?: string;
-  strategyRationale?: string;
-}
+export type TraderMode = PortfolioWorkflowMode;

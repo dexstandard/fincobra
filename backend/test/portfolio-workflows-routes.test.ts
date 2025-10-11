@@ -27,7 +27,10 @@ import { cancelOrder } from '../src/services/binance-client.js';
 import { authCookies } from './helpers.js';
 import * as orderOrchestrator from '../src/services/order-orchestrator.js';
 import { CANCEL_ORDER_REASONS } from '../src/services/order-orchestrator.types.js';
-import { developerInstructions } from '../src/agents/main-trader.js';
+import {
+  developerInstructions,
+  getDeveloperInstructionsForMode,
+} from '../src/agents/main-trader.js';
 
 vi.mock('../src/workflows/portfolio-review.js', () => ({
   reviewWorkflowPortfolio: vi.fn(() => Promise.resolve()),
@@ -1134,6 +1137,21 @@ describe('portfolio workflow routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ instructions: developerInstructions });
+    await app.close();
+  });
+
+  it('returns futures developer instructions when requested', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('dev-futures');
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/developer-instructions?mode=futures',
+      cookies: authCookies(userId),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      instructions: getDeveloperInstructionsForMode('futures'),
+    });
     await app.close();
   });
 });
