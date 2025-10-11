@@ -1,4 +1,8 @@
-import { type ReactElement } from 'react';
+import {
+  type Dispatch,
+  type ReactElement,
+  type SetStateAction,
+} from 'react';
 
 import { useQueries } from '@tanstack/react-query';
 import axios from 'axios';
@@ -8,16 +12,20 @@ import SelectInput from './SelectInput';
 import AiApiKeySection from './AiApiKeySection';
 import ExchangeApiKeySection from './ExchangeApiKeySection';
 import GroqApiKeySection from './GroqApiKeySection';
+import type {
+  AiProvider,
+  ExchangeProvider,
+} from './ApiKeyProviderSelector.types';
 
-interface ProviderConfig {
-  value: string;
+interface ProviderConfig<TValue extends string> {
+  value: TValue;
   label: string;
   queryKey: string;
   getKeyPath: (id: string) => string;
   renderForm: () => ReactElement;
 }
 
-const aiBaseConfigs: ProviderConfig[] = [
+const aiBaseConfigs: ProviderConfig<AiProvider>[] = [
   {
     value: 'openai',
     label: 'OpenAI',
@@ -34,7 +42,7 @@ const aiBaseConfigs: ProviderConfig[] = [
   },
 ];
 
-const exchangeConfigs: ProviderConfig[] = [
+const exchangeConfigs: ProviderConfig<ExchangeProvider>[] = [
   {
     value: 'binance',
     label: 'Binance',
@@ -69,29 +77,75 @@ const exchangeConfigs: ProviderConfig[] = [
   },
 ];
 
-interface Props {
-  type: 'ai' | 'exchange';
+interface AiProps {
+  type: 'ai';
   label: string;
-  value: string;
-  onChange: (v: string) => void;
+  value: AiProvider;
+  onChange: Dispatch<SetStateAction<AiProvider>>;
 }
 
-export default function ApiKeyProviderSelector({
+interface ExchangeProps {
+  type: 'exchange';
+  label: string;
+  value: ExchangeProvider;
+  onChange: Dispatch<SetStateAction<ExchangeProvider>>;
+}
+
+type Props = AiProps | ExchangeProps;
+
+export default function ApiKeyProviderSelector(props: Props) {
+  const { user } = useUser();
+
+  if (!user) return null;
+
+  if (props.type === 'ai') {
+    return (
+      <ProviderSelector
+        type="ai"
+        label={props.label}
+        value={props.value}
+        onChange={props.onChange}
+        configs={aiBaseConfigs}
+        userId={user.id}
+      />
+    );
+  }
+
+  return (
+    <ProviderSelector
+      type="exchange"
+      label={props.label}
+      value={props.value}
+      onChange={props.onChange}
+      configs={exchangeConfigs}
+      userId={user.id}
+    />
+  );
+}
+
+interface ProviderSelectorProps<TValue extends string> {
+  type: 'ai' | 'exchange';
+  label: string;
+  value: TValue;
+  onChange: Dispatch<SetStateAction<TValue>>;
+  configs: ProviderConfig<TValue>[];
+  userId: string;
+}
+
+function ProviderSelector<TValue extends string>({
   type,
   label,
   value,
   onChange,
-}: Props) {
-  const { user } = useUser();
-  const baseConfigs = type === 'ai' ? aiBaseConfigs : exchangeConfigs;
-
+  configs,
+  userId,
+}: ProviderSelectorProps<TValue>) {
   const queries = useQueries({
-    queries: baseConfigs.map((cfg) => ({
-      queryKey: [cfg.queryKey, user?.id],
-      enabled: !!user,
+    queries: configs.map((cfg) => ({
+      queryKey: [cfg.queryKey, userId],
       queryFn: async () => {
         try {
-          const res = await api.get(cfg.getKeyPath(user!.id));
+          const res = await api.get(cfg.getKeyPath(userId));
           return res.data.key as string;
         } catch (err) {
           if (axios.isAxiosError(err) && err.response?.status === 404)
@@ -102,14 +156,10 @@ export default function ApiKeyProviderSelector({
     })),
   });
 
-  const configs = type === 'ai' ? aiBaseConfigs : exchangeConfigs;
-
-  const queryFor = (val: string) => {
-    const idx = baseConfigs.findIndex((c) => c.value === val);
+  const queryFor = (val: TValue) => {
+    const idx = configs.findIndex((c) => c.value === val);
     return queries[idx];
   };
-
-  if (!user) return null;
 
   const selectedIndex = Math.max(
     configs.findIndex((c) => c.value === value),
@@ -128,7 +178,7 @@ export default function ApiKeyProviderSelector({
           <SelectInput
             id={`${type}-provider`}
             value={value}
-            onChange={onChange}
+            onChange={(next) => onChange(next as TValue)}
             options={configs.map((p) => ({ value: p.value, label: p.label }))}
           />
           {hasKey === false && (
