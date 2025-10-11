@@ -13,6 +13,13 @@ import {
 } from '../src/services/binance-client.js';
 
 const getNewsByTokenMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+const getUsdPriceMock = vi.hoisted(() =>
+  vi.fn().mockImplementation(async (symbol: 'USDT' | 'USDC') => ({
+    symbol,
+    price: symbol === 'USDT' ? 0.999 : 1.001,
+    updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+  })),
+);
 
 function defaultFetchPairPrice(t1: string, t2: string) {
   if (t1 === 'USDT') {
@@ -122,11 +129,16 @@ vi.mock('../src/repos/review-raw-log.js', () => ({
     }),
 }));
 
+vi.mock('../src/services/price-oracle.js', () => ({
+  getUsdPrice: getUsdPriceMock,
+}));
+
 describe('collectPromptData', () => {
   beforeEach(() => {
     __resetNewsContextCacheForTest();
     getNewsByTokenMock.mockReset();
     getNewsByTokenMock.mockResolvedValue([]);
+    getUsdPriceMock.mockClear();
     vi.mocked(fetchAccount).mockResolvedValue({
       balances: [
         { asset: 'BTC', free: '1', locked: '0' },
@@ -165,6 +177,41 @@ describe('collectPromptData', () => {
     expect(prompt?.portfolio.pnlPct).toBeCloseTo(0.05);
     expect(prompt?.reviewInterval).toBe('PT1H');
     expect(prompt).not.toHaveProperty('instructions');
+  });
+
+  it('adds stablecoin oracle report when using stable cash token', async () => {
+    const row: ActivePortfolioWorkflow = {
+      id: 'stable-report',
+      userId: 'stable-user',
+      model: 'm',
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyId: null,
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: 'stable-report',
+    };
+
+    const prompt = await collectPromptData(row, mockLogger());
+    expect(getUsdPriceMock).toHaveBeenCalledWith('USDT');
+    expect(getUsdPriceMock).toHaveBeenCalledWith('USDC');
+    const stableReport = prompt?.reports?.find((r) => r.token === 'USDC/USDT');
+    expect(stableReport?.stablecoinOracle?.pair).toBe('USDC/USDT');
+    expect(
+      stableReport?.stablecoinOracle?.quotes.USDT.usdPrice ?? 0,
+    ).toBeCloseTo(0.999);
+    expect(
+      stableReport?.stablecoinOracle?.quotes.USDC.usdPrice ?? 0,
+    ).toBeCloseTo(1.001);
+    expect(
+      stableReport?.stablecoinOracle?.quotes.USDT.updatedAt,
+    ).toBe('2025-01-01T00:00:00.000Z');
   });
 
   it('throws descriptive error when a token pair is unsupported', async () => {

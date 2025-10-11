@@ -19,6 +19,7 @@ import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import { getNewsByToken } from '../repos/news.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
+import { getUsdPrice } from '../services/price-oracle.js';
 import type {
   RunParams,
   RebalancePosition,
@@ -249,6 +250,43 @@ async function getNewsContextWithCache(
 
   pendingNewsContexts.set(token, promise);
   return promise;
+}
+
+async function buildStablecoinOracleReport(
+  cashToken: string,
+  log: FastifyBaseLogger,
+): Promise<PromptReport | null> {
+  const normalized = cashToken.toUpperCase();
+  if (normalized !== 'USDT' && normalized !== 'USDC') {
+    return null;
+  }
+
+  try {
+    const [usdtQuote, usdcQuote] = await Promise.all([
+      getUsdPrice('USDT'),
+      getUsdPrice('USDC'),
+    ]);
+
+    return {
+      token: 'USDC/USDT',
+      stablecoinOracle: {
+        pair: 'USDC/USDT',
+        quotes: {
+          USDT: {
+            usdPrice: usdtQuote.price,
+            updatedAt: usdtQuote.updatedAt.toISOString(),
+          },
+          USDC: {
+            usdPrice: usdcQuote.price,
+            updatedAt: usdcQuote.updatedAt.toISOString(),
+          },
+        },
+      },
+    };
+  } catch (err) {
+    log.error({ err }, 'failed to fetch stablecoin oracle quotes');
+    return null;
+  }
 }
 
 export function __resetNewsContextCacheForTest(): void {
@@ -613,12 +651,21 @@ export async function collectPromptData(
   const nonStableTokens = tokens.filter((t) => !isStablecoin(t));
   const decisionInterval = normalizeDecisionInterval(row.reviewInterval);
   const ltfFrames = pickLtf(decisionInterval);
-  const reports = await Promise.all(
-    nonStableTokens.map(async (token) => ({
-      token,
-      news: await getNewsContextWithCache(token, log),
-    })),
-  );
+  const reports: PromptReport[] = [];
+  if (nonStableTokens.length) {
+    const tokenReports = await Promise.all(
+      nonStableTokens.map(async (token) => ({
+        token,
+        news: await getNewsContextWithCache(token, log),
+      })),
+    );
+    reports.push(...tokenReports);
+  }
+
+  const stablecoinOracleReport = await buildStablecoinOracleReport(cash, log);
+  if (stablecoinOracleReport) {
+    reports.push(stablecoinOracleReport);
+  }
 
   const prompt: RebalancePrompt = {
     reviewInterval: decisionInterval,

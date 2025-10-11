@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { AiApiProvider } from '../repos/ai-api-key.types.js';
 import type { MarketOverviewPayload } from '../services/indicators.types.js';
+import type { SupportedOracleSymbol } from '../services/price-oracle.types.js';
 export interface RunParams {
   log: FastifyBaseLogger;
   model: string;
@@ -70,9 +71,20 @@ export interface NewsContext {
   items: NewsContextItem[];
 }
 
+export interface StablecoinOracleQuoteReport {
+  usdPrice: number;
+  updatedAt: string;
+}
+
+export interface StablecoinOracleReport {
+  pair: 'USDC/USDT';
+  quotes: Record<SupportedOracleSymbol, StablecoinOracleQuoteReport>;
+}
+
 export interface PromptReport {
   token: string;
-  news: NewsContext;
+  news?: NewsContext;
+  stablecoinOracle?: StablecoinOracleReport;
 }
 
 export interface RebalancePrompt {
