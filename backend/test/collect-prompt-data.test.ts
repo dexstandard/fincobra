@@ -494,6 +494,9 @@ describe('collectPromptData', () => {
       expect(news?.bear ?? 0).toBeGreaterThan(0);
       expect(news?.bull ?? 0).toBeGreaterThan(0);
       expect(news?.top).toMatch(/^StablecoinDepeg — bearish \(sev=\d\.\d{2}\)/);
+      expect(news?.warning).toBe(
+        'Machine-estimated news risk. Verify the headlines and source links before reacting to avoid panic selling.',
+      );
     } finally {
       vi.useRealTimers();
     }

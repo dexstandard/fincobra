@@ -41,6 +41,7 @@ export const developerInstructions = [
   '- You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place orders consistent with those targets.',
   '- Use the market overview dataset for price action, higher-timeframe trend, returns, and risk flags.',
   '- Use the structured news feed for event risks.',
+  '- Verify critical news headlines (and their source links when needed) before acting so machine-tagged events do not trigger unnecessary panic selling.',
   '- If a bearish Hack | StablecoinDepeg | Outage with severity ≥ 0.75 appears, allow protective action even if technicals are neutral.',
   '- If your chosen strategy overlaps with any recent strategies, do not follow it blindly; provide evidence of expected alpha inside the rationale.',
   'Execution Rules',
@@ -113,6 +114,8 @@ export const rebalanceResponseSchema = {
 };
 
 const BIAS_DENOMINATOR_EPSILON = 1e-6;
+const NEWS_CONTEXT_WARNING =
+  'Machine-estimated news risk. Verify the headlines and source links before reacting to avoid panic selling.';
 const NEWS_CONTEXT_CACHE_TTL_MS = 60_000;
 
 interface NewsContextCacheEntry {
@@ -268,6 +271,7 @@ function createEmptyNewsContext(): NewsContext {
     bull: 0,
     bear: 0,
     top: null,
+    warning: NEWS_CONTEXT_WARNING,
     items: [],
   };
 }
@@ -338,6 +342,7 @@ async function buildNewsContext(
       bull,
       bear,
       top: topSummary,
+      warning: NEWS_CONTEXT_WARNING,
       items: ordered.map((item) => ({
         title: item.title,
         link: item.link,
