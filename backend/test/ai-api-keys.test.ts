@@ -66,7 +66,9 @@ describe('AI API key routes', () => {
     const key1 = 'aikey1234567890';
     const key2 = 'aikeyabcdefghij';
 
-    fetchMock.mockResolvedValueOnce({ ok: false } as any);
+    fetchMock.mockResolvedValueOnce(
+      new Response('', { status: 401, statusText: 'Unauthorized' }),
+    );
     let res = await app.inject({
       method: 'POST',
       url: `/api/users/${userId}/ai-key`,
@@ -78,7 +80,15 @@ describe('AI API key routes', () => {
     let row = await getAiKey(userId);
     expect(row?.aiApiKeyEnc).toBeUndefined();
 
-    fetchMock.mockResolvedValueOnce({ ok: true } as any);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ data: [{ id: 'gpt-5' }] }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
     res = await app.inject({
       method: 'POST',
       url: `/api/users/${userId}/ai-key`,
@@ -106,7 +116,9 @@ describe('AI API key routes', () => {
     });
     expect(res.statusCode).toBe(409);
 
-    fetchMock.mockResolvedValueOnce({ ok: false } as any);
+    fetchMock.mockResolvedValueOnce(
+      new Response('', { status: 401, statusText: 'Unauthorized' }),
+    );
     res = await app.inject({
       method: 'PUT',
       url: `/api/users/${userId}/ai-key`,
@@ -122,7 +134,15 @@ describe('AI API key routes', () => {
     });
     expect(res.json()).toMatchObject({ key: '<REDACTED>' });
 
-    fetchMock.mockResolvedValueOnce({ ok: true } as any);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ data: [{ id: 'gpt-5-turbo' }] }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
     res = await app.inject({
       method: 'PUT',
       url: `/api/users/${userId}/ai-key`,
@@ -155,7 +175,17 @@ describe('AI API key routes', () => {
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;
     (globalThis as any).fetch = fetchMock;
-    fetchMock.mockResolvedValue({ ok: true } as any);
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ data: [{ id: 'gpt-5' }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
+      ),
+    );
     const adminId = await insertAdminUser(
       'admin1',
       encrypt('admin@example.com', process.env.KEY_PASSWORD!),
