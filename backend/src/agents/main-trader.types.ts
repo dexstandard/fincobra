@@ -55,7 +55,23 @@ export type NewsContext = SpotNewsContext;
 export type StablecoinOracleQuoteReport = SpotStablecoinOracleQuoteReport;
 export type StablecoinOracleReport = SpotStablecoinOracleReport;
 export type MainTraderDecision = SpotTraderDecision;
-export type MainTraderOrder = SpotTraderOrder;
+
+export interface MainTraderFuturesOrder {
+  positionSide: 'LONG' | 'SHORT';
+  quantity?: number;
+  type?: 'MARKET' | 'LIMIT';
+  price?: number;
+  reduceOnly?: boolean;
+  leverage?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  hedgeMode?: boolean;
+  positionIdx?: 0 | 1 | 2;
+}
+
+export interface MainTraderOrder extends SpotTraderOrder {
+  futures?: MainTraderFuturesOrder;
+}
 
 export type TraderPromptResult =
   | { mode: 'spot'; prompt: SpotRebalancePrompt }

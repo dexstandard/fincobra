@@ -3,6 +3,7 @@ import type { ErrorResponse } from './error-messages.types.js';
 export const ERROR_MESSAGES = {
   forbidden: 'forbidden',
   notFound: 'not found',
+  validationFailed: 'validation failed',
 };
 
 export function lengthMessage(field: string, max: number) {
