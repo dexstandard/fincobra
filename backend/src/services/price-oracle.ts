@@ -24,7 +24,7 @@ const PRICE_FEEDS: Record<SupportedOracleSymbol, OracleFeedConfig> = {
 
 const PRICE_CACHE_TTL_SECONDS = 30;
 
-const priceCache = new NodeCache<PriceOracleQuote>({
+const priceCache = new NodeCache({
   stdTTL: PRICE_CACHE_TTL_SECONDS,
   checkperiod: Math.max(1, Math.ceil(PRICE_CACHE_TTL_SECONDS / 2)),
 });
@@ -121,7 +121,7 @@ async function fetchQuoteFromOracle(symbol: SupportedOracleSymbol): Promise<Pric
 
 export async function getUsdPrice(symbol: SupportedOracleSymbol): Promise<PriceOracleQuote> {
   const cacheKey = `price:${symbol}`;
-  const cached = priceCache.get(cacheKey);
+  const cached = priceCache.get<PriceOracleQuote>(cacheKey);
   if (cached) {
     return cached;
   }
