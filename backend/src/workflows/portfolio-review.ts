@@ -26,7 +26,8 @@ import { insertReviewResult } from '../repos/review-result.js';
 import type { ReviewResultInsert } from '../repos/review-result.types.js';
 import { parseExecLog, validateExecResponse } from '../util/parse-exec-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
-import { createDecisionLimitOrders } from '../services/rebalance.js';
+import { executeSpotDecision } from '../services/rebalance.js';
+import { executeFuturesDecision } from '../services/futures-execution.js';
 import { ensureApiKeys } from '../services/portfolio-workflows.js';
 import type { SpotRebalancePrompt } from '../agents/main-trader.types.js';
 import pLimit from 'p-limit';
@@ -386,34 +387,61 @@ async function runWorkflowAttempt(
     const resultId = await runStep('insertReviewResult', () =>
       insertReviewResult(resultEntry),
     );
-    if (
-      prompt.mode === 'spot' &&
-      spotDecision &&
-      !validationError &&
-      !wf.manualRebalance &&
-      spotDecision.orders.length
-    ) {
-      const orderResult = await createDecisionLimitOrders({
-        userId: wf.userId,
-        orders: spotDecision.orders,
-        reviewResultId: resultId,
-        log: runLog,
-        defaultExchange,
-      });
-      if (orderResult.needsPriceDivergenceRetry) {
-        runLog.warn(
-          {
+    if (prompt.mode === 'spot') {
+      if (
+        spotDecision &&
+        !validationError &&
+        !wf.manualRebalance &&
+        spotDecision.orders.length
+      ) {
+        const orderResult = await executeSpotDecision({
+          userId: wf.userId,
+          orders: spotDecision.orders,
+          reviewResultId: resultId,
+          log: runLog,
+          defaultExchange,
+        });
+        if (orderResult.needsPriceDivergenceRetry) {
+          runLog.warn(
+            {
+              canceledOrders: orderResult.priceDivergenceCancellations,
+            },
+            'orders canceled due to price divergence',
+          );
+          return {
+            kind: 'retry',
             canceledOrders: orderResult.priceDivergenceCancellations,
+            ...(lastAiRequestAt !== null && {
+              lastAiRequestAt,
+            }),
+          };
+        }
+      }
+    } else if (
+      futuresDecision &&
+      !wf.manualRebalance &&
+      futuresDecision.actions.length
+    ) {
+      if (!defaultExchange) {
+        runLog.error('workflow run failed: missing exchange provider for futures execution');
+      } else {
+        const futuresOutcome = await executeFuturesDecision({
+          userId: wf.userId,
+          actions: futuresDecision.actions,
+          reviewResultId: resultId,
+          log: runLog,
+          exchange: defaultExchange,
+          defaultLeverage: wf.futuresDefaultLeverage,
+          marginMode: wf.futuresMarginMode,
+        });
+        runLog.info(
+          {
+            executedFuturesActions: futuresOutcome.executed,
+            failedFuturesActions: futuresOutcome.failed,
+            skippedFuturesActions: futuresOutcome.skipped,
           },
-          'orders canceled due to price divergence',
+          'completed futures execution',
         );
-        return {
-          kind: 'retry',
-          canceledOrders: orderResult.priceDivergenceCancellations,
-          ...(lastAiRequestAt !== null && {
-            lastAiRequestAt,
-          }),
-        };
       }
     }
     runLog.info('workflow run complete');
