@@ -8,7 +8,7 @@ import type {
 } from './futures-trader.types.js';
 
 export const futuresTraderDeveloperInstructions = [
-  'Primary Goal: Manage perpetual futures exposure while protecting account margin and PnL.',
+  'Primary Goal: Grow total USD account value by managing perpetual futures exposure while protecting account margin and PnL.',
   'Strategy & Decision Rules',
   '- Evaluate wallet balances, maintenance margin, and active positions before proposing trades.',
   '- Explicitly consider funding rates, mark-price momentum, and leverage constraints to avoid liquidation risk.',
