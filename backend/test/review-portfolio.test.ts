@@ -3,7 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
 import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
-import { setAiKey } from '../src/repos/ai-api-key.js';
+import { setAiKey, setGroqKey } from '../src/repos/ai-api-key.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/review-raw-log.js';
 import { getRecentReviewResults } from '../src/repos/review-result.js';
 import * as mainTrader from '../src/agents/main-trader.js';
@@ -20,6 +20,11 @@ vi.spyOn(mainTrader, 'run').mockImplementation(runMainTrader);
 const getNewsByTokenMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 vi.mock('../src/repos/news.js', () => ({
   getNewsByToken: getNewsByTokenMock,
+}));
+
+const waitMock = vi.hoisted(() => vi.fn());
+vi.mock('../src/util/time.js', () => ({
+  wait: waitMock,
 }));
 
 import {
@@ -190,12 +195,22 @@ vi.mock('../src/services/rebalance.js', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  waitMock.mockReset();
+  waitMock.mockResolvedValue(undefined);
   ['1', '2', '3', '4', '5'].forEach((id) => removeWorkflowFromSchedule(id));
 });
 
-async function setupWorkflow(tokens: string[], manual = false) {
+async function setupWorkflow(
+  tokens: string[],
+  manual = false,
+  aiProvider: 'openai' | 'groq' = 'openai',
+) {
   const userId = await insertUser();
-  await setAiKey({ userId, apiKeyEnc: 'enc' });
+  if (aiProvider === 'groq') {
+    await setGroqKey({ userId, apiKeyEnc: 'enc' });
+  } else {
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
+  }
   const agent = await insertPortfolioWorkflow({
     userId,
     model: 'gpt',
@@ -208,6 +223,7 @@ async function setupWorkflow(tokens: string[], manual = false) {
     agentInstructions: 'inst',
     manualRebalance: manual,
     useEarn: false,
+    aiProvider,
   });
   return { userId, workflowId: agent.id };
 }
@@ -283,28 +299,103 @@ describe('reviewPortfolio', () => {
     };
     runMainTrader.mockResolvedValue(decision);
     const clearCachesSpy = vi.spyOn(mainTrader, 'clearMainTraderCaches');
-    createDecisionLimitOrders
-      .mockResolvedValueOnce({
-        placed: 0,
-        canceled: 1,
-        priceDivergenceCancellations: 1,
-        futuresExecuted: 0,
-        futuresFailed: 0,
-        needsPriceDivergenceRetry: true,
-      })
-      .mockResolvedValueOnce({
-        placed: 1,
-        canceled: 0,
-        priceDivergenceCancellations: 0,
-        futuresExecuted: 0,
-        futuresFailed: 0,
-        needsPriceDivergenceRetry: false,
+    const firstOrderPromise = new Promise<void>((resolve) => {
+      createDecisionLimitOrders.mockImplementationOnce(async () => {
+        resolve();
+        return {
+          placed: 0,
+          canceled: 1,
+          priceDivergenceCancellations: 1,
+          futuresExecuted: 0,
+          futuresFailed: 0,
+          needsPriceDivergenceRetry: true,
+        };
       });
+    });
+    createDecisionLimitOrders.mockResolvedValueOnce({
+      placed: 1,
+      canceled: 0,
+      priceDivergenceCancellations: 0,
+      futuresExecuted: 0,
+      futuresFailed: 0,
+      needsPriceDivergenceRetry: false,
+    });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, workflowId);
     expect(runMainTrader).toHaveBeenCalledTimes(2);
     expect(createDecisionLimitOrders).toHaveBeenCalledTimes(2);
     expect(clearCachesSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits one minute before retrying price divergence when using groq', async () => {
+    const { workflowId } = await setupWorkflow(['BTC'], false, 'groq');
+    const decision = {
+      orders: [
+        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 },
+      ],
+      shortReport: 'retry',
+    };
+    runMainTrader.mockResolvedValue(decision);
+    const firstRunPromise = new Promise<void>((resolve) => {
+      runMainTrader.mockImplementationOnce(async () => {
+        resolve();
+        return decision;
+      });
+    });
+    const firstOrderPromise = new Promise<void>((resolve) => {
+      createDecisionLimitOrders.mockImplementationOnce(async () => {
+        resolve();
+        return {
+          placed: 0,
+          canceled: 1,
+          priceDivergenceCancellations: 1,
+          futuresExecuted: 0,
+          futuresFailed: 0,
+          needsPriceDivergenceRetry: true,
+        };
+      });
+    });
+    createDecisionLimitOrders.mockResolvedValueOnce({
+      placed: 1,
+      canceled: 0,
+      priceDivergenceCancellations: 0,
+      futuresExecuted: 0,
+      futuresFailed: 0,
+      needsPriceDivergenceRetry: false,
+    });
+
+    let resolveWait: (() => void) | undefined;
+    const waitPromise = new Promise<void>((resolve) => {
+      resolveWait = resolve;
+    });
+    waitMock.mockReturnValueOnce(waitPromise);
+
+    try {
+      const log = mockLogger();
+      const reviewPromise = reviewWorkflowPortfolio(log, workflowId);
+
+      await firstRunPromise;
+      await firstOrderPromise;
+      await Promise.resolve();
+
+      const firstCallArgs = runMainTrader.mock.calls[0]?.[0];
+      expect(firstCallArgs?.aiProvider).toBe('groq');
+
+      expect(runMainTrader).toHaveBeenCalledTimes(1);
+
+      resolveWait?.();
+      await reviewPromise;
+
+      expect(waitMock).toHaveBeenCalledTimes(1);
+      const [delayMs] = waitMock.mock.calls[0] ?? [];
+      expect(delayMs).toBeGreaterThanOrEqual(59_900);
+      expect(delayMs).toBeLessThanOrEqual(60_000);
+      expect(runMainTrader).toHaveBeenCalledTimes(2);
+      expect(createDecisionLimitOrders).toHaveBeenCalledTimes(2);
+    } finally {
+      waitMock.mockReset();
+      waitMock.mockResolvedValue(undefined);
+    }
   });
 
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {

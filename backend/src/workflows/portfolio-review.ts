@@ -25,11 +25,13 @@ import { type RebalancePrompt } from '../agents/main-trader.types.js';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
 import type { SupportedExchange } from '../services/exchange-gateway.js';
+import * as timeUtils from '../util/time.js';
 
 /** Workflows currently running. Used to avoid concurrent runs. */
 const runningWorkflows = new Set<string>();
 
 const PRICE_DIVERGENCE_RETRY_LIMIT = 1;
+const GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS = 60_000;
 
 export function removeWorkflowFromSchedule(id: string): boolean {
   return runningWorkflows.delete(id);
@@ -150,6 +152,7 @@ function buildReviewResultEntry({
 interface WorkflowAttemptResult {
   kind: 'success' | 'retry' | 'error';
   canceledOrders?: number;
+  lastAiRequestAt?: number;
 }
 
 export async function executeWorkflow(
@@ -159,6 +162,7 @@ export async function executeWorkflow(
   const execLogId = randomUUID();
   const baseLog = log.child({ execLogId });
   let lastRetry: WorkflowAttemptResult | null = null;
+  let lastAiRequestAt: number | null = null;
 
   let attempt = 0;
   while (attempt <= PRICE_DIVERGENCE_RETRY_LIMIT) {
@@ -174,11 +178,34 @@ export async function executeWorkflow(
       clearMainTraderCaches();
     }
 
+    const attemptStartedAt = Date.now();
     const result = await runWorkflowAttempt(wf, attemptLog);
+    if (typeof result.lastAiRequestAt === 'number') {
+      lastAiRequestAt = result.lastAiRequestAt;
+    }
     if (result.kind === 'success') {
       return;
     }
     if (result.kind === 'retry') {
+      const referenceTime =
+        typeof result.lastAiRequestAt === 'number'
+          ? result.lastAiRequestAt
+          : lastAiRequestAt ?? attemptStartedAt;
+      lastAiRequestAt = referenceTime;
+      if (wf.aiProvider === 'groq') {
+        const elapsed = Date.now() - referenceTime;
+        const waitMs = Math.max(
+          0,
+          GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS - elapsed,
+        );
+        if (waitMs > 0) {
+          attemptLog.info(
+            { delayMs: waitMs },
+            'delaying price divergence retry for groq rate limits',
+          );
+          await timeUtils.wait(waitMs);
+        }
+      }
       lastRetry = result;
       attempt += 1;
       continue;
@@ -199,6 +226,7 @@ async function runWorkflowAttempt(
   wf: ActivePortfolioWorkflow,
   runLog: FastifyBaseLogger,
 ): Promise<WorkflowAttemptResult> {
+  let lastAiRequestAt: number | null = null;
   const runStep = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
     runLog.info({ step: name }, 'step start');
     try {
@@ -252,6 +280,7 @@ async function runWorkflowAttempt(
       portfolioId: wf.id,
       aiProvider: wf.aiProvider,
     };
+    lastAiRequestAt = Date.now();
     const decision = await runStep('runMainTrader', () =>
       runMainTrader(params, prompt!, wf.agentInstructions),
     );
@@ -314,17 +343,26 @@ async function runWorkflowAttempt(
         return {
           kind: 'retry',
           canceledOrders: orderResult.priceDivergenceCancellations,
+          ...(lastAiRequestAt !== null && {
+            lastAiRequestAt,
+          }),
         };
       }
     }
     runLog.info('workflow run complete');
-    return { kind: 'success' };
+    return {
+      kind: 'success',
+      ...(lastAiRequestAt !== null && { lastAiRequestAt }),
+    };
   } catch (err) {
     if (prompt) {
       await saveFailure(wf, String(err), prompt);
     }
     runLog.error({ err }, 'workflow run failed');
-    return { kind: 'error' };
+    return {
+      kind: 'error',
+      ...(lastAiRequestAt !== null && { lastAiRequestAt }),
+    };
   }
 }
 
