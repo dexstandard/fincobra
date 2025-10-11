@@ -17,6 +17,7 @@ The current "portfolio workflow" automation treats spot and futures trades as va
 
 ## Target Experience
 - Operators configure a workflow as **Spot** or **Futures** (potential third type later for cross-margin strategies).
+- Modes are mutually exclusive in this phase to keep data, prompts, and execution pipelines isolated.
 - Each mode has independent prompt generation, AI instructions, and schema validation tailored to its data and controls.
 - Execution pipelines match the order type: spot mode submits exchange limit orders; futures mode opens/updates positions with leverage, stop loss, and take profit instructions.
 - Review logs, audit trails, and UI clearly state which engine produced the decision.
@@ -25,6 +26,7 @@ The current "portfolio workflow" automation treats spot and futures trades as va
 1. **Workflow Mode Flag**
    - Add a `mode` column to `portfolio_workflow` with enum values `spot` | `futures` (default `spot`). Gate workflow selection, prompt builders, and execution paths on this flag.
    - Surface the mode in API payloads, validation, and frontend forms.
+   - Keep the existing scheduling cadence shared across both modes; no additional cron or risk-threshold tracks are necessary initially.
 
 2. **Dedicated Agents**
    - Split `main-trader` into `spot-trader` and `futures-trader` modules. Each module owns its developer instructions, response schema, and JSON validation.
@@ -57,7 +59,7 @@ The current "portfolio workflow" automation treats spot and futures trades as va
 
 2. **API & Frontend wiring**
    - Extend workflow create/update APIs to validate the new mode.
-   - Update frontend forms to let users choose Spot vs Futures with contextual help.
+   - Update frontend forms to let users choose Spot vs Futures with contextual help and render mode-specific history tables (spot limit orders vs. futures trades).
 
 3. **Agent refactor**
    - Extract existing spot-specific prompt/logic into `agents/spot-trader`.
@@ -85,7 +87,7 @@ The current "portfolio workflow" automation treats spot and futures trades as va
    - Document the operational changes for the support team (workflow migration steps, limitations).
    - Provide a data migration script or manual steps to set existing workflows to `spot` mode and flag futures workflows for recreation.
 
-## Open Questions
-- Do futures workflows require separate scheduling cadences or risk thresholds?
-- Should we support hybrid workflows in the future, or will mode be mutually exclusive?
-- How should we display futures trade history alongside spot limit orders in the UI?
+## Open Questions & Resolutions
+- **Do futures workflows require separate scheduling cadences or risk thresholds?** No. Futures reviews can reuse the existing scheduling cadence and risk-threshold configuration, so no additional scheduler track is required in the first phase.
+- **Should we support hybrid workflows in the future, or will mode be mutually exclusive?** Mode remains mutually exclusive for now. Engineering should optimize for a clean split between spot and futures paths, leaving hybrid scenarios for a later iteration.
+- **How should we display futures trade history alongside spot limit orders in the UI?** Render mode-specific history views. When a workflow is marked as futures, the frontend should surface a dedicated futures trade table instead of the spot limit-order table, with copy explaining the distinction.
