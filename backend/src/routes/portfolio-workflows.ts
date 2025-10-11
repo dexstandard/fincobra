@@ -47,7 +47,10 @@ import type {
   MainTraderDecision,
   MainTraderOrder,
 } from '../agents/main-trader.types.js';
-import { developerInstructions } from '../agents/main-trader.js';
+import {
+  developerInstructions,
+  getDeveloperInstructionsForMode,
+} from '../agents/main-trader.js';
 import { adminOnlyPreHandlers, getValidatedUserId } from './_shared/guards.js';
 import { parseBody, parseRequestParams } from './_shared/validation.js';
 
@@ -149,6 +152,12 @@ const manualRebalanceBodySchema = z
   .strip()
   .optional()
   .transform((body): ManualRebalanceBody => body ?? {});
+
+const instructionsQuerySchema = z
+  .object({
+    mode: z.enum(['spot', 'futures']).optional(),
+  })
+  .strip();
 
 async function requireAuthenticatedUser(
   req: FastifyRequest,
@@ -481,13 +490,57 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       return {
         items: rows.map((r) => {
           let orders: unknown[] | undefined;
+          let actions: unknown[] | undefined;
           try {
             const parsed = JSON.parse(r.log);
-            if (parsed && Array.isArray(parsed.orders)) {
-              orders = parsed.orders;
+            if (parsed && typeof parsed === 'object') {
+              if (Array.isArray((parsed as { orders?: unknown[] }).orders)) {
+                orders = (parsed as { orders: unknown[] }).orders;
+              }
+              if (Array.isArray((parsed as { actions?: unknown[] }).actions)) {
+                actions = (parsed as { actions: unknown[] }).actions;
+              }
+              const nested = (parsed as {
+                result?: { orders?: unknown[]; actions?: unknown[] };
+                response?: { orders?: unknown[]; actions?: unknown[] };
+                output?: Array<{
+                  content?: Array<{ text?: string }>;
+                }>;
+              });
+              if (!orders && nested.result && typeof nested.result === 'object') {
+                if (Array.isArray(nested.result.orders)) orders = nested.result.orders;
+                if (Array.isArray(nested.result.actions)) actions = nested.result.actions;
+              }
+              if (nested.response && typeof nested.response === 'object') {
+                if (Array.isArray(nested.response.orders)) orders = nested.response.orders;
+                if (Array.isArray(nested.response.actions)) actions = nested.response.actions;
+              }
+              if (nested.output && !orders) {
+                const text = nested.output
+                  .flatMap((item) => item.content ?? [])
+                  .find((c) => typeof c.text === 'string')?.text;
+                if (text) {
+                  try {
+                    const parsedText = JSON.parse(text) as {
+                      result?: { orders?: unknown[]; actions?: unknown[] };
+                    };
+                    if (
+                      parsedText.result &&
+                      typeof parsedText.result === 'object'
+                    ) {
+                      if (Array.isArray(parsedText.result.orders))
+                        orders = parsedText.result.orders;
+                      if (Array.isArray(parsedText.result.actions))
+                        actions = parsedText.result.actions;
+                    }
+                  } catch {
+                    // ignore nested JSON parse errors
+                  }
+                }
+              }
             }
           } catch {
-            // ignore JSON parse errors and leave orders undefined
+            // ignore JSON parse errors and leave orders/actions undefined
           }
           const resp =
             r.rebalance === null
@@ -496,6 +549,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
                   rebalance: !!r.rebalance,
                   shortReport: r.shortReport ?? '',
                   ...(orders ? { orders } : {}),
+                  ...(actions ? { actions } : {}),
                 };
           return {
             id: r.id,
@@ -518,9 +572,17 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       config: { rateLimit: RATE_LIMITS.RELAXED },
       preHandler: sessionPreHandlers,
     },
-    async (req) => {
-      req.log.info('fetched developer instructions');
-      return { instructions: developerInstructions };
+    async (req, reply) => {
+      const parsed = instructionsQuerySchema.safeParse(req.query ?? {});
+      if (!parsed.success) {
+        req.log.warn({ err: parsed.error }, 'invalid instructions query');
+        return reply
+          .code(400)
+          .send(errorResponse(ERROR_MESSAGES.validationFailed));
+      }
+      const mode = parsed.data.mode ?? 'spot';
+      req.log.info({ mode }, 'fetched developer instructions');
+      return { instructions: getDeveloperInstructionsForMode(mode) };
     },
   );
 

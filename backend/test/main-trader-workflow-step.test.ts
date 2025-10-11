@@ -63,7 +63,7 @@ describe('main trader step', () => {
       marketData: { currentPrice: 0, minNotional: 10 },
       reports: [{ token: 'BTC', news: null, tech: null }],
     };
-    const decision = await run(
+    const result = await run(
       {
         log: mockLogger(),
         model: 'gpt',
@@ -71,9 +71,10 @@ describe('main trader step', () => {
         portfolioId: 'agent1',
         aiProvider: 'openai',
       },
-      prompt,
+      { mode: 'spot', prompt },
     );
-    expect(decision?.orders).toEqual([
+    expect(result.mode).toBe('spot');
+    expect(result.decision?.orders).toEqual([
       {
         pair: 'BTCUSDT',
         token: 'BTC',
@@ -106,7 +107,7 @@ describe('main trader step', () => {
         portfolioId: 'agent1',
         aiProvider: 'openai',
       },
-      prompt,
+      { mode: 'spot', prompt },
       'custom developer instructions',
     );
     const [, , instructionsArg] = callAiMock.mock.calls[0];

@@ -84,6 +84,60 @@ describe('portfolio workflow exec log routes', () => {
     await app.close();
   });
 
+  it('includes futures actions in exec log response', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('101');
+    const agent = await insertPortfolioWorkflow({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+      mode: 'futures',
+      futuresDefaultLeverage: 5,
+      futuresMarginMode: 'cross',
+    });
+    const actions = [
+      {
+        symbol: 'BTCUSDT',
+        positionSide: 'LONG',
+        action: 'OPEN',
+        type: 'MARKET',
+        quantity: 0.1,
+      },
+    ] as const;
+    await insertReviewResult({
+      portfolioWorkflowId: agent.id,
+      log: JSON.stringify({
+        actions,
+        shortReport: 'plan',
+      }),
+      rebalance: true,
+      shortReport: 'plan',
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/portfolio-workflows/${agent.id}/exec-log?page=1&pageSize=5`,
+      cookies: authCookies(userId),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.items[0].response.actions).toEqual(actions);
+    expect(body.items[0].response.orders).toBeUndefined();
+
+    await app.close();
+  });
+
   it('cancels open order and enforces ownership', async () => {
     const app = await buildServer();
     const user1Id = await insertUser('12');
