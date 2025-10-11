@@ -47,7 +47,7 @@ function extractStatus(error: unknown): number | undefined {
 export async function callAi(
   model: string,
   developerInstructions: string,
-  schema: unknown,
+  schema: Record<string, unknown>,
   input: unknown,
   apiKey: string,
   webSearch = false,
@@ -161,7 +161,7 @@ function filterSupportedModels(models: { id: string }[]): string[] {
 export async function verifyAiKey(key: string): Promise<boolean> {
   try {
     const client = createClient(key);
-    await client.models.list({ limit: 1 });
+    await client.models.list();
     return true;
   } catch {
     return false;

@@ -13,7 +13,7 @@ interface AiClient {
   call: (
     model: string,
     developerInstructions: string,
-    schema: unknown,
+    schema: Record<string, unknown>,
     input: unknown,
     apiKey: string,
     webSearch?: boolean,
@@ -39,7 +39,7 @@ export async function callAi(
   provider: AiApiProvider,
   model: string,
   developerInstructions: string,
-  schema: unknown,
+  schema: Record<string, unknown>,
   input: unknown,
   apiKey: string,
   webSearch = false,

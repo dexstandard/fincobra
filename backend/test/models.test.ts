@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
 import { insertUser } from './repos/users.js';
-import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
+import { setAiKey, setGroqKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import { authCookies } from './helpers.js';
 
 const listModelsMock = vi.fn();
@@ -129,5 +129,47 @@ describe('model routes', () => {
     expect(listModelsMock).not.toHaveBeenCalled();
 
     await app.close();
+  });
+
+  it('filters Groq models to supported set', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('groq-models');
+    const key = 'groqkey-1234567890';
+    await setGroqKey({
+      userId,
+      apiKeyEnc: encrypt(key, process.env.KEY_PASSWORD!),
+    });
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn();
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = fetchMock as any;
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: [
+            { id: 'meta-llama/llama-4-8b' },
+            { id: 'random-other-model' },
+            { id: 'openai/gpt-oss-llama3' },
+          ],
+        }),
+    } as any);
+
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/users/${userId}/models`,
+        query: { provider: 'groq' },
+        cookies: authCookies(userId),
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({
+        models: ['meta-llama/llama-4-8b', 'openai/gpt-oss-llama3'],
+      });
+    } finally {
+      (globalThis as any).fetch = originalFetch;
+      await app.close();
+    }
   });
 });

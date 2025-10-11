@@ -12,6 +12,12 @@ interface VerificationResult {
   reason?: string;
 }
 
+function isSupportedGroqModel(id: string): boolean {
+  return (
+    id.includes('openai/gpt-oss') || id.includes('meta-llama/llama-4')
+  );
+}
+
 function normalizeReason(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const trimmed = raw.trim();
@@ -41,7 +47,7 @@ export async function verifyGroqKey(key: string): Promise<VerificationResult> {
 export async function callGroqAi(
   model: string,
   developerInstructions: string,
-  schema: unknown,
+  schema: Record<string, unknown>,
   input: unknown,
   apiKey: string,
   _webSearch = false,
@@ -83,7 +89,10 @@ export async function fetchSupportedModels(
     });
     if (!res.ok) return null;
     const body = (await res.json()) as { data?: GroqModel[] };
-    return (body.data ?? []).map((m) => m.id).sort();
+    return (body.data ?? [])
+      .map((m) => m.id)
+      .filter((id) => isSupportedGroqModel(id))
+      .sort();
   } catch {
     return null;
   }
