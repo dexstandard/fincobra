@@ -16,6 +16,12 @@ export interface BinanceAccount {
   balances: BinanceBalance[];
 }
 
+export interface BinanceFuturesBalanceEntry {
+  asset?: string;
+  balance?: string;
+  availableBalance?: string;
+}
+
 export interface BinanceUserCreds {
   key: string;
   secret: string;
