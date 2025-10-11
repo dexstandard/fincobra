@@ -66,6 +66,7 @@ export interface NewsContext {
   bull: number;
   bear: number;
   top: string | null;
+  warning: string;
   items: NewsContextItem[];
 }
 
