@@ -12,6 +12,9 @@ interface Props {
 export default function WorkflowDetailsMobile({ workflow }: Props) {
   const tokens = [workflow.cashToken, ...workflow.tokens.map((t) => t.token)];
   const t = useTranslation();
+  const isSpot = workflow.mode === 'spot';
+  const modeLabel =
+    workflow.mode === 'spot' ? t('spot_trading') : t('futures_trading');
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
@@ -20,21 +23,30 @@ export default function WorkflowDetailsMobile({ workflow }: Props) {
         </h1>
         <WorkflowStatusLabel status={workflow.status} />
       </div>
+      <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 inline-block px-2 py-0.5 rounded-full mb-1">
+        {modeLabel}
+      </div>
       <p className="text-xs text-gray-500">
         <FormattedDate date={workflow.createdAt} />
       </p>
-      {workflow.status === 'active' && (
+      {workflow.status === 'active' && isSpot && (
         <WorkflowAllocationPie
           cashToken={workflow.cashToken}
           tokens={workflow.tokens}
           ownerId={workflow.userId}
         />
       )}
-      <WorkflowPnlMobile
-        tokens={tokens}
-        startBalanceUsd={workflow.startBalanceUsd}
-        userId={workflow.userId}
-      />
+      {isSpot ? (
+        <WorkflowPnlMobile
+          tokens={tokens}
+          startBalanceUsd={workflow.startBalanceUsd}
+          userId={workflow.userId}
+        />
+      ) : (
+        <p className="mt-2 text-sm text-gray-600">
+          {t('futures_metrics_unavailable')}
+        </p>
+      )}
     </div>
   );
 }

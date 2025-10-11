@@ -18,6 +18,7 @@ import Button from './ui/Button';
 import { useTranslation } from '../lib/i18n';
 import PromptVisualizer from './PromptVisualizer';
 import type { PromptData } from './PromptVisualizer.types';
+import type { TradingMode } from '../lib/exchange.types';
 
 const MAX_LEN = 255;
 function truncate(text: string) {
@@ -59,6 +60,7 @@ interface Props {
   tokens: string[];
   developerInstructions?: string;
   readOnly?: boolean;
+  mode?: TradingMode;
 }
 
 export default function ExecLogItem({
@@ -68,6 +70,7 @@ export default function ExecLogItem({
   tokens,
   developerInstructions,
   readOnly = false,
+  mode = 'spot',
 }: Props) {
   const [showJson, setShowJson] = useState(false);
   const [showTx, setShowTx] = useState(false);
@@ -81,6 +84,7 @@ export default function ExecLogItem({
   const hasError = error && Object.keys(error).length > 0;
   const hasResponse = response && Object.keys(response).length > 0;
   const t = useTranslation();
+  const isFuturesMode = mode === 'futures';
   const { data: orders, refetch: refetchOrders } = useQuery({
     queryKey: ['exec-orders', workflowId, log.id],
     queryFn: async () => {
@@ -89,11 +93,14 @@ export default function ExecLogItem({
       );
       return res.data.orders as LimitOrder[];
     },
-    enabled: showTx || (!!response?.rebalance && manualRebalance),
+    enabled:
+      !isFuturesMode && (showTx || (!!response?.rebalance && manualRebalance)),
   });
   const hasOrders = !!orders && orders.length > 0;
   const txEnabled =
-    !!response?.rebalance && (!manualRebalance || hasOrders || readOnly);
+    !isFuturesMode &&
+    !!response?.rebalance &&
+    (!manualRebalance || hasOrders || readOnly);
   const [creating, setCreating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [order, setOrder] = useState<{

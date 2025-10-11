@@ -26,7 +26,7 @@ export default function WorkflowView() {
   const toast = useToast();
   const aiProvider = workflow?.aiProvider ?? 'openai';
   const { hasOpenAIKey, hasGroqKey, hasBinanceKey, hasBybitKey } =
-    usePrerequisites([], { aiProvider });
+    usePrerequisites([], { aiProvider, mode: workflow?.mode });
   const hasExchangeKey = hasBinanceKey || hasBybitKey;
   const hasAiKey = aiProvider === 'groq' ? hasGroqKey : hasOpenAIKey;
   const t = useTranslation();
@@ -71,6 +71,7 @@ export default function WorkflowView() {
   const viewingAsAdmin = user?.role === 'admin' && !isOwner;
   const readOnly = !isOwner;
   const isActive = workflow.status === 'active';
+  const isFutures = workflow.mode === 'futures';
   return (
     <div className="p-4">
       <div className="hidden md:block">
@@ -138,6 +139,11 @@ export default function WorkflowView() {
               onChange={setOnlyRebalance}
             />
           </div>
+          {isFutures && (
+            <p className="mb-3 text-sm text-gray-600">
+              {t('futures_history_placeholder')}
+            </p>
+          )}
           {logData.items.length === 0 ? (
             <p>{t('no_logs_yet')}</p>
           ) : (
@@ -178,6 +184,7 @@ export default function WorkflowView() {
                               }
                               developerInstructions={workflow.agentInstructions}
                               readOnly={readOnly}
+                              mode={workflow.mode}
                             />
                           </td>
                         </tr>
@@ -206,6 +213,7 @@ export default function WorkflowView() {
                       }
                       developerInstructions={workflow.agentInstructions}
                       readOnly={readOnly}
+                      mode={workflow.mode}
                     />
                   </div>
                 ))}

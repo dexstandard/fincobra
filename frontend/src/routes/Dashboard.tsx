@@ -27,6 +27,7 @@ interface WorkflowSummary {
   startBalanceUsd?: number | null;
   reviewInterval: string;
   ownerEmail?: string | null;
+  mode: 'spot' | 'futures';
 }
 
 function formatOwnerEmail(email?: string | null) {
@@ -49,22 +50,28 @@ function WorkflowRow({
   canDelete: boolean;
 }) {
   const t = useTranslation();
-  const tokenList = [
-    workflow.cashToken,
-    ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
-  ];
+  const isSpot = workflow.mode === 'spot';
+  const tokenList = isSpot
+    ? [
+        workflow.cashToken,
+        ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
+      ]
+    : [];
+  const modeLabel =
+    workflow.mode === 'spot' ? t('spot_trading') : t('futures_trading');
   const { balance, isLoading } = useWorkflowBalanceUsd(
     tokenList,
     workflow.userId,
   );
-  const balanceText =
-    balance === null
+  const balanceText = !isSpot
+    ? '-'
+    : balance === null
       ? '-'
       : isLoading
         ? t('loading')
         : `$${balance.toFixed(2)}`;
   const pnl =
-    balance !== null && workflow.startBalanceUsd != null
+    isSpot && balance !== null && workflow.startBalanceUsd != null
       ? balance - workflow.startBalanceUsd
       : null;
   const pnlPercent =
@@ -72,17 +79,19 @@ function WorkflowRow({
       ? (pnl / workflow.startBalanceUsd) * 100
       : null;
   const pnlText =
-    pnl === null
+    !isSpot
       ? '-'
-      : isLoading
-        ? t('loading')
-        : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
-            pnlPercent !== null
-              ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
-              : ''
-          }`;
+      : pnl === null
+        ? '-'
+        : isLoading
+          ? t('loading')
+          : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
+              pnlPercent !== null
+                ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
+                : ''
+            }`;
   const pnlClass =
-    pnl === null || isLoading
+    !isSpot || pnl === null || isLoading
       ? ''
       : pnlPercent !== null
         ? pnlPercent <= -3
@@ -96,8 +105,10 @@ function WorkflowRow({
             ? 'text-green-600'
             : 'text-gray-600';
   const pnlTooltip =
-    pnl === null || isLoading
-      ? undefined
+    !isSpot || pnl === null || isLoading
+      ? !isSpot
+        ? t('futures_metrics_unavailable')
+        : undefined
       : `${t('pnl')} = $${balance!.toFixed(2)} - $${workflow.startBalanceUsd!.toFixed(2)} = ${
           pnl > 0 ? '+' : pnl < 0 ? '-' : ''
         }$${Math.abs(pnl).toFixed(2)}${
@@ -105,6 +116,12 @@ function WorkflowRow({
             ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
             : ''
         }`;
+  const balanceTooltip =
+    !isSpot || balance === null || isLoading
+      ? !isSpot
+        ? t('futures_metrics_unavailable')
+        : undefined
+      : undefined;
   return (
     <tr key={workflow.id}>
       <td>
@@ -121,7 +138,12 @@ function WorkflowRow({
           '-'
         )}
       </td>
-      <td>{balanceText}</td>
+      <td>
+        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+          {modeLabel}
+        </span>
+      </td>
+      <td title={balanceTooltip}>{balanceText}</td>
       <td className={pnlClass} title={pnlTooltip}>
         {pnlText}
       </td>
@@ -172,22 +194,28 @@ function WorkflowBlock({
   canDelete: boolean;
 }) {
   const t = useTranslation();
-  const tokenList = [
-    workflow.cashToken,
-    ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
-  ];
+  const isSpot = workflow.mode === 'spot';
+  const tokenList = isSpot
+    ? [
+        workflow.cashToken,
+        ...(workflow.tokens ? workflow.tokens.map((t) => t.token) : []),
+      ]
+    : [];
+  const modeLabel =
+    workflow.mode === 'spot' ? t('spot_trading') : t('futures_trading');
   const { balance, isLoading } = useWorkflowBalanceUsd(
     tokenList,
     workflow.userId,
   );
-  const balanceText =
-    balance === null
+  const balanceText = !isSpot
+    ? '-'
+    : balance === null
       ? '-'
       : isLoading
         ? t('loading')
         : `$${balance.toFixed(2)}`;
   const pnl =
-    balance !== null && workflow.startBalanceUsd != null
+    isSpot && balance !== null && workflow.startBalanceUsd != null
       ? balance - workflow.startBalanceUsd
       : null;
   const pnlPercent =
@@ -195,17 +223,19 @@ function WorkflowBlock({
       ? (pnl / workflow.startBalanceUsd) * 100
       : null;
   const pnlText =
-    pnl === null
+    !isSpot
       ? '-'
-      : isLoading
-        ? t('loading')
-        : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
-            pnlPercent !== null
-              ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
-              : ''
-          }`;
+      : pnl === null
+        ? '-'
+        : isLoading
+          ? t('loading')
+          : `${pnl > 0 ? '+' : pnl < 0 ? '-' : ''}$${Math.abs(pnl).toFixed(2)}${
+              pnlPercent !== null
+                ? ` (${pnlPercent > 0 ? '+' : pnlPercent < 0 ? '-' : ''}${Math.abs(pnlPercent).toFixed(2)}%)`
+                : ''
+            }`;
   const pnlClass =
-    pnl === null || isLoading
+    !isSpot || pnl === null || isLoading
       ? ''
       : pnlPercent !== null
         ? pnlPercent <= -3
@@ -219,8 +249,10 @@ function WorkflowBlock({
             ? 'text-green-600'
             : 'text-gray-600';
   const pnlTooltip =
-    pnl === null || isLoading
-      ? undefined
+    !isSpot || pnl === null || isLoading
+      ? !isSpot
+        ? t('futures_metrics_unavailable')
+        : undefined
       : `${t('pnl')} = $${balance!.toFixed(2)} - $${workflow.startBalanceUsd!.toFixed(2)} = ${
           pnl > 0 ? '+' : pnl < 0 ? '-' : ''
         }$${Math.abs(pnl).toFixed(2)}${
@@ -244,10 +276,15 @@ function WorkflowBlock({
           '-'
         )}
       </div>
+      <div className="mb-2 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+        {modeLabel}
+      </div>
       <div className="grid grid-cols-3 gap-2 mb-2 items-center">
         <div>
           <div className="text-xs text-gray-500">{t('balance')}</div>
-          {balanceText}
+          <span title={!isSpot ? t('futures_metrics_unavailable') : undefined}>
+            {balanceText}
+          </span>
         </div>
         <div className={pnlClass} title={pnlTooltip}>
           <div className="text-xs text-gray-500">{t('pnl')}</div>
@@ -497,13 +534,14 @@ export default function Dashboard() {
             ) : (
               <>
                 <table className="w-full mb-4 hidden md:table">
-                  <thead>
-                    <tr>
-                      <th className="text-left">{t('tokens')}</th>
-                      <th className="text-left">{t('balance_usd')}</th>
-                      <th className="text-left">{t('pnl_usd')}</th>
-                      <th className="text-left">{t('model')}</th>
-                      <th className="text-left">{t('interval')}</th>
+                    <thead>
+                      <tr>
+                        <th className="text-left">{t('tokens')}</th>
+                        <th className="text-left">{t('trading_mode')}</th>
+                        <th className="text-left">{t('balance_usd')}</th>
+                        <th className="text-left">{t('pnl_usd')}</th>
+                        <th className="text-left">{t('model')}</th>
+                        <th className="text-left">{t('interval')}</th>
                       {showOwnerColumn && (
                         <th className="text-left">{t('owner')}</th>
                       )}

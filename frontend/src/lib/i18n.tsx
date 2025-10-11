@@ -77,6 +77,22 @@ const translations: Record<Lang, Record<string, string>> = {
       'Futures bots trade from your Bybit or Binance futures account with leverage-aware execution.',
     trading_mode_connect_exchange:
       'Connect your {{exchange}} API key to enable this mode.',
+    futures_agent_warning:
+      'Futures workflows trade perpetual contracts with leverage. Keep enough margin in your futures wallet to avoid liquidation.',
+    futures_default_leverage: 'Default leverage',
+    futures_default_leverage_hint:
+      'Used for initial position sizing unless overridden by the agent. Must be between 1 and 125.',
+    futures_margin_mode: 'Margin mode',
+    futures_margin_mode_cross: 'Cross',
+    futures_margin_mode_isolated: 'Isolated',
+    futures_wallet_warning:
+      'Futures workflows use your futures wallet balances and margin. Keep funds in the futures account while the bot is running.',
+    futures_leverage_required:
+      'Enter a default leverage before enabling futures mode.',
+    futures_metrics_unavailable:
+      'Futures performance metrics will be available in a future update.',
+    futures_history_placeholder:
+      'Futures trade executions will appear here once the dedicated history view is available.',
     connect_binance_api: 'Connect your Binance API',
     connect_exchange_api: 'Connect your exchange API',
     my_workflows: 'Portfolios',
@@ -294,6 +310,22 @@ const translations: Record<Lang, Record<string, string>> = {
       'Фьючерсные боты работают с вашим фьючерсным счётом Bybit или Binance и учитывают настройки плеча.',
     trading_mode_connect_exchange:
       'Подключите API ключ {{exchange}}, чтобы включить этот режим.',
+    futures_agent_warning:
+      'Фьючерсные портфели торгуют бессрочными контрактами с плечом. Держите достаточную маржу на фьючерсном кошельке, чтобы избегать ликвидаций.',
+    futures_default_leverage: 'Базовое плечо',
+    futures_default_leverage_hint:
+      'Используется для открытия позиций по умолчанию. Значение должно быть от 1 до 125.',
+    futures_margin_mode: 'Режим маржи',
+    futures_margin_mode_cross: 'Кросс',
+    futures_margin_mode_isolated: 'Изолированная',
+    futures_wallet_warning:
+      'Фьючерсные портфели используют баланс и маржу фьючерсного счёта. Убедитесь, что средства остаются на фьючерсном кошельке во время работы бота.',
+    futures_leverage_required:
+      'Укажите базовое плечо перед включением фьючерсного режима.',
+    futures_metrics_unavailable:
+      'Показатели по фьючерсам появятся в одном из следующих обновлений.',
+    futures_history_placeholder:
+      'История сделок по фьючерсам появится здесь после запуска отдельного отчёта.',
     connect_binance_api: 'Подключите ваш Binance API',
     connect_exchange_api: 'Подключите API биржи',
     my_workflows: 'Портфели',
