@@ -4,6 +4,20 @@ interface ServiceWorkerMessage {
 
 const UPDATE_INTERVAL_MS = 15 * 60 * 1000;
 
+/**
+ * Registers the UI service worker and keeps it fresh by:
+ *
+ * - explicitly asking the browser to re-download `/sw.js` on an interval and
+ *   whenever the tab becomes visible again (`registration.update()`). The
+ *   browser only fires `updatefound` if that network request produced a new
+ *   worker script.
+ * - requesting that any newly installed worker activates immediately while an
+ *   existing controller is present so the new bundle can take over without the
+ *   usual waiting period.
+ * - reloading the page only after the browser confirms the new worker has been
+ *   activated (via `controllerchange`) to avoid unnecessary refreshes when no
+ *   update was found.
+ */
 async function registerServiceWorker(): Promise<void> {
   const registration = await navigator.serviceWorker.register('/sw.js');
 
@@ -47,6 +61,9 @@ async function registerServiceWorker(): Promise<void> {
   });
 
   const requestUpdate = () => {
+    // Ask the browser to fetch the latest `/sw.js` from the UI server. If the
+    // contents are unchanged nothing else happens; otherwise the browser emits
+    // `updatefound` and the flow above activates the new worker.
     void registration.update();
   };
 
