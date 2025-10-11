@@ -1,9 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import buildServer from '../src/server.js';
 import { encrypt } from '../src/util/crypto.js';
 import { insertUser } from './repos/users.js';
 import { setAiKey, shareAiKey } from '../src/repos/ai-api-key.js';
 import { authCookies } from './helpers.js';
+
+const listModelsMock = vi.fn();
+
+vi.mock('openai', () => {
+  class APIError extends Error {}
+
+  return {
+    default: vi.fn(() => ({
+      responses: { create: vi.fn() },
+      models: { list: listModelsMock },
+    })),
+    APIError,
+  };
+});
+
+beforeEach(() => {
+  listModelsMock.mockReset();
+});
 
 describe('model routes', () => {
   it('returns filtered models', async () => {
@@ -13,20 +31,14 @@ describe('model routes', () => {
     const userId = await insertUser('1', null);
     await setAiKey({ userId, apiKeyEnc: enc });
 
-    const fetchMock = vi.fn();
-    const originalFetch = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: [
-          { id: 'foo-search' },
-          { id: 'gpt-3.5' },
-          { id: 'o3-mini' },
-          { id: 'gpt-5' },
-        ],
-      }),
-    } as any);
+    listModelsMock.mockResolvedValueOnce({
+      data: [
+        { id: 'foo-search' },
+        { id: 'gpt-3.5' },
+        { id: 'o3-mini' },
+        { id: 'gpt-5' },
+      ],
+    });
 
     const res = await app.inject({
       method: 'GET',
@@ -37,7 +49,6 @@ describe('model routes', () => {
     expect(res.json()).toEqual({ models: ['foo-search', 'o3-mini', 'gpt-5'] });
 
     await app.close();
-    (globalThis as any).fetch = originalFetch;
   });
 
   it('requires a key', async () => {
@@ -59,13 +70,7 @@ describe('model routes', () => {
     const userId3 = await insertUser('3', null);
     await setAiKey({ userId: userId3, apiKeyEnc: enc });
 
-    const fetchMock = vi.fn();
-    const originalFetch = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ data: [{ id: 'gpt-5' }] }),
-    } as any);
+    listModelsMock.mockResolvedValueOnce({ data: [{ id: 'gpt-5' }] });
 
     let res = await app.inject({
       method: 'GET',
@@ -82,10 +87,9 @@ describe('model routes', () => {
       cookies: authCookies(userId3),
     });
     expect(res.statusCode).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(listModelsMock).toHaveBeenCalledTimes(1);
 
     await app.close();
-    (globalThis as any).fetch = originalFetch;
   });
 
   it("forbids accessing another user's models", async () => {
@@ -115,10 +119,6 @@ describe('model routes', () => {
       model: 'gpt-5',
     });
 
-    const fetchMock = vi.fn();
-    const originalFetch = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
-
     const res = await app.inject({
       method: 'GET',
       url: `/api/users/${userId}/models`,
@@ -126,9 +126,8 @@ describe('model routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ models: ['gpt-5'] });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(listModelsMock).not.toHaveBeenCalled();
 
-    (globalThis as any).fetch = originalFetch;
     await app.close();
   });
 });
