@@ -21,6 +21,7 @@ import TextInput from './TextInput';
 import Toggle from '../ui/Toggle';
 import SelectInput from './SelectInput';
 import FormField from './FormField';
+import PortfolioAllocationPreview from './PortfolioAllocationPreview';
 
 const SHOW_EARN_FEATURE = false;
 
@@ -151,6 +152,17 @@ export default function PortfolioWorkflowFields({
     onTokensChange?.(newTokens);
   };
 
+  const cashTokenSymbol = tokensWatch[0]?.token;
+  const allocationTokens = tokensWatch
+    .slice(1)
+    .filter((token): token is { token: string; minAllocation: number } =>
+      Boolean(token?.token),
+    )
+    .map((token) => ({
+      token: token.token,
+      minAllocation: token.minAllocation,
+    }));
+
   return (
     <>
       <div className="space-y-2 w-fit">
@@ -245,6 +257,12 @@ export default function PortfolioWorkflowFields({
           </button>
         )}
       </div>
+      <PortfolioAllocationPreview
+        cashToken={cashTokenSymbol}
+        tokens={allocationTokens}
+        balances={balances}
+        useEarn={useEarn}
+      />
       <div
         className={`grid ${summaryGridCols} items-center gap-x-4 gap-y-2 mt-2`}
       >

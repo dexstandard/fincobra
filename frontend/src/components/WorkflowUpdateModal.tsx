@@ -83,6 +83,7 @@ export default function WorkflowUpdateModal({
     accountBalances,
     isAccountLoading,
     activeExchange,
+    activeTradingMode,
   } = usePrerequisites(tokenSymbols, {
     exchange: desiredExchange,
     mode: tradingMode,
@@ -354,6 +355,7 @@ export default function WorkflowUpdateModal({
               <WalletBalances
                 balances={balances}
                 exchange={activeExchange}
+                mode={activeTradingMode}
               />
             </div>
           </div>

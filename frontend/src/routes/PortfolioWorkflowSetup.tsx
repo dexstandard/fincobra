@@ -12,7 +12,6 @@ import { useToast } from '../lib/useToast';
 import Button from '../components/ui/Button';
 import { usePrerequisites } from '../lib/usePrerequisites';
 import WorkflowStartButton from '../components/WorkflowStartButton';
-import WalletBalances from '../components/WalletBalances';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -82,7 +81,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
     balances,
     accountBalances,
     isAccountLoading,
-    activeExchange,
   } = usePrerequisites(tokenSymbols, {
     exchange: desiredExchange,
     mode: tradingMode,
@@ -357,14 +355,6 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               </p>
             </div>
           </div>
-          {activeExchange && (
-            <div className="mt-2">
-              <WalletBalances
-                balances={balances}
-                exchange={activeExchange}
-              />
-            </div>
-          )}
         </div>
       )}
 
