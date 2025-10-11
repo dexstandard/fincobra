@@ -55,6 +55,11 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
   const [aiProvider, setAiProvider] = useState<
     'openai' | 'groq'
   >(workflow?.aiProvider ?? 'openai');
+  const handleAiProviderChange = (provider: string) => {
+    if (provider === 'openai' || provider === 'groq') {
+      setAiProvider(provider);
+    }
+  };
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
   const [useEarn, setUseEarn] = useState(workflow?.useEarn ?? false);
   const [tokenSymbols, setTokenSymbols] = useState(
@@ -224,7 +229,7 @@ export default function PortfolioWorkflowSetup({ workflow }: Props) {
               type="ai"
               label={t('ai_provider')}
               value={aiProvider}
-              onChange={setAiProvider}
+              onChange={handleAiProviderChange}
             />
             {hasAiKey && (models.length || workflow?.model) && (
               <div>
