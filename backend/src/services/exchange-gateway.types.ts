@@ -57,6 +57,12 @@ export interface ExchangeFuturesLeverageRequest {
   leverage: number;
 }
 
+export interface ExchangeFuturesMarginModeRequest {
+  symbol: string;
+  marginMode: 'cross' | 'isolated';
+  leverage?: number | null;
+}
+
 export interface ExchangeFuturesPositionIntent {
   symbol: string;
   positionSide: ExchangePositionSide;
@@ -123,6 +129,10 @@ export interface ExchangeGatewaySpotModule {
 
 export interface ExchangeGatewayFuturesModule {
   fetchWallet?(userId: string): Promise<ExchangeFuturesWallet | null>;
+  setMarginMode?(
+    userId: string,
+    request: ExchangeFuturesMarginModeRequest,
+  ): Promise<unknown>;
   setLeverage(
     userId: string,
     request: ExchangeFuturesLeverageRequest,

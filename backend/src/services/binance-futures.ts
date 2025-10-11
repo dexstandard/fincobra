@@ -57,6 +57,24 @@ function mapCloseSide(positionSide: 'LONG' | 'SHORT'): 'BUY' | 'SELL' {
   return positionSide === 'LONG' ? 'SELL' : 'BUY';
 }
 
+export async function setFuturesMarginMode(
+  userId: string,
+  symbol: string,
+  marginMode: 'cross' | 'isolated',
+) {
+  const marginType = marginMode === 'isolated' ? 'ISOLATED' : 'CROSSED';
+  return withUserCreds(userId, async (creds) =>
+    postSignedFuturesRequest(creds, {
+      path: '/fapi/v1/marginType',
+      errorMessage: 'failed to set futures margin mode',
+      params: {
+        symbol: symbol.toUpperCase(),
+        marginType,
+      },
+    }),
+  );
+}
+
 export async function setFuturesLeverage(
   userId: string,
   symbol: string,
