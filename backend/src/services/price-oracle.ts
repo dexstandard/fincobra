@@ -22,7 +22,7 @@ const PRICE_FEEDS: Record<SupportedOracleSymbol, OracleFeedConfig> = {
   USDC: { address: '0x8fffffd4afb6115b954bd326cbe7b4ba576818f6' },
 };
 
-const PRICE_CACHE_TTL_SECONDS = 30;
+const PRICE_CACHE_TTL_SECONDS = 10;
 
 const priceCache = new NodeCache({
   stdTTL: PRICE_CACHE_TTL_SECONDS,
