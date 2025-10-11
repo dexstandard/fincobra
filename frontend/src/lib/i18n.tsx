@@ -67,7 +67,7 @@ const translations: Record<Lang, Record<string, string>> = {
     spot_trading: 'Spot trading',
     futures_trading: 'Futures trading',
     binance_capabilities:
-      'Supports Binance spot trading, Earn balances, and USD value previews.',
+      'Supports Binance spot and futures trading, Earn balances, and USD value previews.',
     bybit_capabilities:
       'Supports Bybit USDT perpetual futures trading with leverage controls.',
     trading_mode: 'Trading mode',
@@ -284,7 +284,7 @@ const translations: Record<Lang, Record<string, string>> = {
     spot_trading: 'Спот-торговля',
     futures_trading: 'Фьючерсная торговля',
     binance_capabilities:
-      'Поддерживает спот-торговлю на Binance, балансы Earn и просмотр стоимости в USD.',
+      'Поддерживает спот- и фьючерсную торговлю на Binance, балансы Earn и просмотр стоимости в USD.',
     bybit_capabilities:
       'Поддерживает торговлю фьючерсами USDT perpetual на Bybit с управлением плечом.',
     trading_mode: 'Режим торговли',

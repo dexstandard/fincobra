@@ -20,8 +20,10 @@ export default function ExchangeApiKeySection({ exchange, label }: Props) {
     exchange === 'binance'
       ? t('binance_capabilities')
       : t('bybit_capabilities');
-  const modeLabel =
-    exchange === 'binance' ? t('spot_trading') : t('futures_trading');
+  const modeLabels =
+    exchange === 'binance'
+      ? [t('spot_trading'), t('futures_trading')]
+      : [t('futures_trading')];
   const exchangeFields = [
     {
       name: 'key',
@@ -55,9 +57,14 @@ export default function ExchangeApiKeySection({ exchange, label }: Props) {
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <span>{label}</span>
-        <span className="uppercase tracking-wide text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
-          {modeLabel}
-        </span>
+        {modeLabels.map((mode) => (
+          <span
+            key={mode}
+            className="uppercase tracking-wide text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800"
+          >
+            {mode}
+          </span>
+        ))}
       </div>
       <p className="mt-1 text-sm text-gray-600">{capabilityCopy}</p>
     </div>
