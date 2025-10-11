@@ -38,7 +38,7 @@ import {
   computeDerivedItem,
   sortDerivedItems,
   computeWeight,
-} from './news-analyst.js';
+} from './news-heuristics.js';
 
 export const spotDeveloperInstructions = [
   'Primary Goal: Grow total portfolio USD value and monitor PnL every decision cycle.',
