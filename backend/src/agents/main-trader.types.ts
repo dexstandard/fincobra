@@ -1,10 +1,12 @@
 import type { FastifyBaseLogger } from 'fastify';
+import type { AiApiProvider } from '../repos/ai-api-key.types.js';
 import type { MarketOverviewPayload } from '../services/indicators.types.js';
 export interface RunParams {
   log: FastifyBaseLogger;
   model: string;
   apiKey: string;
   portfolioId: string;
+  aiProvider: AiApiProvider;
 }
 
 export interface RebalancePosition {

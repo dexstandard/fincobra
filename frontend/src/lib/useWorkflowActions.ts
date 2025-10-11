@@ -10,8 +10,9 @@ export function useWorkflowActions(id?: string) {
   const toast = useToast();
 
   const startMut = useMutation({
-    mutationFn: async () => {
-      await api.post(`/portfolio-workflows/${id}/start`);
+    mutationFn: async (provider?: 'openai' | 'groq') => {
+      const body = provider ? { aiProvider: provider } : undefined;
+      await api.post(`/portfolio-workflows/${id}/start`, body);
     },
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['workflow', id, user?.id] }),

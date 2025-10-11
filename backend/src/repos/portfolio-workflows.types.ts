@@ -1,3 +1,5 @@
+import type { AiApiProvider } from './ai-api-key.types.js';
+
 export interface PortfolioWorkflowToken {
   token: string;
   minAllocation: number;
@@ -7,6 +9,7 @@ export interface PortfolioWorkflow {
   id: string;
   userId: string;
   model: string | null;
+  aiProvider: AiApiProvider;
   status: string;
   createdAt: string;
   startBalance: number | null;
@@ -25,6 +28,7 @@ export interface PortfolioWorkflow {
 export interface PortfolioWorkflowInsert {
   userId: string;
   model: string | null;
+  aiProvider: AiApiProvider;
   status: string;
   startBalance: number | null;
   cashToken: string;
@@ -40,6 +44,7 @@ export interface PortfolioWorkflowInsert {
 export interface PortfolioWorkflowUpdate {
   id: string;
   model: string | null;
+  aiProvider: AiApiProvider;
   status: string;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
@@ -55,6 +60,7 @@ export interface PortfolioWorkflowUpdate {
 export interface PortfolioWorkflowInactiveSearch {
   userId: string;
   model: string | null;
+  aiProvider: AiApiProvider;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;
@@ -66,6 +72,7 @@ export interface PortfolioWorkflowInactiveSearch {
 
 export interface PortfolioWorkflowUserApiKeys {
   aiApiKeyEnc?: string | null;
+  groqAiApiKeyEnc?: string | null;
   binanceApiKeyEnc?: string | null;
   binanceApiSecretEnc?: string | null;
   binanceKeyId?: string | null;
@@ -78,6 +85,7 @@ export interface ActivePortfolioWorkflow {
   id: string;
   userId: string;
   model: string | null;
+  aiProvider: AiApiProvider;
   cashToken: string;
   tokens: PortfolioWorkflowToken[];
   risk: string;

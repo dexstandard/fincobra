@@ -71,9 +71,15 @@ const sampleMarketOverview = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../src/services/openai-client.js', () => ({
-  callAi: vi.fn().mockResolvedValue('ok'),
-}));
+vi.mock('../src/services/ai-service.js', async () => {
+  const actual = await vi.importActual<
+    typeof import('../src/services/ai-service.js')
+  >('../src/services/ai-service.js');
+  return {
+    ...actual,
+    callAi: vi.fn().mockResolvedValue('ok'),
+  };
+});
 
 vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),

@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import NodeCache from 'node-cache';
-import { callAi } from '../services/openai-client.js';
+import { callAi, extractJson as extractAiJson } from '../services/ai-service.js';
 import { isStablecoin } from '../util/tokens.js';
 import {
   fetchMarketOverview,
@@ -657,26 +657,17 @@ export async function collectPromptData(
   return prompt;
 }
 
-function extractResult(res: string): MainTraderDecision | null {
-  try {
-    const json = JSON.parse(res);
-    const outputs = Array.isArray((json as any).output)
-      ? (json as any).output
-      : [];
-    const msg = outputs.find(
-      (o: any) => o.type === 'message' || o.id?.startsWith('msg_'),
-    );
-    const text = msg?.content?.[0]?.text;
-    if (typeof text !== 'string') return null;
-    const parsed = JSON.parse(text);
-    return parsed.result ?? null;
-  } catch {
-    return null;
-  }
+function extractResult(
+  provider: RunParams['aiProvider'],
+  res: string,
+): MainTraderDecision | null {
+  const parsed = extractAiJson<{ result?: MainTraderDecision }>(provider, res);
+  if (!parsed) return null;
+  return parsed.result ?? null;
 }
 
 export async function run(
-  { log, model, apiKey }: RunParams,
+  { log, model, apiKey, aiProvider }: RunParams,
   prompt: RebalancePrompt,
   instructionsOverride?: string,
 ): Promise<MainTraderDecision | null> {
@@ -684,6 +675,7 @@ export async function run(
     ? instructionsOverride
     : developerInstructions;
   const res = await callAi(
+    aiProvider,
     model,
     instructions,
     rebalanceResponseSchema,
@@ -691,7 +683,7 @@ export async function run(
     apiKey,
     true,
   );
-  const decision = extractResult(res);
+  const decision = extractResult(aiProvider, res);
   if (!decision) {
     log.error('main trader returned invalid response');
     return null;

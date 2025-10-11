@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { callAi } from '../src/services/openai-client.js';
+import { callAi } from '../src/services/ai-service.js';
 import {
   developerInstructions,
   rebalanceResponseSchema,
@@ -42,6 +42,7 @@ describe('callAi structured output', () => {
       ],
     };
     await callAi(
+      'openai',
       'gpt-test',
       developerInstructions,
       rebalanceResponseSchema,
@@ -100,6 +101,7 @@ describe('callAi structured output', () => {
       marketData: {},
     };
     await callAi(
+      'openai',
       'gpt-test',
       developerInstructions,
       rebalanceResponseSchema,

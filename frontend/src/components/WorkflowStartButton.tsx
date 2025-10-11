@@ -18,6 +18,7 @@ interface WorkflowPreviewDetails {
   manualRebalance: boolean;
   useEarn: boolean;
   exchangeKeyId: string | null;
+  aiProvider: 'openai' | 'groq';
 }
 
 interface Props {
@@ -51,7 +52,9 @@ export default function WorkflowStartButton({
     setIsCreating(true);
     try {
       if (workflow) {
-        await api.post(`/portfolio-workflows/${workflow.id}/start`);
+        await api.post(`/portfolio-workflows/${workflow.id}/start`, {
+          aiProvider: workflowData.aiProvider,
+        });
         queryClient.invalidateQueries({ queryKey: ['workflows'] });
         toast.show(t('workflow_started_success'), 'success');
         navigate('/');
@@ -59,6 +62,7 @@ export default function WorkflowStartButton({
         const [cashToken, ...positions] = workflowData.tokens;
         const res = await api.post('/portfolio-workflows', {
           model,
+          aiProvider: workflowData.aiProvider,
           cash: cashToken.token.toUpperCase(),
           tokens: positions.map((t) => ({
             token: t.token.toUpperCase(),
