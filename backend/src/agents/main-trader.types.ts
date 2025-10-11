@@ -78,7 +78,9 @@ export interface StablecoinOracleQuoteReport {
 
 export interface StablecoinOracleReport {
   pair: 'USDC/USDT';
-  quotes: Record<SupportedOracleSymbol, StablecoinOracleQuoteReport>;
+  quotes: Partial<
+    Record<SupportedOracleSymbol, StablecoinOracleQuoteReport>
+  >;
 }
 
 export interface PromptReport {

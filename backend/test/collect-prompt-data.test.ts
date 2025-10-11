@@ -199,19 +199,48 @@ describe('collectPromptData', () => {
     };
 
     const prompt = await collectPromptData(row, mockLogger());
+    expect(getUsdPriceMock).toHaveBeenCalledTimes(1);
     expect(getUsdPriceMock).toHaveBeenCalledWith('USDT');
-    expect(getUsdPriceMock).toHaveBeenCalledWith('USDC');
     const stableReport = prompt?.reports?.find((r) => r.token === 'USDC/USDT');
     expect(stableReport?.stablecoinOracle?.pair).toBe('USDC/USDT');
     expect(
-      stableReport?.stablecoinOracle?.quotes.USDT.usdPrice ?? 0,
+      stableReport?.stablecoinOracle?.quotes.USDT?.usdPrice ?? 0,
     ).toBeCloseTo(0.999);
     expect(
-      stableReport?.stablecoinOracle?.quotes.USDC.usdPrice ?? 0,
-    ).toBeCloseTo(1.001);
+      stableReport?.stablecoinOracle?.quotes.USDC,
+    ).toBeUndefined();
     expect(
-      stableReport?.stablecoinOracle?.quotes.USDT.updatedAt,
+      stableReport?.stablecoinOracle?.quotes.USDT?.updatedAt,
     ).toBe('2025-01-01T00:00:00.000Z');
+  });
+
+  it('requests matching oracle quote for USDC cash token', async () => {
+    const row: ActivePortfolioWorkflow = {
+      id: 'stable-report-usdc',
+      userId: 'stable-user-usdc',
+      model: 'm',
+      cashToken: 'USDC',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyId: null,
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: 'stable-report-usdc',
+    };
+
+    const prompt = await collectPromptData(row, mockLogger());
+    expect(getUsdPriceMock).toHaveBeenCalledTimes(1);
+    expect(getUsdPriceMock).toHaveBeenCalledWith('USDC');
+    const stableReport = prompt?.reports?.find((r) => r.token === 'USDC/USDT');
+    expect(stableReport?.stablecoinOracle?.quotes.USDT).toBeUndefined();
+    expect(
+      stableReport?.stablecoinOracle?.quotes.USDC?.usdPrice ?? 0,
+    ).toBeCloseTo(1.001);
   });
 
   it('throws descriptive error when a token pair is unsupported', async () => {

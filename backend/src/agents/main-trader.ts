@@ -20,6 +20,7 @@ import { getNewsByToken } from '../repos/news.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
 import { getUsdPrice } from '../services/price-oracle.js';
+import type { SupportedOracleSymbol } from '../services/price-oracle.types.js';
 import type {
   RunParams,
   RebalancePosition,
@@ -29,6 +30,8 @@ import type {
   MainTraderDecision,
   MainTraderOrder,
   NewsContext,
+  PromptReport,
+  StablecoinOracleQuoteReport,
 } from './main-trader.types.js';
 import {
   computeDerivedItem,
@@ -262,25 +265,21 @@ async function buildStablecoinOracleReport(
   }
 
   try {
-    const [usdtQuote, usdcQuote] = await Promise.all([
-      getUsdPrice('USDT'),
-      getUsdPrice('USDC'),
-    ]);
-
+    const symbol: SupportedOracleSymbol = normalized;
+    const quote = await getUsdPrice(symbol);
+    const quotes: Partial<
+      Record<SupportedOracleSymbol, StablecoinOracleQuoteReport>
+    > = {
+      [symbol]: {
+        usdPrice: quote.price,
+        updatedAt: quote.updatedAt.toISOString(),
+      },
+    };
     return {
       token: 'USDC/USDT',
       stablecoinOracle: {
         pair: 'USDC/USDT',
-        quotes: {
-          USDT: {
-            usdPrice: usdtQuote.price,
-            updatedAt: usdtQuote.updatedAt.toISOString(),
-          },
-          USDC: {
-            usdPrice: usdcQuote.price,
-            updatedAt: usdcQuote.updatedAt.toISOString(),
-          },
-        },
+        quotes,
       },
     };
   } catch (err) {
