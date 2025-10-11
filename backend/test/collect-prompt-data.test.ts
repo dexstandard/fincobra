@@ -236,6 +236,33 @@ describe('collectPromptData', () => {
     expect(prompt?.previousReports?.[0]?.pnlShiftUsd).toBeCloseTo(100);
   });
 
+  it('computes pnl shifts for all previous reports when current pnl is available', async () => {
+    const row: ActivePortfolioWorkflow = {
+      id: '1',
+      userId: 'u1',
+      model: 'm',
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      aiApiKeyId: null,
+      aiApiKeyEnc: '',
+      manualRebalance: false,
+      useEarn: false,
+      startBalance: 20000,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      portfolioId: '1',
+    };
+
+    const prompt = await collectPromptData(row, mockLogger());
+
+    expect(prompt?.previousReports).toHaveLength(3);
+    expect(prompt?.previousReports?.[0]?.pnlShiftUsd).toBeCloseTo(500);
+    expect(prompt?.previousReports?.[1]?.pnlShiftUsd).toBeCloseTo(100);
+    expect(prompt?.previousReports?.[2]?.pnlShiftUsd).toBeCloseTo(100);
+  });
+
   it('handles three-token portfolio', async () => {
     const row: ActivePortfolioWorkflow = {
       id: '1',

@@ -515,6 +515,13 @@ export async function collectPromptData(
     }),
   );
 
+  const snapshots = [
+    ...(typeof portfolio.pnlUsd === 'number'
+      ? [{ pnlUsd: portfolio.pnlUsd }]
+      : []),
+    ...promptSnapshots,
+  ];
+
   const previousReports: PreviousReport[] = [];
   for (let index = 0; index < prevRows.length; index += 1) {
     const r = prevRows[index];
@@ -585,8 +592,8 @@ export async function collectPromptData(
       ...(orders.length ? { orders } : {}),
       ...(strategyName ? { strategyName } : {}),
     };
-    const currentSnapshot = promptSnapshots[index];
-    const previousSnapshot = promptSnapshots[index + 1];
+    const currentSnapshot = snapshots[index];
+    const previousSnapshot = snapshots[index + 1];
     if (
       currentSnapshot &&
       typeof currentSnapshot.pnlUsd === 'number' &&
