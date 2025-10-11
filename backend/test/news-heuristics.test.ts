@@ -4,7 +4,7 @@ import {
   sortDerivedItems,
   computeWeight,
   computeTimeDecay,
-} from '../src/agents/news-analyst.js';
+} from '../src/agents/news-heuristics.js';
 
 describe('news analyst helpers', () => {
   it('computes weight with reputation and time decay', () => {
