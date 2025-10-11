@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { callAi } from '../src/services/ai-service.js';
 import {
   developerInstructions,
@@ -7,13 +7,40 @@ import {
 import { type RebalancePrompt } from '../src/agents/main-trader.types.js';
 import { LimitOrderStatus } from '../src/repos/limit-orders.types.js';
 
+const createResponseMock = vi.fn();
+
+vi.mock('openai', () => {
+  class APIError extends Error {
+    status?: number;
+    error?: unknown;
+
+    constructor(message?: string, options?: { status?: number; error?: unknown }) {
+      super(message);
+      this.status = options?.status;
+      this.error = options?.error;
+    }
+  }
+
+  return {
+    default: vi.fn(() => ({
+      responses: {
+        create: createResponseMock,
+      },
+      models: {
+        list: vi.fn(),
+      },
+    })),
+    APIError,
+  };
+});
+
+beforeEach(() => {
+  createResponseMock.mockReset();
+  createResponseMock.mockResolvedValue({ output: [] });
+});
+
 describe('callAi structured output', () => {
   it('includes json schema in request', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, text: async () => '' });
-    const originalFetch = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
     const prompt: RebalancePrompt = {
       policy: { floor: { USDT: 20 } },
       cash: 'USDT',
@@ -49,16 +76,14 @@ describe('callAi structured output', () => {
       prompt,
       'key',
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, opts] = fetchMock.mock.calls[0];
-    const body = JSON.parse(opts.body);
-    expect(opts.body).toBe(JSON.stringify(body));
+    expect(createResponseMock).toHaveBeenCalledTimes(1);
+    const [body] = createResponseMock.mock.calls[0];
     expect(body.instructions).toMatch(
       /You are a day-trading portfolio manager. Autonomously choose ANY trading strategy, set target allocations, and optionally place orders consistent with those targets/i,
     );
     expect(body.instructions).toMatch(/On error, return error message/i);
     expect(typeof body.input).toBe('string');
-    const parsed = JSON.parse(body.input);
+    const parsed = JSON.parse(body.input as string);
     expect(parsed.previousReports).toEqual([
       { ts: '2025-01-01T00:00:00.000Z', shortReport: 'p1' },
       {
@@ -76,19 +101,14 @@ describe('callAi structured output', () => {
       },
     ]);
     expect(body.tools).toBeUndefined();
-    expect(body.text.format.type).toBe('json_schema');
-    const anyOf = body.text.format.schema.properties.result.anyOf;
+    expect(body.text?.format?.type).toBe('json_schema');
+    const anyOf =
+      body.text?.format?.schema?.properties?.result?.anyOf ?? undefined;
     expect(Array.isArray(anyOf)).toBe(true);
     expect(anyOf).toHaveLength(2);
-    (globalThis as any).fetch = originalFetch;
   });
 
   it('adds web search tool when enabled', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, text: async () => '' });
-    const originalFetch = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
     const prompt: RebalancePrompt = {
       reviewInterval: '1h',
       policy: { floor: {} },
@@ -109,9 +129,8 @@ describe('callAi structured output', () => {
       'key',
       true,
     );
-    const [, opts] = fetchMock.mock.calls[0];
-    const body = JSON.parse(opts.body);
-    expect(body.tools).toEqual([{ type: 'web_search_preview' }]);
-    (globalThis as any).fetch = originalFetch;
+    expect(createResponseMock).toHaveBeenCalledTimes(1);
+    const [body] = createResponseMock.mock.calls[0];
+    expect(body.tools).toEqual([{ type: 'web_search' }]);
   });
 });

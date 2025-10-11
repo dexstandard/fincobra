@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { cancelOrder: cancelOrderMock, fetchOrder: fetchOrderMock } = vi.hoisted(
   () => ({
@@ -6,6 +6,14 @@ const { cancelOrder: cancelOrderMock, fetchOrder: fetchOrderMock } = vi.hoisted(
     fetchOrder: vi.fn().mockResolvedValue({ status: 'CANCELED' }),
   }),
 );
+
+const { modelsListMock } = vi.hoisted(() => ({
+  modelsListMock: vi.fn(),
+}));
+
+const { fetchMock } = vi.hoisted(() => ({
+  fetchMock: vi.fn(),
+}));
 
 vi.mock('../src/services/binance-client.js', async () => {
   const actual = await vi.importActual<
@@ -17,6 +25,20 @@ vi.mock('../src/services/binance-client.js', async () => {
     fetchOrder: fetchOrderMock,
   };
 });
+
+vi.mock('openai', () => ({
+  default: vi.fn(() => ({
+    responses: {
+      create: vi.fn(),
+    },
+    models: {
+      list: modelsListMock,
+    },
+  })),
+  APIError: class extends Error {},
+}));
+
+const originalFetch = globalThis.fetch;
 
 import buildServer from '../src/server.js';
 import { insertUser, insertAdminUser } from './repos/users.js';
@@ -52,6 +74,20 @@ beforeEach(() => {
   removeWorkflowFromScheduleSpy.mockClear();
   (cancelOrder as any).mockClear();
   cancelOrdersSpy.mockClear();
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(
+    new Response('0.0.0.0', {
+      status: 200,
+      headers: { 'content-type': 'text/plain' },
+    }),
+  );
+  (globalThis as any).fetch = fetchMock as typeof fetch;
+  modelsListMock.mockReset();
+  modelsListMock.mockResolvedValue({ data: [] });
+});
+
+afterEach(() => {
+  (globalThis as any).fetch = originalFetch;
 });
 
 describe('AI API key routes', () => {
@@ -59,14 +95,10 @@ describe('AI API key routes', () => {
     const app = await buildServer();
     const userId = await insertUser('1');
 
-    const fetchMock = vi.fn();
-    const originalFetch = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
-
     const key1 = 'aikey1234567890';
     const key2 = 'aikeyabcdefghij';
 
-    fetchMock.mockResolvedValueOnce({ ok: false } as any);
+    modelsListMock.mockRejectedValueOnce(new Error('Unauthorized'));
     let res = await app.inject({
       method: 'POST',
       url: `/api/users/${userId}/ai-key`,
@@ -78,7 +110,6 @@ describe('AI API key routes', () => {
     let row = await getAiKey(userId);
     expect(row?.aiApiKeyEnc).toBeUndefined();
 
-    fetchMock.mockResolvedValueOnce({ ok: true } as any);
     res = await app.inject({
       method: 'POST',
       url: `/api/users/${userId}/ai-key`,
@@ -106,7 +137,7 @@ describe('AI API key routes', () => {
     });
     expect(res.statusCode).toBe(409);
 
-    fetchMock.mockResolvedValueOnce({ ok: false } as any);
+    modelsListMock.mockRejectedValueOnce(new Error('Unauthorized'));
     res = await app.inject({
       method: 'PUT',
       url: `/api/users/${userId}/ai-key`,
@@ -122,7 +153,6 @@ describe('AI API key routes', () => {
     });
     expect(res.json()).toMatchObject({ key: '<REDACTED>' });
 
-    fetchMock.mockResolvedValueOnce({ ok: true } as any);
     res = await app.inject({
       method: 'PUT',
       url: `/api/users/${userId}/ai-key`,
@@ -147,15 +177,10 @@ describe('AI API key routes', () => {
     expect(res.statusCode).toBe(404);
 
     await app.close();
-    (globalThis as any).fetch = originalFetch;
   });
 
   it('allows admin to share and revoke ai key', async () => {
     const app = await buildServer();
-    const fetchMock = vi.fn();
-    const originalFetch = globalThis.fetch;
-    (globalThis as any).fetch = fetchMock;
-    fetchMock.mockResolvedValue({ ok: true } as any);
     const adminId = await insertAdminUser(
       'admin1',
       encrypt('admin@example.com', process.env.KEY_PASSWORD!),
@@ -306,7 +331,6 @@ describe('AI API key routes', () => {
     );
 
     await app.close();
-    (globalThis as any).fetch = originalFetch;
   });
 
   it("forbids accessing another user's ai key", async () => {

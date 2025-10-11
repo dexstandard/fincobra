@@ -1,16 +1,12 @@
+import OpenAI, { APIError } from 'openai';
 import type {
   AIResponse,
   AIResponseContent,
   AIResponseOutput,
 } from './openai-client.types.js';
 
-const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
 const RETRYABLE_STATUS = 502;
 const RETRY_DELAY_MS = 2_000;
-
-interface OpenAiModel {
-  id: string;
-}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -18,15 +14,48 @@ function delay(ms: number): Promise<void> {
   });
 }
 
+function createClient(apiKey: string): OpenAI {
+  return new OpenAI({ apiKey });
+}
+
+type ResponseCreateParams = Parameters<
+  InstanceType<typeof OpenAI>['responses']['create']
+>[0];
+
+function isApiError(error: unknown): error is APIError {
+  return error instanceof APIError;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function formatErrorDetail(error: unknown): string {
+  if (isApiError(error)) {
+    if (typeof error.error === 'string') return error.error;
+    if (error.error) return compactJson(error.error);
+    return error.message;
+  }
+  if (error instanceof Error) return error.message;
+  return 'Unknown error';
+}
+
+function extractStatus(error: unknown): number | undefined {
+  return isApiError(error) ? error.status : undefined;
+}
+
 export async function callAi(
   model: string,
   developerInstructions: string,
-  schema: unknown,
+  schema: Record<string, unknown>,
   input: unknown,
   apiKey: string,
   webSearch = false,
 ): Promise<string> {
-  const body: Record<string, unknown> = {
+  const tools = webSearch
+    ? ([{ type: 'web_search' }] as ResponseCreateParams['tools'])
+    : undefined;
+  const body: ResponseCreateParams = {
     model,
     input: compactJson(input),
     instructions: developerInstructions,
@@ -38,26 +67,24 @@ export async function callAi(
         schema,
       },
     },
+    ...(tools ? { tools } : {}),
   };
-  if (webSearch) body.tools = [{ type: 'web_search_preview' }];
   let attempt = 0;
+  const client = createClient(apiKey);
   while (true) {
-    const res = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: compactJson(body),
-    });
-    const text = await res.text();
-    if (res.ok) return text;
-    if (res.status === RETRYABLE_STATUS && attempt === 0) {
-      attempt += 1;
-      await delay(RETRY_DELAY_MS);
-      continue;
+    try {
+      const response = await client.responses.create(body);
+      return compactJson(response);
+    } catch (error) {
+      const status = extractStatus(error);
+      if (status === RETRYABLE_STATUS && attempt === 0) {
+        attempt += 1;
+        await delay(RETRY_DELAY_MS);
+        continue;
+      }
+      const detail = formatErrorDetail(error);
+      throw new Error(`AI request failed: ${status ?? 'unknown'} ${detail}`);
     }
-    throw new Error(`AI request failed: ${res.status} ${text}`);
   }
 }
 
@@ -70,10 +97,6 @@ export function compactJson(value: unknown): string {
     }
   }
   return JSON.stringify(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function isAIResponse(value: unknown): value is AIResponse {
@@ -126,7 +149,7 @@ export function extractJson<T>(res: string): T | null {
   }
 }
 
-function filterSupportedModels(models: OpenAiModel[]): string[] {
+function filterSupportedModels(models: { id: string }[]): string[] {
   return models
     .map((m) => m.id)
     .filter(
@@ -137,10 +160,9 @@ function filterSupportedModels(models: OpenAiModel[]): string[] {
 
 export async function verifyAiKey(key: string): Promise<boolean> {
   try {
-    const res = await fetch(OPENAI_MODELS_URL, {
-      headers: { Authorization: `Bearer ${key}` },
-    });
-    return res.ok;
+    const client = createClient(key);
+    await client.models.list();
+    return true;
   } catch {
     return false;
   }
@@ -150,12 +172,9 @@ export async function fetchSupportedModels(
   apiKey: string,
 ): Promise<string[] | null> {
   try {
-    const res = await fetch(OPENAI_MODELS_URL, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { data?: OpenAiModel[] };
-    return filterSupportedModels(body.data ?? []);
+    const client = createClient(apiKey);
+    const modelsPage = await client.models.list();
+    return filterSupportedModels(modelsPage.data ?? []);
   } catch {
     return null;
   }
