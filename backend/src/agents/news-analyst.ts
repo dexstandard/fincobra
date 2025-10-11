@@ -1,58 +1,9 @@
-export const HALF_LIFE_MS = 6 * 60 * 60 * 1000;
+import Groq from 'groq-sdk';
 
-export const REPUTATION_SCORES: Record<string, number> = {
-  'coindesk.com': 0.95,
-  'cointelegraph.com': 0.65,
-  'bitcoinist.com': 0.58,
-  'cryptopotato.com': 0.6,
-  'news.bitcoin.com': 0.5,
-};
+const MODEL_NAME = 'groq/compound';
+const DEFAULT_TEMPERATURE = 0.2;
 
-type EventType =
-  | 'Hack'
-  | 'StablecoinDepeg'
-  | 'Outage'
-  | 'Delisting'
-  | 'Listing'
-  | 'Unlock'
-  | 'Regulation'
-  | 'ETF'
-  | 'Macro'
-  | 'WhaleMove'
-  | 'Airdrop'
-  | 'Funding'
-  | 'Partnership'
-  | 'Upgrade'
-  | 'Launch'
-  | 'Rumor'
-  | 'Other';
-
-type Polarity = 'bullish' | 'bearish' | 'neutral';
-
-interface Rule {
-  id: string;
-  eventType: EventType;
-  regex: RegExp;
-  basePolarity: Polarity;
-  baseSeverity: number;
-  baseConfidence: number;
-}
-
-export interface DerivedItem {
-  title: string;
-  link: string | null;
-  pubDate: string | null;
-  domain: string | null;
-  weight: number;
-  eventType: EventType;
-  polarity: Polarity;
-  severity: number;
-  eventConfidence: number;
-  headlineScore: number;
-  matchedRules: string[];
-}
-
-const EVENT_PRIORITY: EventType[] = [
+export const NEWS_AGENT_EVENT_TYPES = [
   'Hack',
   'StablecoinDepeg',
   'Outage',
@@ -70,345 +21,356 @@ const EVENT_PRIORITY: EventType[] = [
   'Launch',
   'Rumor',
   'Other',
-];
+] as const;
 
-const RULES: Rule[] = [
-  {
-    id: 'R.H1',
-    eventType: 'Hack',
-    regex:
-      /\b(hack(ed|ing)?|exploit(ed|ing)?|breach|attack(ed)?|drain(ed)?|rug ?pull|vuln(erability)?|stolen|theft|phish(ed|ing))\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.8,
-    baseConfidence: 0.9,
-  },
-  {
-    id: 'R.SD1',
-    eventType: 'StablecoinDepeg',
-    regex: /\b(depeg(ged|ging|s)?|unpeg(ged|s)?|off[- ]?peg)\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.75,
-    baseConfidence: 0.85,
-  },
-  {
-    id: 'R.SD2',
-    eventType: 'StablecoinDepeg',
-    regex: /\b(reserve(s)? (issue|shortfall|problem)|collateral (issue|risk))\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.65,
-    baseConfidence: 0.75,
-  },
-  {
-    id: 'R.O1',
-    eventType: 'Outage',
-    regex:
-      /\b(outage|halt(ed)?|pause(d|s)?|suspend(ed|s|sion)|downtime|disruption|congestion|degrad(ed|ing)?)\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.7,
-    baseConfidence: 0.8,
-  },
-  {
-    id: 'R.D1',
-    eventType: 'Delisting',
-    regex: /\b(delist(s|ed|ing)?|remove(d)? from (trading|exchange))\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.65,
-    baseConfidence: 0.85,
-  },
-  {
-    id: 'R.L1',
-    eventType: 'Listing',
-    regex:
-      /\b(list(s|ed|ing)?|trading (pair|starts?|opens?))\b.*\b(binance|coinbase|kraken|okx|bybit)\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.6,
-    baseConfidence: 0.85,
-  },
-  {
-    id: 'R.L2',
-    eventType: 'Listing',
-    regex:
-      /\b(binance|coinbase|kraken|okx|bybit)\b.*\b(list(s|ed|ing)?|trading (pair|starts?|opens?))\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.6,
-    baseConfidence: 0.85,
-  },
-  {
-    id: 'R.U1',
-    eventType: 'Unlock',
-    regex: /\b(unlock(s|ed|ing)?|vesting|cliff)\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.6,
-    baseConfidence: 0.8,
-  },
-  {
-    id: 'R.REG1',
-    eventType: 'Regulation',
-    regex:
-      /\b(sec|cftc|fca|esma|doj|finma|mas)\b.*\b(lawsuit|sue(d)?|settlement|fine(d)?|charge(d)?|ban(ned)?|enforcement)\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.7,
-    baseConfidence: 0.85,
-  },
-  {
-    id: 'R.REG2',
-    eventType: 'Regulation',
-    regex: /\b(license|registered|authorization|green ?light)\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.55,
-    baseConfidence: 0.7,
-  },
-  {
-    id: 'R.ETF1',
-    eventType: 'ETF',
-    regex: /\b(etf|spot etf|futures etf)\b.*\b(approval|approved)\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.65,
-    baseConfidence: 0.85,
-  },
-  {
-    id: 'R.ETF2',
-    eventType: 'ETF',
-    regex: /\b(etf|spot etf|futures etf)\b.*\b(deny|denied|rejected|delay(ed)?)\b/i,
-    basePolarity: 'bearish',
-    baseSeverity: 0.6,
-    baseConfidence: 0.8,
-  },
-  {
-    id: 'R.M1',
-    eventType: 'Macro',
-    regex:
-      /\b(inflation|cpi|jobs report|fomc|fed|interest rate|yields?|usd|treasury|gdp|economy|economic data)\b/i,
-    basePolarity: 'neutral',
-    baseSeverity: 0.4,
-    baseConfidence: 0.6,
-  },
-  {
-    id: 'R.W1',
-    eventType: 'WhaleMove',
-    regex: /\b(whale|transfer(ed|s)?|moved|on-chain|wallet|address)\b/i,
-    basePolarity: 'neutral',
-    baseSeverity: 0.5,
-    baseConfidence: 0.6,
-  },
-  {
-    id: 'R.W2',
-    eventType: 'WhaleMove',
-    regex: /\b(\d[\d,\.]{2,})\s*(btc|eth|sol|usdt|usdc)\b/i,
-    basePolarity: 'neutral',
-    baseSeverity: 0.45,
-    baseConfidence: 0.7,
-  },
-  {
-    id: 'R.A1',
-    eventType: 'Airdrop',
-    regex: /\b(airdrop|token distribution|retroactive reward)\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.45,
-    baseConfidence: 0.65,
-  },
-  {
-    id: 'R.F1',
-    eventType: 'Funding',
-    regex: /\b(raises?|funding|seed round|series [abc])\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.45,
-    baseConfidence: 0.6,
-  },
-  {
-    id: 'R.P1',
-    eventType: 'Partnership',
-    regex: /\b(partner(ship)?|collaborat(e|ion|es)|integrat(e|ion))\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.45,
-    baseConfidence: 0.6,
-  },
-  {
-    id: 'R.UP1',
-    eventType: 'Upgrade',
-    regex: /\b(upgrade|update|fork|hard fork|soft fork|mainnet|testnet)\b/i,
-    basePolarity: 'neutral',
-    baseSeverity: 0.4,
-    baseConfidence: 0.6,
-  },
-  {
-    id: 'R.LN1',
-    eventType: 'Launch',
-    regex: /\b(launch(es|ed|ing)?|debut|rollout)\b/i,
-    basePolarity: 'bullish',
-    baseSeverity: 0.45,
-    baseConfidence: 0.6,
-  },
-  {
-    id: 'R.R1',
-    eventType: 'Rumor',
-    regex:
-      /\b(rumor|rumour|unconfirmed|reportedly|according to (social media|sources))\b/i,
-    basePolarity: 'neutral',
-    baseSeverity: 0.2,
-    baseConfidence: 0.5,
-  },
-];
+export type NewsAgentEventType = (typeof NEWS_AGENT_EVENT_TYPES)[number];
+export type NewsAgentSentiment = 'bullish' | 'bearish' | 'neutral';
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
+export interface NewsAgentInput {
+  headline: string;
+  summary?: string | null;
+  body?: string | null;
+  link?: string | null;
+  domain?: string | null;
+  tokens?: string[];
+  publishedAt?: string | null;
+  sentimentHint?: NewsAgentSentiment | null;
+  categoryHint?: NewsAgentEventType | null;
 }
 
-export function getReputation(domain: string | null): number {
-  if (!domain) return 0;
-  return REPUTATION_SCORES[domain] ?? 0;
+interface NewsAgentRawResponse {
+  category: string;
+  categoryConfidence: number;
+  sentiment: string;
+  sentimentConfidence: number;
+  severity: number;
+  novelty: number;
+  timeSensitivity: number;
+  priority: number;
+  reasoning: string;
+  riskNotes?: string | null;
+  tags?: unknown;
 }
 
-export function computeTimeDecay(pubDate: string | null, now: Date): number {
-  if (!pubDate) return 0;
-  const publishedMs = Date.parse(pubDate);
-  if (Number.isNaN(publishedMs)) return 0;
-  const ageMs = now.getTime() - publishedMs;
-  if (ageMs <= 0) return 1;
-  return Math.pow(0.5, ageMs / HALF_LIFE_MS);
+export interface NewsAgentAnalysis {
+  category: NewsAgentEventType;
+  categoryConfidence: number;
+  sentiment: NewsAgentSentiment;
+  sentimentConfidence: number;
+  severity: number;
+  novelty: number;
+  timeSensitivity: number;
+  priority: number;
+  reasoning: string;
+  riskNotes: string | null;
+  tags: string[];
+  raw: unknown;
 }
 
-export function computeDerivedItem(item: {
-  title: string;
-  link: string | null;
-  pubDate: string | null;
-  domain: string | null;
-  weight: number;
-}): DerivedItem {
-  const titleLower = item.title.toLowerCase();
-  const matchedRules: string[] = [];
-  const matchesByType = new Map<EventType, Rule[]>();
+export const newsAgentInstructions = [
+  'You are FinCobra\'s automated crypto news agent.',
+  'Classify the primary risk event in each headline using the provided categories.',
+  'Estimate impact severity, novelty, time sensitivity, and the confidence of your classification.',
+  'Provide concise risk notes only when additional context is necessary.',
+  'Work strictly within the JSON schema. Return scores between 0 and 1 for all probability-style metrics.',
+  '',
+  'Event categories:',
+  ...NEWS_AGENT_EVENT_TYPES.map((type) => `- ${type}`),
+].join('\n');
 
-  for (const rule of RULES) {
-    if (rule.regex.test(titleLower)) {
-      matchedRules.push(rule.id);
-      const existing = matchesByType.get(rule.eventType) ?? [];
-      existing.push(rule);
-      matchesByType.set(rule.eventType, existing);
-    }
-  }
+export const newsAgentResponseSchema = {
+  type: 'object',
+  properties: {
+    category: { type: 'string', enum: [...NEWS_AGENT_EVENT_TYPES] },
+    categoryConfidence: { type: 'number', minimum: 0, maximum: 1 },
+    sentiment: { type: 'string', enum: ['bullish', 'bearish', 'neutral'] },
+    sentimentConfidence: { type: 'number', minimum: 0, maximum: 1 },
+    severity: { type: 'number', minimum: 0, maximum: 1 },
+    novelty: { type: 'number', minimum: 0, maximum: 1 },
+    timeSensitivity: { type: 'number', minimum: 0, maximum: 1 },
+    priority: { type: 'integer', minimum: 1, maximum: 5 },
+    reasoning: { type: 'string' },
+    riskNotes: { type: 'string' },
+    tags: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+  },
+  required: [
+    'category',
+    'categoryConfidence',
+    'sentiment',
+    'sentimentConfidence',
+    'severity',
+    'novelty',
+    'timeSensitivity',
+    'priority',
+    'reasoning',
+  ],
+  additionalProperties: false,
+} as const;
 
-  const negativeBuckets: EventType[] = ['Hack', 'StablecoinDepeg', 'Outage', 'Delisting'];
-
-  let eventType: EventType = 'Other';
-  for (const type of EVENT_PRIORITY) {
-    if ((matchesByType.get(type) ?? []).length > 0) {
-      eventType = type;
-      break;
-    }
-  }
-
-  const rumorRules = matchesByType.get('Rumor') ?? [];
-  const hasNegative = negativeBuckets.some(
-    (type) => (matchesByType.get(type) ?? []).length > 0,
-  );
-  let rumorOverride = false;
-  if (rumorRules.length && !hasNegative) {
-    eventType = 'Rumor';
-    rumorOverride = true;
-  }
-
-  const eventRules = matchesByType.get(eventType) ?? [];
-  let primaryRule: Rule | null = null;
-  for (const rule of eventRules) {
-    if (!primaryRule || rule.baseConfidence > primaryRule.baseConfidence) {
-      primaryRule = rule;
-    }
-  }
-
-  let polarity: Polarity = primaryRule?.basePolarity ?? 'neutral';
-  let severity = primaryRule?.baseSeverity ?? 0.3;
-  let eventConfidence = primaryRule?.baseConfidence ?? 0.4;
-
-  const reputation = getReputation(item.domain);
-  const rumorMatched = rumorRules.length > 0;
-  const hasListing = (matchesByType.get('Listing') ?? []).length > 0;
-  const etfRules = matchesByType.get('ETF') ?? [];
-  const hasEtfApproval = etfRules.some((rule) => rule.id === 'R.ETF1');
-
-  if (hasNegative) {
-    polarity = 'bearish';
-  } else if (!rumorOverride && (hasListing || hasEtfApproval)) {
-    polarity = 'bullish';
-  }
-
-  if (eventType === 'WhaleMove') {
-    const depositLike = /(deposit|inflow|transfer(ed|s)?)/.test(titleLower);
-    const withdrawLike = /(withdraw|withdrawal|outflow|redeem)/.test(titleLower);
-    if (depositLike) {
-      polarity = 'bearish';
-    } else if (withdrawLike) {
-      polarity = 'bullish';
-    }
-  }
-
-  if (eventRules.length >= 2) {
-    eventConfidence += 0.05;
-  }
-  if (reputation >= 0.8) {
-    severity += 0.05;
-    eventConfidence += 0.05;
-  }
-  if (rumorMatched) {
-    eventConfidence -= 0.1;
-  }
-
-  if (rumorMatched) {
-    severity *= 0.7;
-    eventConfidence *= 0.8;
-  }
-
-  severity = clamp(severity, 0, 1);
-  eventConfidence = clamp(eventConfidence, 0, 1);
-
-  const headlineScore =
-    item.weight * (0.6 + 0.4 * severity) * (0.9 + 0.1 * eventConfidence);
-
-  return {
-    title: item.title,
-    link: item.link,
-    pubDate: item.pubDate,
-    domain: item.domain,
-    weight: item.weight,
-    eventType,
-    polarity,
-    severity,
-    eventConfidence,
-    headlineScore,
-    matchedRules,
+interface ChatCompletionRequest {
+  model: string;
+  messages: Array<{
+    role: 'system' | 'user';
+    content: string;
+  }>;
+  temperature?: number;
+  response_format: {
+    type: 'json_schema';
+    json_schema: {
+      name: string;
+      strict: true;
+      schema: typeof newsAgentResponseSchema;
+    };
   };
 }
 
-export function sortDerivedItems(items: DerivedItem[]): DerivedItem[] {
-  return [...items].sort((a, b) => {
-    const scoreDiff = b.headlineScore - a.headlineScore;
-    if (Math.abs(scoreDiff) > 1e-6) return scoreDiff > 0 ? 1 : -1;
-    const severityDiff = b.severity - a.severity;
-    if (Math.abs(severityDiff) > 1e-6) return severityDiff > 0 ? 1 : -1;
-    const aTime = a.pubDate ? Date.parse(a.pubDate) : Number.POSITIVE_INFINITY;
-    const bTime = b.pubDate ? Date.parse(b.pubDate) : Number.POSITIVE_INFINITY;
-    if (!Number.isNaN(aTime) && !Number.isNaN(bTime) && aTime !== bTime) {
-      return aTime - bTime;
-    }
-    const repDiff = getReputation(b.domain) - getReputation(a.domain);
-    if (Math.abs(repDiff) > 1e-6) return repDiff > 0 ? 1 : -1;
-    return 0;
-  });
+interface ChatCompletionResult {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    } | null;
+  }>;
 }
 
-export function computeWeight(
-  domain: string | null,
-  pubDate: string | null,
-  now: Date,
-): number {
-  if (!domain) return 0;
-  const reputation = REPUTATION_SCORES[domain] ?? 0;
-  if (!reputation) return 0;
-  if (!pubDate) return 0;
-  const publishedMs = Date.parse(pubDate);
-  if (Number.isNaN(publishedMs)) return 0;
-  const ageMs = now.getTime() - publishedMs;
-  if (ageMs <= 0) return reputation;
-  const decay = Math.pow(0.5, ageMs / HALF_LIFE_MS);
-  return reputation * decay;
+interface GroqLikeClient {
+  chat: {
+    completions: {
+      create: (params: ChatCompletionRequest) => Promise<ChatCompletionResult>;
+    };
+  };
 }
+
+export interface RunNewsAgentOptions {
+  client?: GroqLikeClient;
+  apiKey?: string;
+  temperature?: number;
+}
+
+function createGroqClient(apiKey: string): GroqLikeClient {
+  return new Groq({ apiKey });
+}
+
+function resolveApiKey(explicit?: string): string {
+  if (explicit && explicit.trim()) {
+    return explicit.trim();
+  }
+  const systemKey = process.env.GROQ_SYSTEM_API_KEY;
+  if (systemKey && systemKey.trim()) {
+    return systemKey.trim();
+  }
+  const fallback = process.env.GROQ_API_KEY;
+  if (fallback && fallback.trim()) {
+    return fallback.trim();
+  }
+  throw new Error('GROQ system API key is not configured');
+}
+
+function clampUnit(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function sanitizeTags(tags: unknown): string[] {
+  if (!Array.isArray(tags)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of tags) {
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function normalizePriority(value: number): number {
+  if (!Number.isFinite(value)) return 3;
+  const clamped = Math.round(value);
+  if (clamped < 1) return 1;
+  if (clamped > 5) return 5;
+  return clamped;
+}
+
+function resolveCategory(value: string): NewsAgentEventType {
+  const normalized = value.trim();
+  const exact = NEWS_AGENT_EVENT_TYPES.find((type) => type === normalized);
+  if (exact) return exact;
+  const lower = normalized.toLowerCase();
+  const match = NEWS_AGENT_EVENT_TYPES.find(
+    (type) => type.toLowerCase() === lower,
+  );
+  if (!match) {
+    throw new Error(`Unsupported category from news agent: ${value}`);
+  }
+  return match;
+}
+
+function resolveSentiment(value: string): NewsAgentSentiment {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'bullish' || normalized === 'bearish' || normalized === 'neutral') {
+    return normalized;
+  }
+  throw new Error(`Unsupported sentiment from news agent: ${value}`);
+}
+
+function requireNumber(value: unknown, field: string): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new Error(`News agent response is missing numeric field: ${field}`);
+  }
+  return value;
+}
+
+function optionalString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function requireString(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`News agent response is missing string field: ${field}`);
+  }
+  return value;
+}
+
+function uppercaseTokens(tokens: string[] | undefined): string[] | undefined {
+  if (!tokens) return undefined;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const token of tokens) {
+    if (typeof token !== 'string') continue;
+    const trimmed = token.trim();
+    if (!trimmed) continue;
+    const upper = trimmed.toUpperCase();
+    if (seen.has(upper)) continue;
+    seen.add(upper);
+    out.push(upper);
+  }
+  return out.length ? out : undefined;
+}
+
+export function buildNewsAgentUserContent(input: NewsAgentInput): string {
+  const payload: Record<string, unknown> = {
+    headline: requireString(input.headline, 'headline'),
+    summary: input.summary ?? null,
+    body: input.body ?? null,
+    link: input.link ?? null,
+    domain: input.domain ?? null,
+    publishedAt: input.publishedAt ?? null,
+  };
+
+  const tokens = uppercaseTokens(input.tokens);
+  if (tokens) {
+    payload.referencedSymbols = tokens;
+  }
+  if (input.sentimentHint) {
+    payload.sentimentHint = input.sentimentHint;
+  }
+  if (input.categoryHint) {
+    payload.categoryHint = input.categoryHint;
+  }
+
+  return JSON.stringify(payload);
+}
+
+export function parseNewsAgentContent(content: string): NewsAgentAnalysis {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    throw new Error('News agent returned an empty body');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (err) {
+    throw new Error('News agent returned invalid JSON');
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error('News agent returned an unexpected structure');
+  }
+
+  const raw = parsed as Partial<NewsAgentRawResponse>;
+  const category = resolveCategory(requireString(raw.category, 'category'));
+  const sentiment = resolveSentiment(
+    requireString(raw.sentiment, 'sentiment'),
+  );
+  const categoryConfidence = clampUnit(
+    requireNumber(raw.categoryConfidence, 'categoryConfidence'),
+  );
+  const sentimentConfidence = clampUnit(
+    requireNumber(raw.sentimentConfidence, 'sentimentConfidence'),
+  );
+  const severity = clampUnit(requireNumber(raw.severity, 'severity'));
+  const novelty = clampUnit(requireNumber(raw.novelty, 'novelty'));
+  const timeSensitivity = clampUnit(
+    requireNumber(raw.timeSensitivity, 'timeSensitivity'),
+  );
+  const priority = normalizePriority(requireNumber(raw.priority, 'priority'));
+  const reasoning = requireString(raw.reasoning, 'reasoning').trim();
+  const riskNotes = optionalString(raw.riskNotes);
+  const tags = sanitizeTags(raw.tags);
+
+  return {
+    category,
+    categoryConfidence,
+    sentiment,
+    sentimentConfidence,
+    severity,
+    novelty,
+    timeSensitivity,
+    priority,
+    reasoning,
+    riskNotes,
+    tags,
+    raw,
+  };
+}
+
+export async function runNewsAgent(
+  input: NewsAgentInput,
+  options: RunNewsAgentOptions = {},
+): Promise<NewsAgentAnalysis> {
+  const { client, temperature = DEFAULT_TEMPERATURE } = options;
+  const resolvedClient =
+    client ?? createGroqClient(resolveApiKey(options.apiKey));
+
+  const request: ChatCompletionRequest = {
+    model: MODEL_NAME,
+    messages: [
+      { role: 'system', content: newsAgentInstructions },
+      { role: 'user', content: buildNewsAgentUserContent(input) },
+    ],
+    temperature,
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'news_agent_response',
+        strict: true,
+        schema: newsAgentResponseSchema,
+      },
+    },
+  };
+
+  const completion = await resolvedClient.chat.completions.create(request);
+  const content = completion.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('News agent returned an empty message');
+  }
+  return parseNewsAgentContent(content);
+}
+
