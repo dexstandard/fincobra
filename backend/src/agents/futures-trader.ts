@@ -1,6 +1,11 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { callAi, extractJson as extractAiJson } from '../services/ai-service.js';
 import type { ActivePortfolioWorkflow } from '../repos/portfolio-workflows.types.js';
+import { ensureApiKeys } from '../services/portfolio-workflows.js';
+import {
+  buildFuturesPrompt,
+  clearFuturesPromptCaches,
+} from '../services/prompt-builders/futures.js';
 import type {
   FuturesTraderDecision,
   FuturesTraderPrompt,
@@ -84,11 +89,16 @@ export async function collectFuturesPromptData(
   row: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
 ): Promise<FuturesTraderPrompt | undefined> {
-  log.error(
-    { workflowId: row.id },
-    'futures prompt collection not implemented yet',
-  );
-  return undefined;
+  const ensuredExchange = await ensureApiKeys(log, row.userId, {
+    exchangeKeyId: row.exchangeApiKeyId,
+    requireAi: false,
+    preferredExchange: 'bybit',
+  });
+  if ('code' in ensuredExchange || !ensuredExchange.exchangeProvider) {
+    log.error({ workflowId: row.id }, 'missing exchange key for futures');
+    return undefined;
+  }
+  return buildFuturesPrompt(row, ensuredExchange.exchangeProvider, log);
 }
 
 function extractFuturesResult(
@@ -126,5 +136,5 @@ export async function runFuturesTrader(
 }
 
 export function clearFuturesTraderCaches(): void {
-  // no caches yet; reserved for parity with spot trader
+  clearFuturesPromptCaches();
 }
