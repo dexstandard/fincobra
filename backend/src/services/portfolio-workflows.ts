@@ -305,6 +305,7 @@ export async function preparePortfolioWorkflowForUpsert(
     exchangeKeyId: body.exchangeKeyId,
     requireAi: body.status === PortfolioWorkflowStatus.Active,
     requireExchange: body.status === PortfolioWorkflowStatus.Active,
+    aiProvider: body.aiProvider,
   });
   if ('code' in ensuredKeys) return ensuredKeys;
   body.exchangeKeyId = ensuredKeys.exchangeKeyId;

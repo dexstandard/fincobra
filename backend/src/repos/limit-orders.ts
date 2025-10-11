@@ -30,7 +30,8 @@ export async function getLimitOrdersByReviewResult(
     `SELECT e.planned_json, e.status, e.created_at, e.order_id, e.cancellation_reason
        FROM limit_order e
        JOIN review_result r ON e.review_result_id = r.id
-      WHERE r.portfolio_workflow_id = $1 AND e.review_result_id = $2`,
+      WHERE r.portfolio_workflow_id = $1 AND e.review_result_id = $2
+      ORDER BY e.created_at ASC, e.order_id ASC`,
     [portfolioWorkflowId, reviewResultId],
   );
   return convertKeysToCamelCase(rows) as LimitOrderByReviewResult[];
