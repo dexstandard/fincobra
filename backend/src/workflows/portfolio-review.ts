@@ -229,6 +229,7 @@ async function runWorkflowAttempt(
       exchangeKeyId: wf.exchangeApiKeyId,
       requireAi: false,
       requireExchange: false,
+      aiProvider: wf.aiProvider,
     });
     if (!('code' in ensuredExchange)) {
       defaultExchange = ensuredExchange.exchangeProvider ?? undefined;
@@ -249,6 +250,7 @@ async function runWorkflowAttempt(
       model: wf.model,
       apiKey: key,
       portfolioId: wf.id,
+      aiProvider: wf.aiProvider,
     };
     const decision = await runStep('runMainTrader', () =>
       runMainTrader(params, prompt!, wf.agentInstructions),

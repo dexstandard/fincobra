@@ -11,12 +11,14 @@ import type {
   PortfolioWorkflowUpdate,
   PortfolioWorkflowUserApiKeys,
 } from './portfolio-workflows.types.js';
+import type { AiApiProvider } from './ai-api-key.types.js';
 
 export function toApi(row: PortfolioWorkflow) {
   return {
     id: row.id,
     userId: row.userId,
     model: row.model,
+    aiProvider: row.aiProvider,
     status: row.status,
     createdAt: new Date(row.createdAt).getTime(),
     startBalanceUsd: row.startBalance ?? null,
@@ -40,11 +42,16 @@ export function toApi(row: PortfolioWorkflow) {
 }
 
 const baseSelect = `
-  SELECT pw.id, pw.user_id, pw.model, pw.status, pw.created_at, pw.start_balance, pw.cash_token,
+  SELECT pw.id, pw.user_id, pw.model, pw.ai_provider, pw.status, pw.created_at, pw.start_balance, pw.cash_token,
          COALESCE(json_agg(json_build_object('token', t.token, 'min_allocation', t.min_allocation) ORDER BY t.position)
                   FILTER (WHERE t.token IS NOT NULL), '[]') AS tokens,
          pw.risk, pw.review_interval, pw.agent_instructions, pw.manual_rebalance, pw.use_earn,
-         COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id, COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
+         CASE
+           WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
+           WHEN pw.ai_provider = 'groq' THEN gk.id
+           ELSE COALESCE(ak.id, oak.id)
+         END AS ai_api_key_id,
+         COALESCE(pw.exchange_key_id, ek.id) AS exchange_api_key_id,
          u.email_enc AS owner_email_enc
     FROM portfolio_workflow pw
     JOIN users u ON u.id = pw.user_id
@@ -52,6 +59,7 @@ const baseSelect = `
     LEFT JOIN ai_api_keys ak ON ak.user_id = pw.user_id AND ak.provider = 'openai'
     LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
     LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+    LEFT JOIN ai_api_keys gk ON gk.user_id = pw.user_id AND gk.provider = 'groq'
     LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
 `;
 
@@ -59,7 +67,7 @@ export async function getPortfolioWorkflow(
   id: string,
 ): Promise<PortfolioWorkflow | undefined> {
   const { rows } = await db.query(
-    `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc`,
+    `${baseSelect} WHERE pw.id = $1 AND pw.status != $2 GROUP BY pw.id, ak.id, oak.id, gk.id, pw.exchange_key_id, ek.id, u.email_enc`,
     [id, PortfolioWorkflowStatus.Retired],
   );
   if (!rows[0]) return undefined;
@@ -81,7 +89,7 @@ export async function getPortfolioWorkflowsPaginated(
       [userId, status],
     );
     const { rows } = await db.query(
-      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $3 OFFSET $4`,
+      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, gk.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $3 OFFSET $4`,
       [userId, status, limit, offset],
     );
     return {
@@ -95,7 +103,7 @@ export async function getPortfolioWorkflowsPaginated(
     [userId, PortfolioWorkflowStatus.Retired],
   );
   const { rows } = await db.query(
-    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $3 OFFSET $4`,
+    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, gk.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $3 OFFSET $4`,
     [userId, PortfolioWorkflowStatus.Retired, limit, offset],
   );
   return {
@@ -122,7 +130,7 @@ export async function getPortfolioWorkflowsPaginatedAdmin(
       [status],
     );
     const { rows } = await db.query(
-      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $2 OFFSET $3`,
+      `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, gk.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $2 OFFSET $3`,
       [status, limit, offset],
     );
     return {
@@ -136,7 +144,7 @@ export async function getPortfolioWorkflowsPaginatedAdmin(
     [PortfolioWorkflowStatus.Retired],
   );
   const { rows } = await db.query(
-    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $2 OFFSET $3`,
+    `${baseSelect} ${where} GROUP BY pw.id, ak.id, oak.id, gk.id, pw.exchange_key_id, ek.id, u.email_enc LIMIT $2 OFFSET $3`,
     [PortfolioWorkflowStatus.Retired, limit, offset],
   );
   return {
@@ -158,7 +166,8 @@ export async function findIdenticalInactiveWorkflow(
     WHERE pw.user_id = $1 AND pw.status = 'inactive' AND ($2::bigint IS NULL OR pw.id != $2)
       AND pw.model = $3 AND pw.cash_token = $4
       AND pw.risk = $5 AND pw.review_interval = $6 AND pw.agent_instructions = $7 AND pw.manual_rebalance = $8 AND pw.use_earn = $9
-      AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $10::jsonb`;
+      AND pw.ai_provider = $10
+      AND COALESCE(t.tokens::jsonb, '[]'::jsonb) = $11::jsonb`;
   const params: unknown[] = [
     data.userId,
     excludeId ?? null,
@@ -169,6 +178,7 @@ export async function findIdenticalInactiveWorkflow(
     data.agentInstructions,
     data.manualRebalance,
     data.useEarn,
+    data.aiProvider,
     JSON.stringify(
       data.tokens.map((t) => ({
         token: t.token,
@@ -209,7 +219,7 @@ export async function findActiveTokenConflicts(
 
 export async function getUserApiKeys(userId: string) {
   const { rows } = await db.query(
-    "SELECT COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc, ek.api_key_enc AS binance_api_key_enc, ek.api_secret_enc AS binance_api_secret_enc, ek.id AS binance_key_id, bek.api_key_enc AS bybit_api_key_enc, bek.api_secret_enc AS bybit_api_secret_enc, bek.id AS bybit_key_id FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance' LEFT JOIN exchange_keys bek ON bek.user_id = u.id AND bek.provider = 'bybit' WHERE u.id = $1",
+    "SELECT COALESCE(ak.api_key_enc, oak.api_key_enc) AS ai_api_key_enc, gk.api_key_enc AS groq_ai_api_key_enc, ek.api_key_enc AS binance_api_key_enc, ek.api_secret_enc AS binance_api_secret_enc, ek.id AS binance_key_id, bek.api_key_enc AS bybit_api_key_enc, bek.api_secret_enc AS bybit_api_secret_enc, bek.id AS bybit_key_id FROM users u LEFT JOIN ai_api_keys ak ON ak.user_id = u.id AND ak.provider = 'openai' LEFT JOIN ai_api_key_shares s ON s.target_user_id = u.id LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai' LEFT JOIN ai_api_keys gk ON gk.user_id = u.id AND gk.provider = 'groq' LEFT JOIN exchange_keys ek ON ek.user_id = u.id AND ek.provider = 'binance' LEFT JOIN exchange_keys bek ON bek.user_id = u.id AND bek.provider = 'bybit' WHERE u.id = $1",
     [userId],
   );
   if (!rows[0]) return undefined;
@@ -222,12 +232,13 @@ export async function insertPortfolioWorkflow(
   let id = '';
   await withTransaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO portfolio_workflow (user_id, model, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn, exchange_key_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO portfolio_workflow (user_id, model, ai_provider, status, start_balance, cash_token, risk, review_interval, agent_instructions, manual_rebalance, use_earn, exchange_key_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id`,
       [
         data.userId,
         data.model,
+        data.aiProvider,
         data.status,
         data.startBalance,
         data.cashToken,
@@ -260,9 +271,10 @@ export async function updatePortfolioWorkflow(
 ): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `UPDATE portfolio_workflow SET model = $1, status = $2, cash_token = $3, risk = $4, review_interval = $5, agent_instructions = $6, start_balance = $7, manual_rebalance = $8, use_earn = $9, exchange_key_id = $10 WHERE id = $11`,
+      `UPDATE portfolio_workflow SET model = $1, ai_provider = $2, status = $3, cash_token = $4, risk = $5, review_interval = $6, agent_instructions = $7, start_balance = $8, manual_rebalance = $9, use_earn = $10, exchange_key_id = $11 WHERE id = $12`,
       [
         data.model,
+        data.aiProvider,
         data.status,
         data.cashToken,
         data.risk,
@@ -303,7 +315,15 @@ export async function deletePortfolioWorkflow(id: string): Promise<void> {
 export async function startPortfolioWorkflow(
   id: string,
   startBalance: number | null,
+  aiProvider?: AiApiProvider,
 ): Promise<void> {
+  if (aiProvider) {
+    await db.query(
+      'UPDATE portfolio_workflow SET status = $1, start_balance = $2, ai_provider = $3 WHERE id = $4',
+      [PortfolioWorkflowStatus.Active, startBalance, aiProvider, id],
+    );
+    return;
+  }
   await db.query(
     'UPDATE portfolio_workflow SET status = $1, start_balance = $2 WHERE id = $3',
     [PortfolioWorkflowStatus.Active, startBalance, id],
@@ -320,12 +340,17 @@ export async function stopPortfolioWorkflow(id: string): Promise<void> {
 export async function getActivePortfolioWorkflowById(
   portfolioWorkflowId: string,
 ): Promise<ActivePortfolioWorkflow | undefined> {
-  const sql = `SELECT pw.id, pw.user_id, pw.model,
+  const sql = `SELECT pw.id, pw.user_id, pw.model, pw.ai_provider,
                       pw.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       pw.risk, pw.review_interval, pw.agent_instructions,
-                      COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id,
+                      CASE
+                        WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
+                        WHEN pw.ai_provider = 'groq' THEN gk.id
+                        ELSE COALESCE(ak.id, oak.id)
+                      END AS ai_api_key_id,
                       CASE
                         WHEN pw.ai_api_key_id IS NOT NULL THEN wak.api_key_enc
+                        WHEN pw.ai_provider = 'groq' THEN gk.api_key_enc
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
@@ -339,6 +364,7 @@ export async function getActivePortfolioWorkflowById(
                  LEFT JOIN ai_api_keys ak ON ak.user_id = pw.user_id AND ak.provider = 'openai'
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+                 LEFT JOIN ai_api_keys gk ON gk.user_id = pw.user_id AND gk.provider = 'groq'
                  LEFT JOIN ai_api_keys wak ON wak.id = pw.ai_api_key_id
                  LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
@@ -355,12 +381,17 @@ export async function getActivePortfolioWorkflowById(
 export async function getActivePortfolioWorkflowsByInterval(
   interval: string,
 ): Promise<ActivePortfolioWorkflow[]> {
-  const sql = `SELECT pw.id, pw.user_id, pw.model,
+  const sql = `SELECT pw.id, pw.user_id, pw.model, pw.ai_provider,
                       pw.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       pw.risk, pw.review_interval, pw.agent_instructions,
-                      COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id,
+                      CASE
+                        WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
+                        WHEN pw.ai_provider = 'groq' THEN gk.id
+                        ELSE COALESCE(ak.id, oak.id)
+                      END AS ai_api_key_id,
                       CASE
                         WHEN pw.ai_api_key_id IS NOT NULL THEN wak.api_key_enc
+                        WHEN pw.ai_provider = 'groq' THEN gk.api_key_enc
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
@@ -374,6 +405,7 @@ export async function getActivePortfolioWorkflowsByInterval(
                  LEFT JOIN ai_api_keys ak ON ak.user_id = pw.user_id AND ak.provider = 'openai'
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+                 LEFT JOIN ai_api_keys gk ON gk.user_id = pw.user_id AND gk.provider = 'groq'
                  LEFT JOIN ai_api_keys wak ON wak.id = pw.ai_api_key_id
                  LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
@@ -386,12 +418,17 @@ export async function getActivePortfolioWorkflowsByInterval(
   return convertKeysToCamelCase(rows) as ActivePortfolioWorkflow[];
 }
 
-const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model,
+const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model, pw.ai_provider,
                       pw.cash_token, COALESCE(t.tokens, '[]') AS tokens,
                       pw.risk, pw.review_interval, pw.agent_instructions,
-                      COALESCE(pw.ai_api_key_id, ak.id, oak.id) AS ai_api_key_id,
+                      CASE
+                        WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
+                        WHEN pw.ai_provider = 'groq' THEN gk.id
+                        ELSE COALESCE(ak.id, oak.id)
+                      END AS ai_api_key_id,
                       CASE
                         WHEN pw.ai_api_key_id IS NOT NULL THEN wak.api_key_enc
+                        WHEN pw.ai_provider = 'groq' THEN gk.api_key_enc
                         WHEN ak.id IS NOT NULL THEN ak.api_key_enc
                         ELSE oak.api_key_enc
                       END AS ai_api_key_enc,
@@ -405,6 +442,7 @@ const activePortfolioWorkflowSelect = `SELECT pw.id, pw.user_id, pw.model,
                  LEFT JOIN ai_api_keys ak ON ak.user_id = pw.user_id AND ak.provider = 'openai'
                  LEFT JOIN ai_api_key_shares s ON s.target_user_id = pw.user_id
                  LEFT JOIN ai_api_keys oak ON oak.user_id = s.owner_user_id AND oak.provider = 'openai'
+                 LEFT JOIN ai_api_keys gk ON gk.user_id = pw.user_id AND gk.provider = 'groq'
                  LEFT JOIN ai_api_keys wak ON wak.id = pw.ai_api_key_id
                  LEFT JOIN exchange_keys ek ON ek.user_id = pw.user_id AND ek.provider = 'binance'
                  LEFT JOIN LATERAL (
@@ -429,26 +467,29 @@ export async function getActivePortfolioWorkflowsByUserAndAiKey(
   const sql = `${activePortfolioWorkflowSelect}
                 WHERE pw.status = 'active'
                   AND pw.user_id = $1
-                  AND COALESCE(
-                        pw.ai_api_key_id,
-                        (
-                          SELECT ak.id
-                            FROM ai_api_keys ak
-                           WHERE ak.user_id = pw.user_id
-                             AND ak.provider = 'openai'
-                             AND ak.id = $2
-                           LIMIT 1
-                        ),
-                        (
-                          SELECT oak.id
-                            FROM ai_api_key_shares s
-                            JOIN ai_api_keys oak
-                              ON oak.user_id = s.owner_user_id
-                             AND oak.provider = 'openai'
-                           WHERE s.target_user_id = pw.user_id
-                             AND oak.id = $2
-                           LIMIT 1
-                        )
+                  AND (
+                        CASE
+                          WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
+                          WHEN pw.ai_provider = 'groq' THEN gk.id
+                          ELSE COALESCE(
+                            (
+                              SELECT ak.id
+                                FROM ai_api_keys ak
+                               WHERE ak.user_id = pw.user_id
+                                 AND ak.provider = 'openai'
+                               LIMIT 1
+                            ),
+                            (
+                              SELECT oak.id
+                                FROM ai_api_key_shares s
+                                JOIN ai_api_keys oak
+                                  ON oak.user_id = s.owner_user_id
+                                 AND oak.provider = 'openai'
+                               WHERE s.target_user_id = pw.user_id
+                               LIMIT 1
+                            )
+                          )
+                        END
                       ) = $2`;
   const { rows } = await db.query(sql, [userId, aiKeyId]);
   return convertKeysToCamelCase(rows) as ActivePortfolioWorkflow[];
@@ -488,26 +529,35 @@ export async function deactivateWorkflowsByUser(
             start_balance = NULL
       WHERE pw.user_id = $2
         AND pw.status = $3
-        AND COALESCE(
-              pw.ai_api_key_id,
-              (
-                SELECT ak.id
-                  FROM ai_api_keys ak
-                 WHERE ak.user_id = pw.user_id
-                   AND ak.provider = 'openai'
-                   AND ak.id = $4
-                 LIMIT 1
-              ),
-              (
-                SELECT oak.id
-                  FROM ai_api_key_shares s
-                  JOIN ai_api_keys oak
-                    ON oak.user_id = s.owner_user_id
-                   AND oak.provider = 'openai'
-                 WHERE s.target_user_id = pw.user_id
-                   AND oak.id = $4
-                 LIMIT 1
-              )
+        AND (
+              CASE
+                WHEN pw.ai_api_key_id IS NOT NULL THEN pw.ai_api_key_id
+                WHEN pw.ai_provider = 'groq' THEN (
+                  SELECT gk.id
+                    FROM ai_api_keys gk
+                   WHERE gk.user_id = pw.user_id
+                     AND gk.provider = 'groq'
+                   LIMIT 1
+                )
+                ELSE COALESCE(
+                  (
+                    SELECT ak.id
+                      FROM ai_api_keys ak
+                     WHERE ak.user_id = pw.user_id
+                       AND ak.provider = 'openai'
+                     LIMIT 1
+                  ),
+                  (
+                    SELECT oak.id
+                      FROM ai_api_key_shares s
+                      JOIN ai_api_keys oak
+                        ON oak.user_id = s.owner_user_id
+                       AND oak.provider = 'openai'
+                     WHERE s.target_user_id = pw.user_id
+                     LIMIT 1
+                  )
+                )
+              END
             ) = $4`,
     [
       PortfolioWorkflowStatus.Inactive,

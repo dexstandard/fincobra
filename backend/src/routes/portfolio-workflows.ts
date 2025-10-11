@@ -25,6 +25,7 @@ import {
 } from '../workflows/portfolio-review.js';
 import { requireAdmin, requireUserId } from '../util/auth.js';
 import { RATE_LIMITS } from '../rate-limit.js';
+import type { AiApiProvider } from '../repos/ai-api-key.types.js';
 import {
   PortfolioWorkflowStatus,
   preparePortfolioWorkflowForUpsert,
@@ -68,6 +69,10 @@ const workflowUpsertSchema = z
       .string()
       .optional()
       .transform((value) => value ?? ''),
+    aiProvider: z
+      .enum(['openai', 'groq'])
+      .optional()
+      .transform((value) => value ?? 'openai'),
     cash: z
       .string()
       .optional()
@@ -85,6 +90,13 @@ const workflowUpsertSchema = z
       .transform((value) => (value === undefined ? null : value)),
   })
   .strip();
+
+const workflowStartSchema = z
+  .object({
+    aiProvider: z.enum(['openai', 'groq']).optional(),
+  })
+  .strip()
+  .default({});
 
 const paginationQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).optional(),
@@ -407,6 +419,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const row = await insertPortfolioWorkflow({
         userId,
         model: validated.model,
+        aiProvider: validated.aiProvider,
         status,
         startBalance,
         cashToken: validated.cash,
@@ -773,6 +786,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       await updatePortfolioWorkflow({
         id,
         model: validated.model,
+        aiProvider: validated.aiProvider,
         status,
         cashToken: validated.cash,
         tokens: validated.tokens,
@@ -824,6 +838,11 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const ctx = await getWorkflowForRequest(req, reply);
       if (!ctx) return;
       const { userId, id, log, workflow: existing } = ctx;
+      const startBody = parseBody(workflowStartSchema, req, reply);
+      if (!startBody) return;
+      const requestedProvider = startBody.aiProvider;
+      const aiProvider: AiApiProvider =
+        requestedProvider ?? existing.aiProvider ?? 'openai';
       if (!existing.model) {
         log.error('missing model');
         return reply.code(400).send(errorResponse('model required'));
@@ -831,6 +850,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       const tokens = existing.tokens.map((t: { token: string }) => t.token);
       const ensuredKeys = await ensureApiKeys(log, userId, {
         exchangeKeyId: existing.exchangeApiKeyId,
+        aiProvider,
       });
       if ('code' in ensuredKeys)
         return reply.code(ensuredKeys.code).send(ensuredKeys.body);
@@ -851,7 +871,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
           return reply.code(bal.code).send(bal.body);
         startBalance = bal;
       }
-      await repoStartWorkflow(id, startBalance);
+      await repoStartWorkflow(id, startBalance, aiProvider);
       reviewWorkflowPortfolio(req.log, id).catch((err) =>
         log.error({ err }, 'initial review failed'),
       );

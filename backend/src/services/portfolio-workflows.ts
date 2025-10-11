@@ -16,6 +16,7 @@ import {
   getExchangeGateway,
   type SupportedExchange,
 } from './exchange-gateway.js';
+import type { AiApiProvider } from '../repos/ai-api-key.types.js';
 
 function normalizeTokenSymbol(token: string): string {
   return token.trim().toUpperCase();
@@ -96,6 +97,12 @@ async function validateWorkflowInput(
   body: PortfolioWorkflowInput,
   id?: string,
 ): Promise<ValidationErr | null> {
+  const aiProvider = (body.aiProvider ?? 'openai') as AiApiProvider;
+  if (aiProvider !== 'openai' && aiProvider !== 'groq') {
+    log.error('invalid ai provider');
+    return { code: 400, body: errorResponse('invalid ai provider') };
+  }
+  body.aiProvider = aiProvider;
   body.cash = (body.cash ?? '').toUpperCase();
   if (!['USDT', 'USDC'].includes(body.cash)) {
     log.error('invalid cash token');
@@ -121,7 +128,7 @@ async function validateWorkflowInput(
   } else if (body.model.length > 50) {
     log.error('model too long');
     return { code: 400, body: errorResponse(lengthMessage('model', 50)) };
-  } else {
+  } else if (aiProvider === 'openai') {
     const [ownKey, sharedKey] = await Promise.all([
       getAiKey(userId),
       getSharedAiKey(userId),
@@ -136,6 +143,7 @@ async function validateWorkflowInput(
       {
         userId,
         model: body.model,
+        aiProvider: body.aiProvider,
         cashToken: body.cash,
         tokens: body.tokens,
         risk: body.risk,
@@ -177,6 +185,7 @@ interface EnsureApiKeysOptions {
   requireAi?: boolean;
   requireExchange?: boolean;
   preferredExchange?: 'binance' | 'bybit';
+  aiProvider?: AiApiProvider;
 }
 
 export async function ensureApiKeys(
@@ -189,6 +198,7 @@ export async function ensureApiKeys(
     requireAi = true,
     requireExchange = true,
     preferredExchange,
+    aiProvider = 'openai',
   } = options;
   const userRow = await getUserApiKeys(userId);
   if (!userRow) {
@@ -196,7 +206,8 @@ export async function ensureApiKeys(
     return { code: 400, body: errorResponse('missing api keys') };
   }
 
-  const hasAiKey = !!userRow.aiApiKeyEnc;
+  const hasAiKey =
+    aiProvider === 'groq' ? !!userRow.groqAiApiKeyEnc : !!userRow.aiApiKeyEnc;
   const hasBinanceKey =
     !!userRow.binanceApiKeyEnc && !!userRow.binanceApiSecretEnc;
   const hasBybitKey =
@@ -294,6 +305,7 @@ export async function preparePortfolioWorkflowForUpsert(
     exchangeKeyId: body.exchangeKeyId,
     requireAi: body.status === PortfolioWorkflowStatus.Active,
     requireExchange: body.status === PortfolioWorkflowStatus.Active,
+    aiProvider: body.aiProvider,
   });
   if ('code' in ensuredKeys) return ensuredKeys;
   body.exchangeKeyId = ensuredKeys.exchangeKeyId;

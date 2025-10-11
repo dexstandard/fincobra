@@ -8,6 +8,7 @@ import { errorResponse, ERROR_MESSAGES } from '../util/error-messages.js';
 import { userPreHandlers, getValidatedUserId } from './_shared/guards.js';
 import { parseBody } from './_shared/validation.js';
 import { REDACTED_KEY } from './_shared/constants.js';
+import { disableUserWorkflowsByAiKey } from '../workflows/disable.js';
 
 interface GroqKeyBody {
   key: string;
@@ -96,6 +97,25 @@ export default async function groqApiKeyRoutes(app: FastifyInstance) {
       const groqKey = await getGroqKey(id);
       if (!groqKey)
         return reply.code(404).send(errorResponse(ERROR_MESSAGES.notFound));
+      const disableSummary = await disableUserWorkflowsByAiKey(
+        req.log,
+        id,
+        groqKey.id,
+      );
+      if (
+        disableSummary.disabledWorkflowIds.length ||
+        disableSummary.unscheduledWorkflowIds.length
+      ) {
+        req.log.info(
+          {
+            userId: id,
+            disabledWorkflowIds: disableSummary.disabledWorkflowIds,
+            unscheduledWorkflowIds: disableSummary.unscheduledWorkflowIds,
+            context: 'groq-ai-key-removed',
+          },
+          'disabled workflows after AI key update',
+        );
+      }
       await clearGroqKey(id);
       return { ok: true };
     },

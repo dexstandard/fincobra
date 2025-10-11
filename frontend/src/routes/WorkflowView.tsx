@@ -24,8 +24,11 @@ export default function WorkflowView() {
   const { startMut, stopMut } = useWorkflowActions(id);
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { hasOpenAIKey, hasBinanceKey, hasBybitKey } = usePrerequisites([]);
+  const aiProvider = workflow?.aiProvider ?? 'openai';
+  const { hasOpenAIKey, hasGroqKey, hasBinanceKey, hasBybitKey } =
+    usePrerequisites([], { aiProvider });
   const hasExchangeKey = hasBinanceKey || hasBybitKey;
+  const hasAiKey = aiProvider === 'groq' ? hasGroqKey : hasOpenAIKey;
   const t = useTranslation();
 
   const reviewMut = useMutation({
@@ -112,11 +115,11 @@ export default function WorkflowView() {
                 <span className="hidden md:inline">{t('update_workflow')}</span>
                 <span className="md:hidden">{t('edit')}</span>
               </Button>
-              {hasOpenAIKey && hasExchangeKey && (
+              {hasAiKey && hasExchangeKey && (
                 <Button
                   disabled={startMut.isPending}
                   loading={startMut.isPending}
-                  onClick={() => startMut.mutate()}
+                  onClick={() => startMut.mutate(aiProvider)}
                 >
                   {t('start_workflow')}
                 </Button>

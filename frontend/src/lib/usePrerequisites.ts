@@ -18,6 +18,7 @@ interface UsePrerequisitesOptions {
   includeAiKey?: boolean;
   exchange?: 'binance' | 'bybit';
   mode?: TradingMode;
+  aiProvider?: 'openai' | 'groq';
 }
 
 interface ExchangeKeySummary {
@@ -28,7 +29,12 @@ export function usePrerequisites(
   tokens: string[],
   options?: UsePrerequisitesOptions,
 ) {
-  const { includeAiKey = true, exchange, mode } = options ?? {};
+  const {
+    includeAiKey = true,
+    exchange,
+    mode,
+    aiProvider = 'openai',
+  } = options ?? {};
   const { user } = useUser();
 
   const aiKeyQuery = useQuery<string | null>({
@@ -37,6 +43,21 @@ export function usePrerequisites(
     queryFn: async () => {
       try {
         const res = await api.get(`/users/${user!.id}/ai-key`);
+        return res.data.key as string;
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 404)
+          return null;
+        throw err;
+      }
+    },
+  });
+
+  const groqKeyQuery = useQuery<string | null>({
+    queryKey: ['groq-key', user?.id],
+    enabled: !!user && includeAiKey,
+    queryFn: async () => {
+      try {
+        const res = await api.get(`/users/${user!.id}/groq-key`);
         return res.data.key as string;
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 404)
@@ -94,16 +115,22 @@ export function usePrerequisites(
   const hasOpenAIKey = includeAiKey
     ? !!aiKeyQuery.data || !!sharedAiKeyQuery.data
     : false;
+  const hasGroqKey = includeAiKey ? !!groqKeyQuery.data : false;
   const hasBinanceKey = !!binanceKeyQuery.data;
   const hasBybitKey = !!bybitKeyQuery.data;
   const binanceKeyId = binanceKeyQuery.data?.id ?? null;
   const bybitKeyId = bybitKeyQuery.data?.id ?? null;
 
   const modelsQuery = useQuery<string[]>({
-    queryKey: ['openai-models', user?.id],
-    enabled: !!user && includeAiKey && hasOpenAIKey,
+    queryKey: ['ai-models', user?.id, aiProvider],
+    enabled:
+      !!user &&
+      includeAiKey &&
+      (aiProvider === 'openai' ? hasOpenAIKey : hasGroqKey),
     queryFn: async () => {
-      const res = await api.get(`/users/${user!.id}/models`);
+      const res = await api.get(`/users/${user!.id}/models`, {
+        params: { provider: aiProvider },
+      });
       return res.data.models as string[];
     },
   });
@@ -208,6 +235,7 @@ export function usePrerequisites(
 
   return {
     hasOpenAIKey,
+    hasGroqKey,
     hasBinanceKey,
     hasBybitKey,
     binanceKeyId,
