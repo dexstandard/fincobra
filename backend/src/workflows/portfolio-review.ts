@@ -38,7 +38,19 @@ import * as timeUtils from '../util/time.js';
 const runningWorkflows = new Set<string>();
 
 const PRICE_DIVERGENCE_RETRY_LIMIT = 1;
-const GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS = 60_000;
+const DEFAULT_GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS = 60_000;
+
+function getGroqPriceDivergenceRetryDelayMs(): number {
+  const raw = process.env.GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS;
+  if (!raw) {
+    return DEFAULT_GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS;
+  }
+  return parsed;
+}
 
 export function removeWorkflowFromSchedule(id: string): boolean {
   return runningWorkflows.delete(id);
@@ -181,14 +193,28 @@ interface WorkflowAttemptResult {
   lastAiRequestAt?: number;
 }
 
+type RunWorkflowAttemptFn = (
+  wf: ActivePortfolioWorkflow,
+  runLog: FastifyBaseLogger,
+) => Promise<WorkflowAttemptResult>;
+
+interface ExecuteWorkflowOverrides {
+  runWorkflowAttempt?: RunWorkflowAttemptFn;
+  wait?: (ms: number) => Promise<void>;
+}
+
 export async function executeWorkflow(
   wf: ActivePortfolioWorkflow,
   log: FastifyBaseLogger,
+  overrides?: ExecuteWorkflowOverrides,
 ) {
   const execLogId = randomUUID();
   const baseLog = log.child({ execLogId });
   let lastRetry: WorkflowAttemptResult | null = null;
   let lastAiRequestAt: number | null = null;
+
+  const runAttempt = overrides?.runWorkflowAttempt ?? runWorkflowAttempt;
+  const waitFn = overrides?.wait ?? timeUtils.wait;
 
   let attempt = 0;
   while (attempt <= PRICE_DIVERGENCE_RETRY_LIMIT) {
@@ -205,7 +231,7 @@ export async function executeWorkflow(
     }
 
     const attemptStartedAt = Date.now();
-    const result = await runWorkflowAttempt(wf, attemptLog);
+    const result = await runAttempt(wf, attemptLog);
     if (typeof result.lastAiRequestAt === 'number') {
       lastAiRequestAt = result.lastAiRequestAt;
     }
@@ -222,14 +248,14 @@ export async function executeWorkflow(
         const elapsed = Date.now() - referenceTime;
         const waitMs = Math.max(
           0,
-          GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS - elapsed,
+          getGroqPriceDivergenceRetryDelayMs() - elapsed,
         );
         if (waitMs > 0) {
           attemptLog.info(
             { delayMs: waitMs },
             'delaying price divergence retry for groq rate limits',
           );
-          await timeUtils.wait(waitMs);
+          await waitFn(waitMs);
         }
       }
       lastRetry = result;

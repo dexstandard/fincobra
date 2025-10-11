@@ -30,7 +30,9 @@ vi.mock('../src/util/time.js', () => ({
 import {
   reviewWorkflowPortfolio,
   removeWorkflowFromSchedule,
+  executeWorkflow,
 } from '../src/workflows/portfolio-review.js';
+import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflows.types.js';
 
 vi.mock('../src/util/crypto.js', () => ({
   decrypt: vi.fn().mockReturnValue('key'),
@@ -330,76 +332,80 @@ describe('reviewPortfolio', () => {
     expect(clearCachesSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('waits one minute before retrying price divergence when using groq', async () => {
-    const { workflowId } = await setupWorkflow(['BTC'], false, 'groq');
-    const decision = {
-      orders: [
-        { pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 },
-      ],
-      shortReport: 'retry',
-    };
-    runMainTrader.mockResolvedValue({ mode: 'spot', decision });
-    const firstRunPromise = new Promise<void>((resolve) => {
-      runMainTrader.mockImplementationOnce(async () => {
-        resolve();
-        return decision;
-      });
-    });
-    const firstOrderPromise = new Promise<void>((resolve) => {
-      createDecisionLimitOrders.mockImplementationOnce(async () => {
-        resolve();
-        return {
-          placed: 0,
-          canceled: 1,
-          priceDivergenceCancellations: 1,
-          futuresExecuted: 0,
-          futuresFailed: 0,
-          needsPriceDivergenceRetry: true,
-        };
-      });
-    });
-    createDecisionLimitOrders.mockResolvedValueOnce({
-      placed: 1,
-      canceled: 0,
-      priceDivergenceCancellations: 0,
-      futuresExecuted: 0,
-      futuresFailed: 0,
-      needsPriceDivergenceRetry: false,
-    });
-
-    let resolveWait: (() => void) | undefined;
-    const waitPromise = new Promise<void>((resolve) => {
-      resolveWait = resolve;
-    });
-    waitMock.mockReturnValueOnce(waitPromise);
-
-    try {
-      const log = mockLogger();
-      const reviewPromise = reviewWorkflowPortfolio(log, workflowId);
-
-      await firstRunPromise;
-      await firstOrderPromise;
-      await Promise.resolve();
-
-      const firstCallArgs = runMainTrader.mock.calls[0]?.[0];
-      expect(firstCallArgs?.aiProvider).toBe('groq');
-
-      expect(runMainTrader).toHaveBeenCalledTimes(1);
-
-      resolveWait?.();
-      await reviewPromise;
-
-      expect(waitMock).toHaveBeenCalledTimes(1);
-      const [delayMs] = waitMock.mock.calls[0] ?? [];
-      expect(delayMs).toBeGreaterThanOrEqual(59_900);
-      expect(delayMs).toBeLessThanOrEqual(60_000);
-      expect(runMainTrader).toHaveBeenCalledTimes(2);
-      expect(createDecisionLimitOrders).toHaveBeenCalledTimes(2);
-    } finally {
+  it(
+    'waits configured delay before retrying price divergence when using groq',
+    async () => {
+      const originalGroqDelay =
+        process.env.GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS;
+      const configuredDelayMs = 25;
+      process.env.GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS = String(
+        configuredDelayMs,
+      );
       waitMock.mockReset();
       waitMock.mockResolvedValue(undefined);
-    }
-  });
+
+      const workflow: ActivePortfolioWorkflow = {
+        id: 'wf-1',
+        userId: 'user-1',
+        model: 'gpt',
+        aiProvider: 'groq',
+        cashToken: 'USDT',
+        tokens: [],
+        risk: 'low',
+        reviewInterval: '1h',
+        agentInstructions: 'inst',
+        aiApiKeyId: 'ai',
+        aiApiKeyEnc: 'enc',
+        exchangeApiKeyId: null,
+        manualRebalance: false,
+        useEarn: false,
+        startBalance: null,
+        createdAt: new Date().toISOString(),
+        portfolioId: 'wf-1',
+        mode: 'spot',
+        futuresDefaultLeverage: null,
+        futuresMarginMode: null,
+      };
+
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+      const runAttempt = vi
+        .fn<
+          (
+            wf: ActivePortfolioWorkflow,
+            logger: FastifyBaseLogger,
+          ) =>
+            Promise<
+              { kind: 'retry'; lastAiRequestAt: number } | { kind: 'success' }
+            >
+        >()
+        .mockResolvedValueOnce({ kind: 'retry', lastAiRequestAt: 0 })
+        .mockResolvedValueOnce({ kind: 'success' });
+
+      try {
+        const log = mockLogger();
+        await executeWorkflow(workflow, log, {
+          runWorkflowAttempt: runAttempt,
+          wait: waitMock,
+        });
+
+        expect(runAttempt).toHaveBeenCalledTimes(2);
+        expect(waitMock).toHaveBeenCalledTimes(1);
+        const [delayMs] = waitMock.mock.calls[0] ?? [];
+        expect(delayMs).toBe(configuredDelayMs);
+      } finally {
+        waitMock.mockReset();
+        waitMock.mockResolvedValue(undefined);
+        vi.useRealTimers();
+        if (originalGroqDelay) {
+          process.env.GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS = originalGroqDelay;
+        } else {
+          delete process.env.GROQ_PRICE_DIVERGENCE_RETRY_DELAY_MS;
+        }
+      }
+    },
+    10_000,
+  );
 
   it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
     const { workflowId: agent3 } = await setupWorkflow(['BTC'], true);
