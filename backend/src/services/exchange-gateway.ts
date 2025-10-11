@@ -9,6 +9,7 @@ import {
 } from './binance-client.js';
 import {
   openFuturesPosition as openBinanceFuturesPosition,
+  setFuturesMarginMode as setBinanceFuturesMarginMode,
   setFuturesLeverage as setBinanceFuturesLeverage,
   setFuturesStopLoss as setBinanceFuturesStopLoss,
   setFuturesTakeProfit as setBinanceFuturesTakeProfit,
@@ -16,6 +17,7 @@ import {
 import {
   fetchFuturesWalletBalance,
   openBybitFuturesPosition,
+  setBybitFuturesMarginMode,
   setBybitFuturesLeverage,
   setBybitFuturesStopLoss,
   setBybitFuturesTakeProfit,
@@ -116,6 +118,13 @@ const binanceGateway: ExchangeGatewaySpecification = {
     },
   },
   futures: {
+    setMarginMode(userId: string, request) {
+      return setBinanceFuturesMarginMode(
+        userId,
+        request.symbol,
+        request.marginMode,
+      );
+    },
     setLeverage(userId: string, request) {
       return setBinanceFuturesLeverage(userId, request.symbol, request.leverage);
     },
@@ -159,6 +168,13 @@ const bybitGateway: ExchangeGatewaySpecification = {
     async fetchWallet(userId: string) {
       const wallet = await fetchFuturesWalletBalance(userId);
       return mapBybitWalletBalance(wallet);
+    },
+    setMarginMode(userId: string, request) {
+      return setBybitFuturesMarginMode(userId, {
+        symbol: request.symbol,
+        marginMode: request.marginMode,
+        leverage: request.leverage ?? null,
+      });
     },
     setLeverage(userId: string, request) {
       return setBybitFuturesLeverage(userId, request.symbol, request.leverage);

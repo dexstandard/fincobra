@@ -4,6 +4,7 @@ import { mockLogger } from './helpers.js';
 import { insertUser } from './repos/users.js';
 import { insertPortfolioWorkflow } from './repos/portfolio-workflows.js';
 import { setAiKey, setGroqKey } from '../src/repos/ai-api-key.js';
+import { setBybitKey } from '../src/repos/exchange-api-keys.js';
 import { getPortfolioReviewRawPromptsResponses } from './repos/review-raw-log.js';
 import { getRecentReviewResults } from '../src/repos/review-result.js';
 import * as mainTrader from '../src/agents/main-trader.js';
@@ -179,20 +180,24 @@ vi.mock('../src/services/indicators.js', () => ({
   clearMarketOverviewCache: vi.fn(),
 }));
 
-const createDecisionLimitOrders = vi.hoisted(() =>
+const executeSpotDecision = vi.hoisted(() =>
   vi
     .fn()
     .mockResolvedValue({
       placed: 0,
       canceled: 0,
       priceDivergenceCancellations: 0,
-      futuresExecuted: 0,
-      futuresFailed: 0,
       needsPriceDivergenceRetry: false,
     }),
 );
+const executeFuturesDecision = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ executed: 0, failed: 0, skipped: 0 }),
+);
 vi.mock('../src/services/rebalance.js', () => ({
-  createDecisionLimitOrders,
+  executeSpotDecision,
+}));
+vi.mock('../src/services/futures-execution.js', () => ({
+  executeFuturesDecision,
 }));
 
 beforeEach(() => {
@@ -260,7 +265,7 @@ describe('reviewPortfolio', () => {
     expect(res.shortReport).toBe('ok');
   });
 
-  it('calls createDecisionLimitOrders when orders requested', async () => {
+  it('calls executeSpotDecision when orders requested', async () => {
     const { userId: user2, workflowId: agent2 } = await setupWorkflow([
       'BTC',
       'ETH',
@@ -275,10 +280,60 @@ describe('reviewPortfolio', () => {
     runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, agent2);
-    expect(createDecisionLimitOrders).toHaveBeenCalledTimes(1);
-    const args = createDecisionLimitOrders.mock.calls[0][0];
+    expect(executeSpotDecision).toHaveBeenCalledTimes(1);
+    const args = executeSpotDecision.mock.calls[0][0];
     expect(args.userId).toBe(user2);
     expect(args.orders).toHaveLength(2);
+  });
+
+  it('routes futures actions to the futures executor', async () => {
+    const userId = await insertUser();
+    await setAiKey({ userId, apiKeyEnc: 'enc' });
+    await setBybitKey({ userId, apiKeyEnc: 'key', apiSecretEnc: 'secret' });
+    const workflow = await insertPortfolioWorkflow({
+      userId,
+      model: 'gpt',
+      status: 'active',
+      startBalance: null,
+      cashToken: 'USDT',
+      tokens: [{ token: 'BTC', minAllocation: 50 }],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'inst',
+      manualRebalance: false,
+      useEarn: false,
+      mode: 'futures',
+      futuresDefaultLeverage: 3,
+      futuresMarginMode: 'cross',
+    });
+    const promptSpy = vi
+      .spyOn(mainTrader, 'collectPromptData')
+      .mockResolvedValueOnce({ mode: 'futures', prompt: { foo: 'bar' } });
+    const futuresDecision = {
+      actions: [
+        {
+          symbol: 'BTCUSDT',
+          positionSide: 'LONG',
+          action: 'OPEN',
+          type: 'MARKET',
+          quantity: 0.5,
+        },
+      ],
+      shortReport: 'futures',
+    };
+    runMainTrader.mockResolvedValue({
+      mode: 'futures',
+      decision: futuresDecision,
+    });
+
+    const log = mockLogger();
+    await reviewWorkflowPortfolio(log, workflow.id);
+    expect(executeFuturesDecision).toHaveBeenCalledTimes(1);
+    const args = executeFuturesDecision.mock.calls[0][0];
+    expect(args.userId).toBe(userId);
+    expect(args.exchange).toBe('bybit');
+    expect(args.actions).toEqual(futuresDecision.actions);
+    promptSpy.mockRestore();
   });
 
   it('treats missing orders as a hold decision', async () => {
@@ -287,7 +342,7 @@ describe('reviewPortfolio', () => {
     runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, workflowId);
-    expect(createDecisionLimitOrders).not.toHaveBeenCalled();
+    expect(executeSpotDecision).not.toHaveBeenCalled();
     const [result] = await getRecentReviewResults(workflowId, 1);
     expect(result.rebalance).toBe(false);
     expect(result.shortReport).toBe('holding pattern');
@@ -305,30 +360,26 @@ describe('reviewPortfolio', () => {
     runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const clearCachesSpy = vi.spyOn(mainTrader, 'clearMainTraderCaches');
     const firstOrderPromise = new Promise<void>((resolve) => {
-      createDecisionLimitOrders.mockImplementationOnce(async () => {
+      executeSpotDecision.mockImplementationOnce(async () => {
         resolve();
         return {
           placed: 0,
           canceled: 1,
           priceDivergenceCancellations: 1,
-          futuresExecuted: 0,
-          futuresFailed: 0,
           needsPriceDivergenceRetry: true,
         };
       });
     });
-    createDecisionLimitOrders.mockResolvedValueOnce({
+    executeSpotDecision.mockResolvedValueOnce({
       placed: 1,
       canceled: 0,
       priceDivergenceCancellations: 0,
-      futuresExecuted: 0,
-      futuresFailed: 0,
       needsPriceDivergenceRetry: false,
     });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, workflowId);
     expect(runMainTrader).toHaveBeenCalledTimes(2);
-    expect(createDecisionLimitOrders).toHaveBeenCalledTimes(2);
+    expect(executeSpotDecision).toHaveBeenCalledTimes(2);
     expect(clearCachesSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -407,7 +458,7 @@ describe('reviewPortfolio', () => {
     10_000,
   );
 
-  it('skips createDecisionLimitOrders when manualRebalance is enabled', async () => {
+  it('skips executeSpotDecision when manualRebalance is enabled', async () => {
     const { workflowId: agent3 } = await setupWorkflow(['BTC'], true);
     const decision = {
       orders: [{ pair: 'BTCUSDT', token: 'BTC', side: 'BUY', qty: 1 }],
@@ -416,7 +467,7 @@ describe('reviewPortfolio', () => {
     runMainTrader.mockResolvedValue({ mode: 'spot', decision });
     const log = mockLogger();
     await reviewWorkflowPortfolio(log, agent3);
-    expect(createDecisionLimitOrders).not.toHaveBeenCalled();
+    expect(executeSpotDecision).not.toHaveBeenCalled();
   });
 
   it('records error when pair is invalid', async () => {

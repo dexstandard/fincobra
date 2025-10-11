@@ -4,10 +4,10 @@
 The current "portfolio workflow" automation treats spot and futures trades as variations of the same review loop. The goal of this document is to outline how the workflow operates today, highlight the coupling problems, and specify concrete engineering tasks to fully separate spot and futures trading experiences.
 
 ## Current Implementation
-- **Single review loop** – `reviewPortfolios` loads active workflows, builds a prompt with `collectPromptData`, sends it to `main-trader`, and executes the returned orders in `createDecisionLimitOrders`.【F:backend/src/workflows/portfolio-review.ts†L1-L337】【F:backend/src/services/rebalance.ts†L1-L188】
+- **Single review loop** – `reviewPortfolios` loads active workflows, builds a prompt with `collectPromptData`, sends it to `main-trader`, and delegates execution to `executeSpotDecision` or `executeFuturesDecision` based on the workflow mode.【F:backend/src/workflows/portfolio-review.ts†L360-L447】【F:backend/src/services/rebalance.ts†L14-L205】【F:backend/src/services/futures-execution.ts†L16-L277】
 - **Shared prompt** – `collectPromptData` queries Binance spot account balances, token prices, and builds one `RebalancePrompt` object. All market datasets (routes, policy floors, news, etc.) are spot-centric.【F:backend/src/agents/main-trader.ts†L406-L721】
 - **Shared response schema** – `MainTraderDecision` accepts an array of limit orders where each order may optionally include a `futures` block. Spot and futures intents therefore share validation, limit-order assumptions, and execution paths.【F:backend/src/agents/main-trader.types.ts†L90-L148】
-- **Unified executor** – `createDecisionLimitOrders` records every decision in `limit_order` and first tries to run `executeFuturesOrder` when the `futures` block is present, otherwise it falls back to Binance spot order placement. Futures actions are forced through the same min-notional and price-drift logic designed for spot limit orders.【F:backend/src/services/rebalance.ts†L189-L398】
+- **Dedicated executors** – `executeSpotDecision` records spot decisions in `limit_order`, while `executeFuturesDecision` orchestrates leverage, entry, and protective orders before persisting outcomes in `futures_order`.【F:backend/src/services/rebalance.ts†L14-L205】【F:backend/src/services/futures-execution.ts†L16-L277】【F:backend/src/repos/futures-orders.ts†L1-L37】
 
 ## Pain Points
 1. **Prompt mismatch** – The prompt never includes futures wallet balances, open positions, funding data, leverage constraints, or risk metrics, so the agent does not have the context required for futures risk management.【F:backend/src/agents/main-trader.ts†L406-L721】
@@ -53,25 +53,25 @@ The current "portfolio workflow" automation treats spot and futures trades as va
    - Ensure prompts/responses are stored separately or tagged to simplify downstream analytics.
 
 ## Task Breakdown
-1. **Schema & Repository updates**
+1. ✅ **Schema & Repository updates**
    - Create migration adding `portfolio_workflow.mode` (enum text) and optional futures config fields (e.g., default leverage, margin mode).
    - Update `portfolio-workflows` repository and tests to read/write the new mode.
 
-2. **API & Frontend wiring**
+2. ✅ **API & Frontend wiring**
    - Extend workflow create/update APIs to validate the new mode.
    - Update frontend forms to let users choose Spot vs Futures with contextual help and render mode-specific history tables (spot limit orders vs. futures trades).
 
-3. **Agent refactor**
+3. ✅ **Agent refactor**
    - Extract existing spot-specific prompt/logic into `agents/spot-trader`.
    - Build `agents/futures-trader` with new prompt schema and tailored instructions.
    - Adjust AI invocation paths to select the right agent based on workflow mode.
 
-4. **Prompt data services**
+4. ✅ **Prompt data services**
    - Implement spot prompt builder wrapper.
    - Implement futures prompt builder leveraging exchange gateways for wallet balances, open positions, funding, and mark prices.
    - Add caching/ batching strategies for the new data sources.
 
-5. **Execution services**
+5. ✅ **Execution services**
    - Replace `createDecisionLimitOrders` with `executeSpotDecision` (spot only).
    - Build `executeFuturesDecision` with dedicated persistence (new repo or extended schema) and integration tests against mock gateways.
 

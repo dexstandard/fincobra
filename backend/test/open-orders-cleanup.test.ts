@@ -139,12 +139,10 @@ vi.mock('../src/services/indicators.js', () => ({
 }));
 
 vi.mock('../src/services/rebalance.js', () => ({
-  createDecisionLimitOrders: vi.fn().mockResolvedValue({
+  executeSpotDecision: vi.fn().mockResolvedValue({
     placed: 0,
     canceled: 0,
     priceDivergenceCancellations: 0,
-    futuresExecuted: 0,
-    futuresFailed: 0,
     needsPriceDivergenceRetry: false,
   }),
 }));

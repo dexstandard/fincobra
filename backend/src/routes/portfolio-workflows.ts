@@ -36,7 +36,7 @@ import {
 } from '../services/portfolio-workflows.js';
 import { getLimitOrdersByReviewResult } from '../repos/limit-orders.js';
 import { LimitOrderStatus } from '../repos/limit-orders.types.js';
-import { createDecisionLimitOrders } from '../services/rebalance.js';
+import { executeSpotDecision } from '../services/rebalance.js';
 import { getRebalanceInfo } from '../repos/review-result.js';
 import { getPromptForReviewResult } from '../repos/review-raw-log.js';
 import { cancelLimitOrder } from '../services/limit-order.js';
@@ -704,7 +704,7 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
       if ('code' in ensuredKeys)
         return reply.code(ensuredKeys.code).send(ensuredKeys.body);
       const defaultExchange = ensuredKeys.exchangeProvider ?? undefined;
-      await createDecisionLimitOrders({
+      await executeSpotDecision({
         userId,
         orders: [updatedOrder],
         reviewResultId: logId,

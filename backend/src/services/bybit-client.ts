@@ -80,6 +80,12 @@ interface FuturesStopParams {
   positionIdx?: 0 | 1 | 2;
 }
 
+interface FuturesMarginModeParams {
+  symbol: string;
+  marginMode: 'cross' | 'isolated';
+  leverage: number | null;
+}
+
 const FUTURES_CATEGORY = 'linear';
 
 function signPayload(secret: string, payload: string): string {
@@ -338,6 +344,36 @@ export async function setBybitFuturesLeverage(
       'failed to set Bybit futures leverage',
     ),
   );
+}
+
+export async function setBybitFuturesMarginMode(
+  userId: string,
+  params: FuturesMarginModeParams,
+) {
+  return withBybitUserCreds(userId, async (creds) => {
+    const tradeMode = params.marginMode === 'isolated' ? 1 : 0;
+    const body: Record<string, unknown> = {
+      category: FUTURES_CATEGORY,
+      symbol: params.symbol.toUpperCase(),
+      tradeMode,
+    };
+
+    if (params.marginMode === 'isolated') {
+      const leverage = params.leverage ?? 1;
+      body.buyLeverage = String(leverage);
+      body.sellLeverage = String(leverage);
+    }
+
+    return requestOrThrow<Record<string, unknown>>(
+      creds,
+      {
+        method: 'POST',
+        path: '/v5/position/switch-isolated',
+        body,
+      },
+      'failed to set Bybit futures margin mode',
+    );
+  });
 }
 
 export async function openBybitFuturesPosition(
