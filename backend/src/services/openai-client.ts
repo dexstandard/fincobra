@@ -53,7 +53,7 @@ export async function callAi(
   webSearch = false,
 ): Promise<string> {
   const tools = webSearch
-    ? ([{ type: 'web_search_preview' }] as ResponseCreateParams['tools'])
+    ? ([{ type: 'web_search' }] as ResponseCreateParams['tools'])
     : undefined;
   const body: ResponseCreateParams = {
     model,
