@@ -1,5 +1,9 @@
 import type { AiApiProvider } from './ai-api-key.types.js';
 
+export type PortfolioWorkflowMode = 'spot' | 'futures';
+
+export type PortfolioWorkflowFuturesMarginMode = 'cross' | 'isolated';
+
 export interface PortfolioWorkflowToken {
   token: string;
   minAllocation: number;
@@ -20,6 +24,9 @@ export interface PortfolioWorkflow {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  mode: PortfolioWorkflowMode;
+  futuresDefaultLeverage: number | null;
+  futuresMarginMode: PortfolioWorkflowFuturesMarginMode | null;
   aiApiKeyId: string | null;
   exchangeApiKeyId: string | null;
   ownerEmailEnc: string | null;
@@ -39,6 +46,9 @@ export interface PortfolioWorkflowInsert {
   manualRebalance: boolean;
   useEarn: boolean;
   exchangeKeyId: string | null;
+  mode?: PortfolioWorkflowMode;
+  futuresDefaultLeverage?: number | null;
+  futuresMarginMode?: PortfolioWorkflowFuturesMarginMode | null;
 }
 
 export interface PortfolioWorkflowUpdate {
@@ -55,6 +65,9 @@ export interface PortfolioWorkflowUpdate {
   manualRebalance: boolean;
   useEarn: boolean;
   exchangeKeyId: string | null;
+  mode?: PortfolioWorkflowMode;
+  futuresDefaultLeverage?: number | null;
+  futuresMarginMode?: PortfolioWorkflowFuturesMarginMode | null;
 }
 
 export interface PortfolioWorkflowInactiveSearch {
@@ -68,6 +81,7 @@ export interface PortfolioWorkflowInactiveSearch {
   agentInstructions: string;
   manualRebalance: boolean;
   useEarn: boolean;
+  mode: PortfolioWorkflowMode;
 }
 
 export interface PortfolioWorkflowUserApiKeys {
@@ -99,4 +113,7 @@ export interface ActivePortfolioWorkflow {
   startBalance: number | null;
   createdAt: string;
   portfolioId: string;
+  mode: PortfolioWorkflowMode;
+  futuresDefaultLeverage: number | null;
+  futuresMarginMode: PortfolioWorkflowFuturesMarginMode | null;
 }

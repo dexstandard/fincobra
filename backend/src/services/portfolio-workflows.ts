@@ -151,6 +151,7 @@ async function validateWorkflowInput(
         agentInstructions: body.agentInstructions,
         manualRebalance: body.manualRebalance,
         useEarn: body.useEarn,
+        mode: body.mode,
       },
       id,
     );

@@ -88,6 +88,20 @@ const workflowUpsertSchema = z
       .union([z.string().regex(/^\d+$/), z.null()])
       .optional()
       .transform((value) => (value === undefined ? null : value)),
+    mode: z
+      .enum(['spot', 'futures'])
+      .optional()
+      .transform((value) => value ?? 'spot'),
+    futuresDefaultLeverage: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .transform((value) => (value === undefined ? null : value)),
+    futuresMarginMode: z
+      .enum(['cross', 'isolated'])
+      .optional()
+      .transform((value) => (value === undefined ? null : value)),
   })
   .strip();
 
@@ -430,6 +444,9 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
         exchangeKeyId: validated.exchangeKeyId,
+        mode: validated.mode,
+        futuresDefaultLeverage: validated.futuresDefaultLeverage,
+        futuresMarginMode: validated.futuresMarginMode,
       });
       if (status === PortfolioWorkflowStatus.Active)
         reviewWorkflowPortfolio(req.log, row.id).catch((err) =>
@@ -797,6 +814,9 @@ export default async function portfolioWorkflowRoutes(app: FastifyInstance) {
         manualRebalance: validated.manualRebalance,
         useEarn: validated.useEarn,
         exchangeKeyId: validated.exchangeKeyId,
+        mode: validated.mode,
+        futuresDefaultLeverage: validated.futuresDefaultLeverage,
+        futuresMarginMode: validated.futuresMarginMode,
       });
       const row = (await getPortfolioWorkflow(id))!;
       if (status === PortfolioWorkflowStatus.Active)

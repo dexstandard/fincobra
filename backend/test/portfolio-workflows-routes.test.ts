@@ -147,6 +147,9 @@ describe('portfolio workflow routes', () => {
       ...rest,
       startBalanceUsd: 100,
     });
+    expect(res.json().mode).toBe('spot');
+    expect(res.json().futuresDefaultLeverage).toBeNull();
+    expect(res.json().futuresMarginMode).toBeNull();
     expect(typeof res.json().aiApiKeyId).toBe('string');
     expect(typeof res.json().exchangeApiKeyId).toBe('string');
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -163,6 +166,9 @@ describe('portfolio workflow routes', () => {
       ...rest,
       startBalanceUsd: 100,
     });
+    expect(res.json().mode).toBe('spot');
+    expect(res.json().futuresDefaultLeverage).toBeNull();
+    expect(res.json().futuresMarginMode).toBeNull();
     expect(typeof res.json().aiApiKeyId).toBe('string');
     expect(typeof res.json().exchangeApiKeyId).toBe('string');
 
@@ -194,6 +200,7 @@ describe('portfolio workflow routes', () => {
     expect(res.statusCode).toBe(200);
     const { cash: cashUpd, ...restUpd } = update;
     expect(res.json()).toMatchObject({ id, cashToken: cashUpd, ...restUpd });
+    expect(res.json().mode).toBe('spot');
 
     res = await app.inject({
       method: 'GET',
@@ -266,6 +273,41 @@ describe('portfolio workflow routes', () => {
 
     await app.close();
     (globalThis as any).fetch = originalFetch;
+  });
+
+  it('persists futures mode configuration', async () => {
+    const app = await buildServer();
+    const userId = await insertUser('futures-mode-user');
+
+    const payload = {
+      model: 'gpt-5',
+      tokens: [
+        { token: 'BTC', minAllocation: 10 },
+        { token: 'ETH', minAllocation: 20 },
+      ],
+      risk: 'low',
+      reviewInterval: '1h',
+      agentInstructions: 'prompt',
+      cash: 'USDT',
+      status: 'inactive',
+      mode: 'futures' as const,
+      futuresDefaultLeverage: 15,
+      futuresMarginMode: 'cross' as const,
+    };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/portfolio-workflows',
+      cookies: authCookies(userId),
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().mode).toBe('futures');
+    expect(res.json().futuresDefaultLeverage).toBe(15);
+    expect(res.json().futuresMarginMode).toBe('cross');
+
+    await app.close();
   });
 
   it('persists bybit exchange selection when starting a workflow', async () => {

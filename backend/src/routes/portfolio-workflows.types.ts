@@ -1,3 +1,8 @@
+import type {
+  PortfolioWorkflowFuturesMarginMode,
+  PortfolioWorkflowMode,
+} from '../repos/portfolio-workflows.types.js';
+
 export interface PortfolioWorkflowTokenInput {
   token: string;
   minAllocation: number;
@@ -15,4 +20,7 @@ export interface PortfolioWorkflowInput {
   useEarn: boolean;
   status: 'active' | 'inactive' | 'retired';
   exchangeKeyId: string | null;
+  mode: PortfolioWorkflowMode;
+  futuresDefaultLeverage: number | null;
+  futuresMarginMode: PortfolioWorkflowFuturesMarginMode | null;
 }
