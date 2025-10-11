@@ -2,15 +2,17 @@ import TokenDisplay from './TokenDisplay';
 import { useUser } from '../lib/useUser';
 import type { BalanceInfo } from '../lib/usePrerequisites';
 import { useTranslation } from '../lib/i18n';
+import type { TradingMode } from '../lib/exchange.types';
 
 const SHOW_EARN_FEATURE = false;
 
 interface Props {
   balances: BalanceInfo[];
   exchange: 'binance' | 'bybit' | null;
+  mode?: TradingMode | null;
 }
 
-export default function WalletBalances({ balances, exchange }: Props) {
+export default function WalletBalances({ balances, exchange, mode }: Props) {
   const { user } = useUser();
   const t = useTranslation();
 
@@ -20,7 +22,9 @@ export default function WalletBalances({ balances, exchange }: Props) {
 
   const title =
     exchange === 'binance'
-      ? t('binance_balances')
+      ? mode === 'futures'
+        ? t('binance_futures_balances')
+        : t('binance_balances')
       : t('bybit_futures_balances');
 
   return (

@@ -3,7 +3,9 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import api from './axios';
 import { useUser } from './useUser';
 import { useBinanceAccount } from './useBinanceAccount';
+import { useBinanceFuturesBalance } from './useBinanceFuturesBalance';
 import { useBybitFuturesBalance } from './useBybitFuturesBalance';
+import type { ExchangeAccountBalance } from './exchange-accounts.types';
 import type { TradingMode } from './exchange.types';
 
 export interface BalanceInfo {
@@ -144,37 +146,59 @@ export function usePrerequisites(
         : undefined);
   const preferBinance = preferredExchange === 'binance';
   const preferBybit = preferredExchange === 'bybit';
+  const isFuturesMode = mode === 'futures';
 
-  const shouldLoadBinanceAccount =
-    hasBinanceKey && (!preferBybit || !hasBybitKey);
+  const shouldLoadBinanceFuturesAccount =
+    hasBinanceKey &&
+    isFuturesMode &&
+    (preferBinance || !hasBybitKey);
+
+  const shouldLoadBinanceSpotAccount =
+    hasBinanceKey &&
+    !isFuturesMode &&
+    (!preferBybit || !hasBybitKey);
+
   const shouldLoadBybitAccount =
     hasBybitKey && (preferBybit || (!preferBinance && !hasBinanceKey));
 
-  const accountQuery = useBinanceAccount({
-    enabled: shouldLoadBinanceAccount,
+  const binanceSpotAccountQuery = useBinanceAccount({
+    enabled: shouldLoadBinanceSpotAccount,
+  });
+
+  const binanceFuturesAccountQuery = useBinanceFuturesBalance({
+    enabled: shouldLoadBinanceFuturesAccount,
   });
 
   const bybitAccountQuery = useBybitFuturesBalance({
     enabled: shouldLoadBybitAccount,
   });
 
-  const activeExchange = shouldLoadBinanceAccount
-    ? 'binance'
-    : shouldLoadBybitAccount
-      ? 'bybit'
-      : null;
+  let activeExchange: 'binance' | 'bybit' | null = null;
+  let activeTradingMode: TradingMode | null = null;
+  let accountBalances = [] as ExchangeAccountBalance[];
+  let isAccountLoading = false;
 
-  const accountBalances =
-    activeExchange === 'binance'
-      ? accountQuery.data?.balances ?? []
-      : activeExchange === 'bybit'
-        ? bybitAccountQuery.data?.balances ?? []
-        : [];
+  if (shouldLoadBinanceFuturesAccount) {
+    activeExchange = 'binance';
+    activeTradingMode = 'futures';
+    accountBalances = binanceFuturesAccountQuery.data?.balances ?? [];
+    isAccountLoading = binanceFuturesAccountQuery.isLoading;
+  } else if (shouldLoadBinanceSpotAccount) {
+    activeExchange = 'binance';
+    activeTradingMode = 'spot';
+    accountBalances = binanceSpotAccountQuery.data?.balances ?? [];
+    isAccountLoading = binanceSpotAccountQuery.isLoading;
+  } else if (shouldLoadBybitAccount) {
+    activeExchange = 'bybit';
+    activeTradingMode = 'futures';
+    accountBalances = bybitAccountQuery.data?.balances ?? [];
+    isAccountLoading = bybitAccountQuery.isLoading;
+  }
 
   const earnBalanceQueries = useQueries({
     queries: tokens.map((token) => ({
       queryKey: ['binance-earn-balance', user?.id, token.toUpperCase()],
-      enabled: !!user && shouldLoadBinanceAccount,
+      enabled: !!user && shouldLoadBinanceSpotAccount,
       queryFn: async () => {
         try {
           const res = await api.get(
@@ -216,8 +240,7 @@ export function usePrerequisites(
     return {
       token,
       isLoading:
-        (shouldLoadBinanceAccount ? accountQuery.isLoading : false) ||
-        (shouldLoadBybitAccount ? bybitAccountQuery.isLoading : false) ||
+        isAccountLoading ||
         (earnBalanceQueries[idx]?.isLoading ?? false) ||
         (priceQueries[idx]?.isLoading ?? false),
       walletBalance: wallet,
@@ -225,13 +248,6 @@ export function usePrerequisites(
       usdValue: (wallet + earn) * price,
     };
   });
-
-  const activeTradingMode: TradingMode | null =
-    activeExchange === 'bybit'
-      ? 'futures'
-      : activeExchange === 'binance'
-        ? 'spot'
-        : null;
 
   return {
     hasOpenAIKey,
@@ -243,12 +259,7 @@ export function usePrerequisites(
     models: includeAiKey ? (modelsQuery.data ?? []) : [],
     balances,
     accountBalances,
-    isAccountLoading:
-      activeExchange === 'binance'
-        ? accountQuery.isLoading
-        : activeExchange === 'bybit'
-          ? bybitAccountQuery.isLoading
-          : false,
+    isAccountLoading,
     activeExchange,
     activeTradingMode,
   } as const;

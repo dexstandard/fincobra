@@ -5,6 +5,7 @@ import { getBinanceKey } from '../repos/exchange-api-keys.js';
 import { decryptKey } from '../util/crypto.js';
 import type {
   BinanceAccount,
+  BinanceFuturesBalanceEntry,
   BinanceKeyVerificationResult,
   BinanceUserCreds,
   Kline,
@@ -259,6 +260,24 @@ export async function fetchAccount(id: string): Promise<BinanceAccount | null> {
     );
     if (!accountRes.ok) throw new Error('failed to fetch account');
     return (await accountRes.json()) as BinanceAccount;
+  });
+}
+
+export async function fetchFuturesBalances(
+  id: string,
+): Promise<BinanceFuturesBalanceEntry[] | null> {
+  return withUserCreds(id, async (creds) => {
+    const params = createTimestampedParams();
+    appendSignature(creds.secret, params);
+    const res = await fetch(
+      `https://fapi.binance.com/fapi/v2/balance?${params.toString()}`,
+      { headers: { 'X-MBX-APIKEY': creds.key } },
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`failed to fetch futures balance: ${res.status} ${body}`);
+    }
+    return (await res.json()) as BinanceFuturesBalanceEntry[];
   });
 }
 
