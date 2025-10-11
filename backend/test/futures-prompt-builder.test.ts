@@ -4,9 +4,11 @@ import { buildFuturesPrompt, clearFuturesPromptCaches } from '../src/services/pr
 import type { ActivePortfolioWorkflow } from '../src/repos/portfolio-workflows.types.js';
 import { mockLogger } from './helpers.js';
 
-const fetchWalletMock = vi.fn();
-const fetchTickerMock = vi.fn();
-const getRecentReviewResultsMock = vi.fn();
+const { fetchWalletMock, fetchTickerMock, getRecentReviewResultsMock } = vi.hoisted(() => ({
+  fetchWalletMock: vi.fn(),
+  fetchTickerMock: vi.fn(),
+  getRecentReviewResultsMock: vi.fn(),
+}));
 
 vi.mock('../src/services/exchange-gateway.js', () => ({
   getExchangeGateway: vi.fn().mockReturnValue({
