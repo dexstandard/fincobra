@@ -6,6 +6,7 @@ import App from './App';
 import queryClient from './lib/queryClient';
 import { UserProvider } from './lib/UserProvider';
 import { ToastProvider } from './components/Toast';
+import registerServiceWorker from './lib/registerServiceWorker';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -24,7 +25,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
+    registerServiceWorker().catch((err: Error) => {
       console.error('Service worker registration failed', err);
     });
   });
