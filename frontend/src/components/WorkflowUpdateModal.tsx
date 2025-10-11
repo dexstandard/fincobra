@@ -65,6 +65,11 @@ export default function WorkflowUpdateModal({
   const [aiProvider, setAiProvider] = useState<'openai' | 'groq'>(
     workflow.aiProvider ?? 'openai',
   );
+  const handleAiProviderChange = (provider: string) => {
+    if (provider === 'openai' || provider === 'groq') {
+      setAiProvider(provider);
+    }
+  };
   const [tradingMode, setTradingMode] = useState<TradingMode>('spot');
   const desiredExchange: 'binance' | 'bybit' =
     tradingMode === 'futures' ? 'bybit' : 'binance';
@@ -228,7 +233,7 @@ export default function WorkflowUpdateModal({
               type="ai"
               label={t('ai_provider')}
               value={aiProvider}
-              onChange={setAiProvider}
+              onChange={handleAiProviderChange}
             />
             {hasAiKey && (models.length || workflow.model) && (
               <div className="mt-2">
